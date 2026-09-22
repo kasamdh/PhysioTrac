@@ -345,8 +345,14 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(t => t.PatientId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(t => t.Claim).WithMany(c => c.Transactions)
                 .HasForeignKey(t => t.ClaimId).OnDelete(DeleteBehavior.SetNull);
+            // Restrict, not SetNull: a second cascading/nulling path to Claims
+            // from the same table triggers SQL Server error 1785 ("may cause
+            // cycles or multiple cascade paths") alongside the ClaimId FK
+            // above. Restrict is also the more correct rule here — a claim
+            // that is the target of a balance transfer shouldn't be
+            // deletable out from under that transfer record anyway.
             e.HasOne(t => t.TransferredToClaim).WithMany()
-                .HasForeignKey(t => t.TransferredToClaimId).OnDelete(DeleteBehavior.SetNull);
+                .HasForeignKey(t => t.TransferredToClaimId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ClaimDenial>(e =>

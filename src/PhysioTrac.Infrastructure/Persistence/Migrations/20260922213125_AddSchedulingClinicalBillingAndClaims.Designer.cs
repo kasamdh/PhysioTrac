@@ -12,8 +12,8 @@ using PhysioTrac.Infrastructure.Persistence;
 namespace PhysioTrac.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PhysioTracDbContext))]
-    [Migration("20260922164456_AddBillingFoundation")]
-    partial class AddBillingFoundation
+    [Migration("20260922213125_AddSchedulingClinicalBillingAndClaims")]
+    partial class AddSchedulingClinicalBillingAndClaims
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -436,6 +436,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)");
 
+                    b.Property<Guid?>("ClaimId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("ClinicalNoteId")
                         .HasColumnType("uniqueidentifier");
 
@@ -479,6 +482,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
 
+                    b.Property<Guid?>("SuperbillId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("Units")
                         .HasColumnType("int");
 
@@ -490,15 +496,212 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ClaimId");
+
                     b.HasIndex("ClinicalNoteId");
 
                     b.HasIndex("LocationId");
 
                     b.HasIndex("PatientId");
 
+                    b.HasIndex("SuperbillId");
+
                     b.HasIndex("OrganizationId", "PatientId", "ServiceDate");
 
                     b.ToTable("Charges");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Claim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ClearinghouseClaimId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DiagnosisCodeListJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PatientInsuranceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PayerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("PatientInsuranceId");
+
+                    b.HasIndex("PayerId");
+
+                    b.HasIndex("OrganizationId", "PatientId", "Status");
+
+                    b.ToTable("Claims");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClaimDenial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActionNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AppealStatus")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DenialCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DenialReason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("DeniedOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Resolution")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClaimId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("OrganizationId", "Resolution", "DueDate");
+
+                    b.ToTable("ClaimDenials");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClaimTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<Guid?>("ClaimId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DenialCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DenialReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Method")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("PaymentDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("RecordedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reference")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("TransferredToClaimId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClaimId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("TransferredToClaimId");
+
+                    b.HasIndex("OrganizationId", "PatientId", "PaymentDate");
+
+                    b.ToTable("ClaimTransactions");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClientInvitation", b =>
@@ -1289,6 +1492,86 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.ToTable("PatientInsurancePolicies");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PatientPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTimeOffset>("AttemptedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FailureMessage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProcessorReference")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId", "AttemptedAt");
+
+                    b.ToTable("PatientPayments");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PatientStatement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("BalanceAtGeneration")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("GeneratedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("StatementDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("OrganizationId", "PatientId", "StatementDate");
+
+                    b.ToTable("PatientStatements");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Payer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1355,6 +1638,52 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "Name");
 
                     b.ToTable("Payers");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PaymentRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PaymentProcessorReference")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("ReceivedOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("RecordedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid?>("SuperbillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SuperbillId");
+
+                    b.HasIndex("PatientId", "ReceivedOn");
+
+                    b.ToTable("PaymentRecords");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.PrivilegedAccessGrant", b =>
@@ -1581,6 +1910,110 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProviderId", "StartDateTime", "EndDateTime");
 
                     b.ToTable("ProviderTimeOffs");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ServicePrice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CptCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("DepositAmount")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("HomeVisitKind")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsHomeVisitTravelFee")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "CptCode")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "HomeVisitKind")
+                        .IsUnique()
+                        .HasFilter("[HomeVisitKind] IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "IsHomeVisitTravelFee")
+                        .IsUnique()
+                        .HasFilter("[IsHomeVisitTravelFee] = 1");
+
+                    b.ToTable("ServicePrices");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Superbill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<Guid>("ClinicianId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CodesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PaymentProcessorReference")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly>("ServiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId");
+
+                    b.ToTable("Superbills");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.UserSession", b =>
@@ -1951,6 +2384,11 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Charge", b =>
                 {
+                    b.HasOne("PhysioTrac.Domain.Entities.Claim", "Claim")
+                        .WithMany("Charges")
+                        .HasForeignKey("ClaimId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "ClinicalNote")
                         .WithMany()
                         .HasForeignKey("ClinicalNoteId")
@@ -1973,6 +2411,13 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("PhysioTrac.Domain.Entities.Superbill", "Superbill")
+                        .WithMany("Charges")
+                        .HasForeignKey("SuperbillId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Claim");
+
                     b.Navigation("ClinicalNote");
 
                     b.Navigation("Location");
@@ -1980,6 +2425,103 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("Patient");
+
+                    b.Navigation("Superbill");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Claim", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.PatientInsurance", "PatientInsurance")
+                        .WithMany()
+                        .HasForeignKey("PatientInsuranceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Payer", "Payer")
+                        .WithMany()
+                        .HasForeignKey("PayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("PatientInsurance");
+
+                    b.Navigation("Payer");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClaimDenial", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Claim", "Claim")
+                        .WithMany("Denials")
+                        .HasForeignKey("ClaimId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Claim");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClaimTransaction", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Claim", "Claim")
+                        .WithMany("Transactions")
+                        .HasForeignKey("ClaimId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Claim", "TransferredToClaim")
+                        .WithMany()
+                        .HasForeignKey("TransferredToClaimId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Claim");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("TransferredToClaim");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClientInvitation", b =>
@@ -2122,6 +2664,36 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Payer");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PatientPayment", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PatientStatement", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Patient");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Payer", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
@@ -2131,6 +2703,24 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PaymentRecord", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Superbill", "Superbill")
+                        .WithMany("Payments")
+                        .HasForeignKey("SuperbillId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("Superbill");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.PrivilegedAccessGrant", b =>
@@ -2211,6 +2801,28 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Provider");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ServicePrice", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Superbill", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Patient");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.UserSession", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
@@ -2261,6 +2873,15 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Provider");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Claim", b =>
+                {
+                    b.Navigation("Charges");
+
+                    b.Navigation("Denials");
+
+                    b.Navigation("Transactions");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNote", b =>
                 {
                     b.Navigation("Addenda");
@@ -2291,6 +2912,13 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Appointments");
 
                     b.Navigation("Availabilities");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Superbill", b =>
+                {
+                    b.Navigation("Charges");
+
+                    b.Navigation("Payments");
                 });
 #pragma warning restore 612, 618
         }

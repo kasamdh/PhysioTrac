@@ -1,0 +1,193 @@
+@page "/appointment-types"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Infrastructure.Persistence
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject PhysioTracDbContext Db
+
+<PageTitle>Appointment types — PhysioTrac</PageTitle>
+
+<h1>Appointment types</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_types is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    @if (CanManage)
+    {
+        <button class="primary" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New appointment type")</button>
+
+        @if (_showForm)
+        {
+            <div class="form-card">
+                @if (_formError is not null)
+                {
+                    <p class="error">@_formError</p>
+                }
+                <label>
+                    Name
+                    <input @bind="_name" />
+                </label>
+                <label>
+                    Description
+                    <input @bind="_description" />
+                </label>
+                <label>
+                    Default duration (minutes)
+                    <input type="number" min="5" step="5" @bind="_durationMinutes" />
+                </label>
+                <label>
+                    Price
+                    <input type="number" min="0" step="0.01" @bind="_price" />
+                </label>
+                <label class="checkbox">
+                    <input type="checkbox" @bind="_onlineBookingEnabled" />
+                    Online booking enabled
+                </label>
+                <label class="checkbox">
+                    <input type="checkbox" @bind="_requiresNewPatient" />
+                    Requires new patient (e.g. Initial Evaluation)
+                </label>
+                <button class="primary" @onclick="CreateType">Save</button>
+            </div>
+        }
+    }
+
+    @if (_types.Count == 0)
+    {
+        <p>No appointment types yet.</p>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Duration</th>
+                    <th>Price</th>
+                    <th>Active</th>
+                    <th>Online booking</th>
+                    <th>New patient only</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var type in _types)
+                {
+                    <tr>
+                        <td>@type.Name</td>
+                        <td>@type.DefaultDurationMinutes min</td>
+                        <td>@(type.Price is { } price ? price.ToString("C") : "—")</td>
+                        <td>@(type.IsActive ? "Yes" : "No")</td>
+                        <td>@(type.OnlineBookingEnabled ? "Yes" : "No")</td>
+                        <td>@(type.RequiresNewPatient ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+<style>
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    .error { color: #dc2626; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card label.checkbox { display: flex; align-items: center; gap: 0.5rem; }
+    .form-card label.checkbox input { width: auto; }
+    .form-card input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+</style>
+
+@code {
+    private List<AppointmentType>? _types;
+    private string? _error;
+    private string? _formError;
+    private bool _showForm;
+    private Guid _organizationId;
+
+    private string _name = string.Empty;
+    private string? _description;
+    private int _durationMinutes = 30;
+    private decimal? _price;
+    private bool _onlineBookingEnabled = true;
+    private bool _requiresNewPatient;
+
+    private bool CanManage => RoleSets.Scheduling.Contains(CurrentUser.Role);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+            _organizationId = organization.Id;
+            _types = await Db.AppointmentTypes.Where(a => a.OrganizationId == organization.Id)
+                .OrderBy(a => a.Name)
+                .ToListAsync();
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task CreateType()
+    {
+        _formError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Scheduling);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _formError = ex.Message;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _formError = "Name is required.";
+            return;
+        }
+        if (_durationMinutes <= 0)
+        {
+            _formError = "Duration must be greater than zero.";
+            return;
+        }
+
+        var type = new AppointmentType
+        {
+            OrganizationId = _organizationId,
+            Name = _name.Trim(),
+            Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+            DefaultDurationMinutes = _durationMinutes,
+            Price = _price,
+            OnlineBookingEnabled = _onlineBookingEnabled,
+            RequiresNewPatient = _requiresNewPatient,
+        };
+        Db.AppointmentTypes.Add(type);
+        await Db.SaveChangesAsync();
+
+        _name = string.Empty;
+        _description = null;
+        _durationMinutes = 30;
+        _price = null;
+        _onlineBookingEnabled = true;
+        _requiresNewPatient = false;
+        _showForm = false;
+        await LoadAsync();
+    }
+}

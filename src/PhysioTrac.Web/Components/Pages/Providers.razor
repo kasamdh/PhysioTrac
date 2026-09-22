@@ -1,0 +1,170 @@
+@page "/providers"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Infrastructure.Persistence
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject PhysioTracDbContext Db
+
+<PageTitle>Providers — PhysioTrac</PageTitle>
+
+<h1>Providers</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_providers is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    @if (CanManage)
+    {
+        <button class="primary" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New provider")</button>
+
+        @if (_showForm)
+        {
+            <div class="form-card">
+                @if (_formError is not null)
+                {
+                    <p class="error">@_formError</p>
+                }
+                <label>
+                    First name
+                    <input @bind="_firstName" />
+                </label>
+                <label>
+                    Last name
+                    <input @bind="_lastName" />
+                </label>
+                <label>
+                    Specialty
+                    <input @bind="_specialty" />
+                </label>
+                <label>
+                    Credentials
+                    <input @bind="_credentials" />
+                </label>
+                <button class="primary" @onclick="CreateProvider">Save</button>
+            </div>
+        }
+    }
+
+    @if (_providers.Count == 0)
+    {
+        <p>No providers yet.</p>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Specialty</th>
+                    <th>Credentials</th>
+                    <th>Active</th>
+                    <th>Online booking</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var provider in _providers)
+                {
+                    <tr>
+                        <td>@provider.FullName</td>
+                        <td>@(provider.Specialty ?? "—")</td>
+                        <td>@(provider.Credentials ?? "—")</td>
+                        <td>@(provider.IsActive ? "Yes" : "No")</td>
+                        <td>@(provider.OnlineBookingEnabled ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+<style>
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    .error { color: #dc2626; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+</style>
+
+@code {
+    private List<Provider>? _providers;
+    private string? _error;
+    private string? _formError;
+    private bool _showForm;
+    private Guid _organizationId;
+
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string? _specialty;
+    private string? _credentials;
+
+    private bool CanManage => RoleSets.Scheduling.Contains(CurrentUser.Role);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+            _organizationId = organization.Id;
+            _providers = await Db.Providers.Where(p => p.OrganizationId == organization.Id)
+                .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
+                .ToListAsync();
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task CreateProvider()
+    {
+        _formError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Scheduling);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _formError = ex.Message;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))
+        {
+            _formError = "First and last name are required.";
+            return;
+        }
+
+        var provider = new Provider
+        {
+            OrganizationId = _organizationId,
+            FirstName = _firstName.Trim(),
+            LastName = _lastName.Trim(),
+            Specialty = string.IsNullOrWhiteSpace(_specialty) ? null : _specialty.Trim(),
+            Credentials = string.IsNullOrWhiteSpace(_credentials) ? null : _credentials.Trim(),
+        };
+        Db.Providers.Add(provider);
+        await Db.SaveChangesAsync();
+
+        _firstName = string.Empty;
+        _lastName = string.Empty;
+        _specialty = null;
+        _credentials = null;
+        _showForm = false;
+        await LoadAsync();
+    }
+}

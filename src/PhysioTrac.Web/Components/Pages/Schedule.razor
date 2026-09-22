@@ -1,0 +1,356 @@
+@page "/schedule"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Common
+@using PhysioTrac.Application.Scheduling
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Domain.Enums
+@using PhysioTrac.Infrastructure.Identity
+@using PhysioTrac.Infrastructure.Persistence
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject IAppointmentService Appointments
+@inject PhysioTracDbContext Db
+
+<PageTitle>Schedule — PhysioTrac</PageTitle>
+
+<h1>Schedule</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else
+{
+    <div class="week-nav">
+        <button @onclick="() => ChangeWeek(-1)">&larr; Previous week</button>
+        <strong>@_weekStart.ToString("MMM d") – @_weekStart.AddDays(6).ToString("MMM d, yyyy")</strong>
+        <button @onclick="() => ChangeWeek(1)">Next week &rarr;</button>
+        @if (CanSchedule)
+        {
+            <button class="primary" @onclick="ToggleForm">@(_showForm ? "Cancel" : "New appointment")</button>
+        }
+    </div>
+
+    @if (_showForm)
+    {
+        <div class="form-card">
+            @if (_formError is not null)
+            {
+                <p class="error">@_formError</p>
+            }
+            <label>
+                Patient
+                <select @bind="_newPatientId">
+                    <option value="">Select patient…</option>
+                    @foreach (var patient in _patientOptions)
+                    {
+                        <option value="@patient.Id">@patient.FullName (@patient.MedicalRecordNumber)</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Therapist
+                <select @bind="_newTherapistId">
+                    <option value="">Select therapist…</option>
+                    @foreach (var therapist in _therapistOptions)
+                    {
+                        <option value="@therapist.Id">@therapist.FirstName @therapist.LastName</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Provider (optional)
+                <select @bind="_newProviderId">
+                    <option value="">None</option>
+                    @foreach (var provider in _providerOptions)
+                    {
+                        <option value="@provider.Id">@provider.FullName</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Appointment type (optional)
+                <select @bind="_newAppointmentTypeId" @bind:after="ApplyAppointmentTypeDefaults">
+                    <option value="">None</option>
+                    @foreach (var type in _appointmentTypeOptions)
+                    {
+                        <option value="@type.Id">@type.Name (@type.DefaultDurationMinutes min)</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Kind
+                <select @bind="_newKind">
+                    @foreach (var kind in Enum.GetValues<AppointmentKind>())
+                    {
+                        <option value="@kind">@kind</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Date
+                <input type="date" @bind="_newDate" />
+            </label>
+            <label>
+                Start time
+                <input type="time" @bind="_newStartTime" />
+            </label>
+            <label>
+                Duration (minutes)
+                <input type="number" min="5" step="5" @bind="_newDurationMinutes" />
+            </label>
+            <label class="checkbox">
+                <input type="checkbox" @bind="_newIsHomeVisit" />
+                Home visit
+            </label>
+            <label>
+                Reason for visit
+                <input @bind="_newReason" maxlength="240" />
+            </label>
+            <button class="primary" @onclick="CreateAppointment">Book appointment</button>
+        </div>
+    }
+
+    @if (_appointments is null)
+    {
+        <p>Loading…</p>
+    }
+    else if (_appointments.Count == 0)
+    {
+        <p>No appointments this week.</p>
+    }
+    else
+    {
+        @foreach (var day in _appointments.GroupBy(a => a.StartsAt.Date).OrderBy(g => g.Key))
+        {
+            <h3>@day.Key.ToString("dddd, MMM d")</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Patient</th>
+                        <th>Therapist</th>
+                        <th>Kind</th>
+                        <th>Status</th>
+                        <th>Home visit</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var appt in day.OrderBy(a => a.StartsAt))
+                    {
+                        <tr>
+                            <td>@appt.StartsAt.ToString("h:mm tt")–@appt.EndsAt.ToString("h:mm tt")</td>
+                            <td>@PatientName(appt.PatientId)</td>
+                            <td>@TherapistName(appt.TherapistId)</td>
+                            <td>@appt.Kind</td>
+                            <td>@appt.Status</td>
+                            <td>@(appt.IsHomeVisit ? "Yes" : "No")</td>
+                            <td>
+                                @if (appt.Status is AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn)
+                                {
+                                    <button class="link-button" @onclick="() => CancelAppointment(appt.Id)">Cancel</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+}
+
+<style>
+    .week-nav { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .week-nav button { padding: 0.4rem 0.8rem; border: 1px solid #cbd5e1; background: white; border-radius: 4px; cursor: pointer; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    .error { color: #dc2626; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; max-width: 420px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card label.checkbox { display: flex; align-items: center; gap: 0.5rem; }
+    .form-card label.checkbox input { width: auto; }
+    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+    .link-button { background: none; border: none; color: #dc2626; cursor: pointer; padding: 0; text-decoration: underline; }
+</style>
+
+@code {
+    private DateTime _weekStart = StartOfWeek(DateTime.Today);
+    private IReadOnlyList<Appointment>? _appointments;
+    private Dictionary<Guid, Patient> _patientsById = new();
+    private Dictionary<Guid, ApplicationUser> _therapistsById = new();
+    private string? _error;
+    private Guid _organizationId;
+
+    private bool _showForm;
+    private string? _formError;
+    private List<Patient> _patientOptions = new();
+    private List<ApplicationUser> _therapistOptions = new();
+    private List<Provider> _providerOptions = new();
+    private List<AppointmentType> _appointmentTypeOptions = new();
+
+    private Guid? _newPatientId;
+    private Guid? _newTherapistId;
+    private Guid? _newProviderId;
+    private Guid? _newAppointmentTypeId;
+    private AppointmentKind _newKind = AppointmentKind.FollowUp;
+    private DateTime _newDate = DateTime.Today.AddDays(1);
+    private TimeOnly _newStartTime = new(9, 0);
+    private int _newDurationMinutes = 30;
+    private bool _newIsHomeVisit;
+    private string? _newReason;
+
+    private bool CanSchedule => RoleSets.Scheduling.Contains(CurrentUser.Role);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+            _organizationId = organization.Id;
+        }
+        catch (ForbiddenException ex)
+        {
+            _error = ex.Message;
+            return;
+        }
+
+        await LoadAppointmentsAsync();
+    }
+
+    private static DateTime StartOfWeek(DateTime date)
+    {
+        var diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return date.Date.AddDays(-diff);
+    }
+
+    private async Task ChangeWeek(int deltaWeeks)
+    {
+        _weekStart = _weekStart.AddDays(7 * deltaWeeks);
+        await LoadAppointmentsAsync();
+    }
+
+    private async Task LoadAppointmentsAsync()
+    {
+        var from = new DateTimeOffset(_weekStart, TimeZoneInfo.Local.GetUtcOffset(_weekStart));
+        var to = from.AddDays(7);
+
+        try
+        {
+            _appointments = await Appointments.ListForRangeAsync(CurrentUser, from, to);
+        }
+        catch (ForbiddenException ex)
+        {
+            _error = ex.Message;
+            return;
+        }
+
+        var patientIds = _appointments.Select(a => a.PatientId).Distinct().ToList();
+        var therapistIds = _appointments.Select(a => a.TherapistId).Distinct().ToList();
+
+        _patientsById = await Db.Patients.Where(p => patientIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
+        _therapistsById = await Db.Users.Where(u => therapistIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id);
+    }
+
+    private string PatientName(Guid id) => _patientsById.TryGetValue(id, out var p) ? p.FullName : "Unknown patient";
+
+    private string TherapistName(Guid id) => _therapistsById.TryGetValue(id, out var u) ? $"{u.FirstName} {u.LastName}" : "Unknown therapist";
+
+    private async Task ToggleForm()
+    {
+        _showForm = !_showForm;
+        _formError = null;
+        if (_showForm)
+        {
+            _patientOptions = await TenantAccess.PatientsFor(CurrentUser, clinical: false)
+                .OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToListAsync();
+            _therapistOptions = await Db.Users
+                .Where(u => u.OrganizationId == _organizationId && (u.Role == UserRole.Therapist || u.Role == UserRole.Assistant))
+                .OrderBy(u => u.LastName).ThenBy(u => u.FirstName).ToListAsync();
+            _providerOptions = await Db.Providers
+                .Where(p => p.OrganizationId == _organizationId && p.IsActive)
+                .OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToListAsync();
+            _appointmentTypeOptions = await Db.AppointmentTypes
+                .Where(a => a.OrganizationId == _organizationId && a.IsActive)
+                .OrderBy(a => a.Name).ToListAsync();
+        }
+    }
+
+    private void ApplyAppointmentTypeDefaults()
+    {
+        var type = _appointmentTypeOptions.FirstOrDefault(t => t.Id == _newAppointmentTypeId);
+        if (type is not null)
+        {
+            _newDurationMinutes = type.DefaultDurationMinutes;
+        }
+    }
+
+    private async Task CreateAppointment()
+    {
+        _formError = null;
+
+        if (_newPatientId is null || _newTherapistId is null)
+        {
+            _formError = "Patient and therapist are required.";
+            return;
+        }
+        if (_newDurationMinutes <= 0)
+        {
+            _formError = "Duration must be greater than zero.";
+            return;
+        }
+
+        var startLocal = _newDate.Date.Add(_newStartTime.ToTimeSpan());
+        var startsAt = new DateTimeOffset(startLocal, TimeZoneInfo.Local.GetUtcOffset(startLocal));
+        var endsAt = startsAt.AddMinutes(_newDurationMinutes);
+
+        var request = new CreateAppointmentRequest(
+            _newPatientId.Value, _newTherapistId.Value, _newProviderId, null, _newAppointmentTypeId,
+            _newKind, startsAt, endsAt, _newIsHomeVisit,
+            string.IsNullOrWhiteSpace(_newReason) ? null : _newReason.Trim());
+
+        try
+        {
+            await Appointments.CreateAsync(request, CurrentUser);
+        }
+        catch (ForbiddenException ex) { _formError = ex.Message; return; }
+        catch (NotFoundException ex) { _formError = ex.Message; return; }
+        catch (InvalidOperationException ex) { _formError = ex.Message; return; }
+
+        _showForm = false;
+        ResetForm();
+        await LoadAppointmentsAsync();
+    }
+
+    private void ResetForm()
+    {
+        _newPatientId = null;
+        _newTherapistId = null;
+        _newProviderId = null;
+        _newAppointmentTypeId = null;
+        _newKind = AppointmentKind.FollowUp;
+        _newDate = DateTime.Today.AddDays(1);
+        _newStartTime = new TimeOnly(9, 0);
+        _newDurationMinutes = 30;
+        _newIsHomeVisit = false;
+        _newReason = null;
+    }
+
+    private async Task CancelAppointment(Guid appointmentId)
+    {
+        try
+        {
+            await Appointments.CancelAsync(appointmentId, CurrentUser);
+        }
+        catch (ForbiddenException ex) { _error = ex.Message; return; }
+        catch (NotFoundException ex) { _error = ex.Message; return; }
+        catch (InvalidOperationException ex) { _error = ex.Message; return; }
+
+        await LoadAppointmentsAsync();
+    }
+}

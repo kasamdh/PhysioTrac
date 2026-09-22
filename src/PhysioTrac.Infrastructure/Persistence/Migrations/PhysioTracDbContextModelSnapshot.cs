@@ -2510,7 +2510,7 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.HasOne("PhysioTrac.Domain.Entities.Claim", "TransferredToClaim")
                         .WithMany()
                         .HasForeignKey("TransferredToClaimId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Claim");
 
