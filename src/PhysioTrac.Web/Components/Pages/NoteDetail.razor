@@ -1,0 +1,370 @@
+@page "/notes/{NoteId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Clinical
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Domain.Enums
+@inject ICurrentUser CurrentUser
+@inject IClinicalNoteService NoteService
+@inject NavigationManager Navigation
+
+<PageTitle>Clinical note — PhysioTrac</PageTitle>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_note is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <a href="/patients/@_note.PatientId">&larr; Back to patient</a>
+    <h1>@_note.NoteType note — @_note.ServiceDate.ToString("yyyy-MM-dd")</h1>
+    <p class="status-line">Status: <strong>@_note.Status</strong>
+        @if (_note.IsSigned)
+        {
+            <span> · Signed by @_note.SignatureName on @_note.SignedAt?.ToString("yyyy-MM-dd h:mm tt")</span>
+        }
+        @if (_note.CosignedAt is not null)
+        {
+            <span> · Cosigned @_note.CosignedAt?.ToString("yyyy-MM-dd h:mm tt")</span>
+        }
+    </p>
+
+    @if (_findings.Count > 0)
+    {
+        <div class="findings">
+            <h3>Documentation checks</h3>
+            <ul>
+                @foreach (var finding in _findings)
+                {
+                    <li class="@(finding.FinalizationBlocker ? "blocker" : "warning")">
+                        <strong>@finding.Title</strong> — @finding.Detail
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="fields">
+        <label>
+            Subjective
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_subjective"></textarea>
+        </label>
+        <label>
+            Objective
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_objective"></textarea>
+        </label>
+        <label>
+            Interventions
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_interventions"></textarea>
+        </label>
+        <label>
+            Assessment
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_assessment"></textarea>
+        </label>
+        <label>
+            Plan
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_plan"></textarea>
+        </label>
+
+        @if (_note.NoteType is NoteType.Evaluation or NoteType.Progress or NoteType.ReEvaluation)
+        {
+            <fieldset>
+                <legend>Plan of care</legend>
+                <label>Start <input type="date" disabled="@(!_canEdit)" @bind="_pocStart" /></label>
+                <label>End <input type="date" disabled="@(!_canEdit)" @bind="_pocEnd" /></label>
+                <label>Frequency per week <input type="number" min="0" disabled="@(!_canEdit)" @bind="_frequencyPerWeek" /></label>
+                <label>Duration (weeks) <input type="number" min="0" disabled="@(!_canEdit)" @bind="_durationWeeks" /></label>
+                <label>Reassessment due <input type="date" disabled="@(!_canEdit)" @bind="_reassessmentDue" /></label>
+            </fieldset>
+        }
+
+        @if (_canEdit)
+        {
+            @if (_saveError is not null)
+            {
+                <p class="error">@_saveError</p>
+            }
+            <button class="primary" @onclick="SaveDraft">Save draft</button>
+        }
+    </div>
+
+    <section>
+        <h3>Treatment interventions</h3>
+        @if (_interventionItems.Count == 0)
+        {
+            <p>No intervention line items yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Description</th><th>Body region</th><th>Category</th><th>Minutes</th><th>Units</th></tr></thead>
+                <tbody>
+                    @foreach (var item in _interventionItems)
+                    {
+                        <tr>
+                            <td>@item.Description</td>
+                            <td>@(item.BodyRegion ?? "—")</td>
+                            <td>@(item.Category?.ToString() ?? "—")</td>
+                            <td>@item.Minutes</td>
+                            <td>@(item.Units?.ToString() ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p>Total minutes: @_interventionItems.Sum(i => i.Minutes)</p>
+        }
+
+        @if (_canEdit)
+        {
+            <div class="inline-form">
+                <input placeholder="Description" @bind="_newInterventionDescription" style="flex:2" />
+                <input placeholder="Body region" @bind="_newInterventionBodyRegion" style="flex:1" />
+                <select @bind="_newInterventionCategory">
+                    <option value="">Uncategorized</option>
+                    @foreach (var category in Enum.GetValues<InterventionCategory>())
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </select>
+                <input type="number" min="0" placeholder="Minutes" @bind="_newInterventionMinutes" style="width:5rem" />
+                <button @onclick="AddIntervention">Add</button>
+            </div>
+        }
+    </section>
+
+    @if (_canFinalize && !_note.IsSigned)
+    {
+        <section class="sign-panel">
+            <h3>Finalize note</h3>
+            <label class="checkbox">
+                <input type="checkbox" @bind="_attestationConfirmed" />
+                I confirm this note has been reviewed and is ready to sign.
+            </label>
+            @if (_signError is not null)
+            {
+                <p class="error">@_signError</p>
+            }
+            <button class="primary" @onclick="SignNote">Sign note</button>
+        </section>
+    }
+
+    @if (_note.Status == NoteStatus.ReviewRequired && _canCosign)
+    {
+        <section class="sign-panel">
+            <h3>Cosignature required</h3>
+            <p>This note was signed by the treating assistant and awaits a supervising cosignature.</p>
+            @if (_signError is not null)
+            {
+                <p class="error">@_signError</p>
+            }
+            <button class="primary" @onclick="CosignNote">Cosign note</button>
+        </section>
+    }
+
+    @if (_note.IsSigned)
+    {
+        <section>
+            <h3>Addenda</h3>
+            @foreach (var addendum in _note.Addenda.OrderBy(a => a.CreatedAt))
+            {
+                <div class="addendum">
+                    <strong>@addendum.Reason</strong> — @addendum.CreatedAt.ToString("yyyy-MM-dd h:mm tt")
+                    <p>@addendum.Body</p>
+                </div>
+            }
+            @if (_canCreateAddendum)
+            {
+                <div class="form-card">
+                    @if (_addendumError is not null)
+                    {
+                        <p class="error">@_addendumError</p>
+                    }
+                    <label>Reason <input @bind="_newAddendumReason" /></label>
+                    <label>Details <textarea rows="3" @bind="_newAddendumBody"></textarea></label>
+                    <button class="primary" @onclick="AddAddendum">Add addendum</button>
+                </div>
+            }
+        </section>
+    }
+}
+
+<style>
+    .error { color: #dc2626; }
+    .status-line { color: #475569; }
+    .findings { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .findings ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+    .findings li.blocker { color: #b91c1c; }
+    .findings li.warning { color: #92400e; }
+    .fields label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .fields textarea, .fields input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; font-family: inherit; }
+    fieldset { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 1rem; }
+    fieldset label { display: inline-block; width: 220px; margin: 0.5rem; }
+    section { margin-top: 2rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #e2e8f0; }
+    .inline-form { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; }
+    .sign-panel { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; }
+    .sign-panel label.checkbox { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .sign-panel label.checkbox input { width: auto; }
+    .addendum { border-left: 3px solid #2563eb; padding-left: 0.75rem; margin-bottom: 0.75rem; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-top: 0.75rem; max-width: 480px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card input, .form-card textarea { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+</style>
+
+@code {
+    [Parameter]
+    public Guid NoteId { get; set; }
+
+    private ClinicalNote? _note;
+    private string? _error;
+    private IReadOnlyList<ComplianceFinding> _findings = Array.Empty<ComplianceFinding>();
+    private List<NoteIntervention> _interventionItems = new();
+
+    private string? _subjective;
+    private string? _objective;
+    private string? _interventions;
+    private string? _assessment;
+    private string? _plan;
+    private DateOnly? _pocStart;
+    private DateOnly? _pocEnd;
+    private int? _frequencyPerWeek;
+    private int? _durationWeeks;
+    private DateOnly? _reassessmentDue;
+    private string? _saveError;
+
+    private bool _attestationConfirmed;
+    private string? _signError;
+
+    private string _newInterventionDescription = string.Empty;
+    private string? _newInterventionBodyRegion;
+    private InterventionCategory? _newInterventionCategory;
+    private int _newInterventionMinutes;
+
+    private string _newAddendumReason = string.Empty;
+    private string _newAddendumBody = string.Empty;
+    private string? _addendumError;
+
+    private bool _canEdit;
+    private bool _canFinalize;
+    private bool _canCosign;
+    private bool _canCreateAddendum;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _note = await NoteService.GetAsync(NoteId, CurrentUser);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _error = ex.Message; return; }
+        catch (PhysioTrac.Application.Common.NotFoundException ex) { _error = ex.Message; return; }
+
+        _canEdit = NoteService.CanEditNote(CurrentUser, _note);
+        _canFinalize = NoteService.CanFinalizeNote(CurrentUser, _note);
+        _canCosign = NoteService.CanCosignNote(CurrentUser, _note);
+        _canCreateAddendum = NoteService.CanCreateAddendum(CurrentUser, _note);
+        _findings = NoteComplianceEvaluator.Evaluate(_note);
+
+        _subjective = _note.Subjective;
+        _objective = _note.Objective;
+        _interventions = _note.Interventions;
+        _assessment = _note.Assessment;
+        _plan = _note.Plan;
+        _pocStart = _note.PlanOfCareStart;
+        _pocEnd = _note.PlanOfCareEnd;
+        _frequencyPerWeek = _note.FrequencyPerWeek;
+        _durationWeeks = _note.DurationWeeks;
+        _reassessmentDue = _note.ReassessmentDue;
+
+        _interventionItems = (await NoteService.ListInterventionsAsync(NoteId, CurrentUser)).ToList();
+    }
+
+    private async Task SaveDraft()
+    {
+        _saveError = null;
+        var request = new UpdateNoteRequest(_subjective, _objective, _interventions, _assessment, _plan,
+            _pocStart, _pocEnd, _frequencyPerWeek, _durationWeeks, _reassessmentDue);
+        try
+        {
+            await NoteService.UpdateDraftAsync(NoteId, request, CurrentUser);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _saveError = ex.Message; return; }
+        await LoadAsync();
+    }
+
+    private async Task AddIntervention()
+    {
+        if (string.IsNullOrWhiteSpace(_newInterventionDescription)) return;
+
+        var request = new CreateInterventionRequest(_newInterventionDescription.Trim(), _newInterventionBodyRegion,
+            _newInterventionCategory, _newInterventionMinutes, null, true, _interventionItems.Count);
+        await NoteService.AddInterventionAsync(NoteId, request, CurrentUser);
+
+        _newInterventionDescription = string.Empty;
+        _newInterventionBodyRegion = null;
+        _newInterventionCategory = null;
+        _newInterventionMinutes = 0;
+        _interventionItems = (await NoteService.ListInterventionsAsync(NoteId, CurrentUser)).ToList();
+    }
+
+    private async Task SignNote()
+    {
+        _signError = null;
+        try
+        {
+            await NoteService.SignNoteAsync(NoteId, _attestationConfirmed, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
+        {
+            _signError = ex.Message;
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private async Task CosignNote()
+    {
+        _signError = null;
+        try
+        {
+            await NoteService.CosignNoteAsync(NoteId, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
+        {
+            _signError = ex.Message;
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private async Task AddAddendum()
+    {
+        _addendumError = null;
+        if (string.IsNullOrWhiteSpace(_newAddendumReason) || string.IsNullOrWhiteSpace(_newAddendumBody))
+        {
+            _addendumError = "Reason and details are required.";
+            return;
+        }
+        try
+        {
+            await NoteService.CreateAddendumAsync(NoteId, new CreateAddendumRequest(_newAddendumReason.Trim(), _newAddendumBody.Trim()), CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
+        {
+            _addendumError = ex.Message;
+            return;
+        }
+
+        _newAddendumReason = string.Empty;
+        _newAddendumBody = string.Empty;
+        await LoadAsync();
+    }
+}

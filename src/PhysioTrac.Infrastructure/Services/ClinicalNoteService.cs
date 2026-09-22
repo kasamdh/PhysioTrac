@@ -263,7 +263,10 @@ public class ClinicalNoteService : IClinicalNoteService
     private async Task<ClinicalNote> LoadNoteInOrgAsync(Guid noteId, ICurrentUser actor, CancellationToken ct)
     {
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
-        var note = await _db.ClinicalNotes.FirstOrDefaultAsync(n => n.Id == noteId, ct)
+        // Addenda are eager-loaded here since every caller of this helper —
+        // including GetAsync, which the note-detail page uses to render the
+        // addendum list — otherwise gets an always-empty collection.
+        var note = await _db.ClinicalNotes.Include(n => n.Addenda).FirstOrDefaultAsync(n => n.Id == noteId, ct)
             ?? throw new NotFoundException("Note was not found.");
         var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == note.PatientId, ct);
         if (patient is null || patient.OrganizationId != organization.Id)

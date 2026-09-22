@@ -1,10 +1,16 @@
 @page "/patients/{PatientId:guid}"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Clinical
 @using PhysioTrac.Application.Tenancy
 @using PhysioTrac.Domain.Entities
+@using PhysioTrac.Domain.Enums
 @inject ICurrentUser CurrentUser
 @inject ITenantAccessService TenantAccess
+@inject IClinicalNoteService NoteService
+@inject IFunctionalGoalService GoalService
+@inject IOutcomeScoreService OutcomeService
 @inject NavigationManager Navigation
 
 <PageTitle>@(_patient?.FullName ?? "Patient") — PhysioTrac</PageTitle>
@@ -34,12 +40,196 @@ else
         <dt>Email</dt>
         <dd>@(_patient.Email ?? "—")</dd>
     </dl>
+
+    <section>
+        <h2>Clinical notes</h2>
+        @if (CanDocument)
+        {
+            <div class="inline-form">
+                <select @bind="_newNoteType">
+                    @foreach (var type in Enum.GetValues<NoteType>())
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+                <input type="date" @bind="_newNoteServiceDate" />
+                <button class="primary" @onclick="StartNote">Start note</button>
+            </div>
+            @if (_noteError is not null)
+            {
+                <p class="error">@_noteError</p>
+            }
+        }
+        @if (_notes is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_notes.Count == 0)
+        {
+            <p>No clinical notes yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr><th>Service date</th><th>Type</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var note in _notes)
+                    {
+                        <tr>
+                            <td>@note.ServiceDate.ToString("yyyy-MM-dd")</td>
+                            <td>@note.NoteType</td>
+                            <td>@note.Status</td>
+                            <td><a href="/notes/@note.Id">Open</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section>
+        <h2>Functional goals</h2>
+        @if (CanDocument)
+        {
+            <button class="primary" @onclick="() => _showGoalForm = !_showGoalForm">@(_showGoalForm ? "Cancel" : "New goal")</button>
+            @if (_showGoalForm)
+            {
+                <div class="form-card">
+                    @if (_goalError is not null)
+                    {
+                        <p class="error">@_goalError</p>
+                    }
+                    <label>Functional limitation <input @bind="_newGoalLimitation" /></label>
+                    <label>Functional task <input @bind="_newGoalTask" /></label>
+                    <label>Baseline value <input type="number" step="0.01" @bind="_newGoalBaseline" /></label>
+                    <label>Target value <input type="number" step="0.01" @bind="_newGoalTarget" /></label>
+                    <label>Unit <input @bind="_newGoalUnit" placeholder="e.g. degrees, reps" /></label>
+                    <label>Measurement method <input @bind="_newGoalMethod" /></label>
+                    <label>Target date <input type="date" @bind="_newGoalTargetDate" /></label>
+                    <button class="primary" @onclick="CreateGoal">Save</button>
+                </div>
+            }
+        }
+        @if (_goals is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_goals.Count == 0)
+        {
+            <p>No functional goals yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr><th>Limitation</th><th>Task</th><th>Baseline → Target</th><th>Current</th><th>Progress</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var goal in _goals)
+                    {
+                        <tr>
+                            <td>@goal.FunctionalLimitation</td>
+                            <td>@goal.FunctionalTask</td>
+                            <td>@goal.BaselineValue → @goal.TargetValue @goal.Unit</td>
+                            <td>
+                                @if (goal.Status == GoalStatus.Active)
+                                {
+                                    <input type="number" step="0.01" style="width:5rem"
+                                           value="@GoalProgressInput(goal.Id, goal.CurrentValue)"
+                                           @onchange="e => _goalProgressEdits[goal.Id] = e.Value?.ToString()" />
+                                    <button @onclick="() => UpdateGoalProgress(goal.Id)">Save</button>
+                                }
+                                else
+                                {
+                                    @(goal.CurrentValue?.ToString() ?? "—")
+                                }
+                            </td>
+                            <td>@(goal.ProgressPercent is { } p ? $"{p}%" : "—")</td>
+                            <td>@goal.Status</td>
+                            <td>
+                                @if (goal.Status == GoalStatus.Draft && CanApproveGoals)
+                                {
+                                    <button @onclick="() => ApproveGoal(goal.Id)">Approve</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section>
+        <h2>Outcome measures</h2>
+        @if (CanDocument)
+        {
+            <button class="primary" @onclick="() => _showOutcomeForm = !_showOutcomeForm">@(_showOutcomeForm ? "Cancel" : "Record score")</button>
+            @if (_showOutcomeForm)
+            {
+                <div class="form-card">
+                    @if (_outcomeError is not null)
+                    {
+                        <p class="error">@_outcomeError</p>
+                    }
+                    <label>
+                        Measure
+                        <select @bind="_newOutcomeMeasure">
+                            @foreach (var measure in Enum.GetValues<OutcomeMeasure>())
+                            {
+                                <option value="@measure">@measure</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Measured on <input type="date" @bind="_newOutcomeDate" /></label>
+                    <label>Score <input type="number" step="0.01" @bind="_newOutcomeScore" /></label>
+                    <label>Maximum score (optional) <input type="number" step="0.01" @bind="_newOutcomeMax" /></label>
+                    <button class="primary" @onclick="RecordOutcome">Save</button>
+                </div>
+            }
+        }
+        @if (_outcomes is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_outcomes.Count == 0)
+        {
+            <p>No outcome scores yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr><th>Measure</th><th>Measured on</th><th>Score</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var outcome in _outcomes)
+                    {
+                        <tr>
+                            <td>@outcome.Measure</td>
+                            <td>@outcome.MeasuredOn.ToString("yyyy-MM-dd")</td>
+                            <td>@outcome.Score@(outcome.MaximumScore is { } max ? $" / {max}" : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
 }
 
 <style>
     dl { display: grid; grid-template-columns: 160px 1fr; row-gap: 0.5rem; max-width: 480px; }
     dt { font-weight: 600; color: #475569; }
     .error { color: #dc2626; }
+    section { margin-top: 2rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; }
+    .inline-form { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-top: 0.75rem; max-width: 420px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
 </style>
 
 @code {
@@ -49,6 +239,34 @@ else
     private Patient? _patient;
     private string? _error;
 
+    private List<ClinicalNote>? _notes;
+    private NoteType _newNoteType = NoteType.Daily;
+    private DateOnly _newNoteServiceDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _noteError;
+
+    private List<FunctionalGoal>? _goals;
+    private bool _showGoalForm;
+    private string? _goalError;
+    private string _newGoalLimitation = string.Empty;
+    private string _newGoalTask = string.Empty;
+    private decimal _newGoalBaseline;
+    private decimal _newGoalTarget;
+    private string _newGoalUnit = string.Empty;
+    private string _newGoalMethod = string.Empty;
+    private DateOnly _newGoalTargetDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1));
+    private readonly Dictionary<Guid, string?> _goalProgressEdits = new();
+
+    private List<OutcomeScore>? _outcomes;
+    private bool _showOutcomeForm;
+    private string? _outcomeError;
+    private OutcomeMeasure _newOutcomeMeasure = OutcomeMeasure.Lefs;
+    private DateOnly _newOutcomeDate = DateOnly.FromDateTime(DateTime.Today);
+    private decimal _newOutcomeScore;
+    private decimal? _newOutcomeMax;
+
+    private bool CanDocument => RoleSets.Clinical.Contains(CurrentUser.Role);
+    private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -57,10 +275,117 @@ else
         }
         catch (PhysioTrac.Application.Common.ForbiddenException ex)
         {
-            // RequirePatientAccessAsync never distinguishes "doesn't exist"
-            // from "not permitted" — same anti-enumeration behavior as the
-            // original's require_patient_access.
             _error = ex.Message;
+            return;
         }
+
+        await ReloadNotesAsync();
+        await ReloadGoalsAsync();
+        await ReloadOutcomesAsync();
+    }
+
+    private async Task ReloadNotesAsync() =>
+        _notes = (await NoteService.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+
+    private async Task ReloadGoalsAsync() =>
+        _goals = (await GoalService.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+
+    private async Task ReloadOutcomesAsync() =>
+        _outcomes = (await OutcomeService.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+
+    private async Task StartNote()
+    {
+        _noteError = null;
+        try
+        {
+            var request = new CreateNoteRequest(PatientId, _newNoteType, _newNoteServiceDate, null,
+                null, null, null, null, null, null, null, null, null, null);
+            var note = await NoteService.CreateDraftAsync(request, CurrentUser);
+            Navigation.NavigateTo($"/notes/{note.Id}");
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _noteError = ex.Message; }
+        catch (PhysioTrac.Application.Common.NotFoundException ex) { _noteError = ex.Message; }
+    }
+
+    private async Task CreateGoal()
+    {
+        _goalError = null;
+        if (string.IsNullOrWhiteSpace(_newGoalLimitation) || string.IsNullOrWhiteSpace(_newGoalTask)
+            || string.IsNullOrWhiteSpace(_newGoalUnit) || string.IsNullOrWhiteSpace(_newGoalMethod))
+        {
+            _goalError = "All fields except suggested wording are required.";
+            return;
+        }
+
+        try
+        {
+            var request = new CreateGoalRequest(PatientId, _newGoalLimitation.Trim(), _newGoalTask.Trim(),
+                _newGoalBaseline, _newGoalTarget, _newGoalUnit.Trim(), _newGoalMethod.Trim(), _newGoalTargetDate, null);
+            await GoalService.CreateAsync(request, CurrentUser);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _goalError = ex.Message; return; }
+
+        _newGoalLimitation = string.Empty;
+        _newGoalTask = string.Empty;
+        _newGoalBaseline = 0;
+        _newGoalTarget = 0;
+        _newGoalUnit = string.Empty;
+        _newGoalMethod = string.Empty;
+        _newGoalTargetDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1));
+        _showGoalForm = false;
+        await ReloadGoalsAsync();
+    }
+
+    private async Task ApproveGoal(Guid goalId)
+    {
+        try
+        {
+            await GoalService.ApproveAsync(goalId, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
+        {
+            _goalError = ex.Message;
+            return;
+        }
+        await ReloadGoalsAsync();
+    }
+
+    private string GoalProgressInput(Guid goalId, decimal? currentValue) =>
+        _goalProgressEdits.TryGetValue(goalId, out var edited) && edited is not null ? edited : currentValue?.ToString() ?? string.Empty;
+
+    private async Task UpdateGoalProgress(Guid goalId)
+    {
+        if (!_goalProgressEdits.TryGetValue(goalId, out var raw) || !decimal.TryParse(raw, out var value))
+        {
+            return;
+        }
+
+        try
+        {
+            await GoalService.UpdateProgressAsync(goalId, new UpdateGoalProgressRequest(value), CurrentUser);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _goalError = ex.Message; return; }
+
+        await ReloadGoalsAsync();
+    }
+
+    private async Task RecordOutcome()
+    {
+        _outcomeError = null;
+        try
+        {
+            var request = new RecordOutcomeScoreRequest(PatientId, null, _newOutcomeMeasure, _newOutcomeDate, _newOutcomeScore, _newOutcomeMax, null);
+            await OutcomeService.RecordAsync(request, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
+        {
+            _outcomeError = ex.Message;
+            return;
+        }
+
+        _newOutcomeScore = 0;
+        _newOutcomeMax = null;
+        _showOutcomeForm = false;
+        await ReloadOutcomesAsync();
     }
 }
