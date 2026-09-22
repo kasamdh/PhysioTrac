@@ -1,0 +1,66 @@
+@page "/patients/{PatientId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject NavigationManager Navigation
+
+<PageTitle>@(_patient?.FullName ?? "Patient") — PhysioTrac</PageTitle>
+
+<a href="/patients">&larr; Back to patients</a>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_patient is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <h1>@_patient.FullName</h1>
+    <dl>
+        <dt>MRN</dt>
+        <dd>@_patient.MedicalRecordNumber</dd>
+        <dt>Date of birth</dt>
+        <dd>@_patient.DateOfBirth.ToString("yyyy-MM-dd") (age @_patient.Age)</dd>
+        <dt>Status</dt>
+        <dd>@_patient.Status</dd>
+        <dt>Phone</dt>
+        <dd>@(_patient.Phone ?? "—")</dd>
+        <dt>Email</dt>
+        <dd>@(_patient.Email ?? "—")</dd>
+    </dl>
+}
+
+<style>
+    dl { display: grid; grid-template-columns: 160px 1fr; row-gap: 0.5rem; max-width: 480px; }
+    dt { font-weight: 600; color: #475569; }
+    .error { color: #dc2626; }
+</style>
+
+@code {
+    [Parameter]
+    public Guid PatientId { get; set; }
+
+    private Patient? _patient;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _patient = await TenantAccess.RequirePatientAccessAsync(CurrentUser, PatientId);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            // RequirePatientAccessAsync never distinguishes "doesn't exist"
+            // from "not permitted" — same anti-enumeration behavior as the
+            // original's require_patient_access.
+            _error = ex.Message;
+        }
+    }
+}

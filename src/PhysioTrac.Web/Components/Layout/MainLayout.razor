@@ -1,0 +1,59 @@
+@inherits LayoutComponentBase
+@inject PhysioTrac.Infrastructure.Identity.CurrentUserAccessor CurrentUserAccessor
+
+<AuthorizeView>
+    <Authorized>
+        <div class="app-shell">
+            <header class="app-header">
+                <span class="app-title">PhysioTrac</span>
+                <nav>
+                    <a href="/patients">Patients</a>
+                </nav>
+                <div class="app-user">
+                    <span>@context.User.Identity?.Name</span>
+                    <form method="post" action="/account/logout">
+                        <button type="submit">Sign out</button>
+                    </form>
+                </div>
+            </header>
+            <main class="app-body">
+                @Body
+            </main>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+<style>
+    .app-header { display: flex; align-items: center; gap: 1.5rem; padding: 0.75rem 1.5rem; background: #1e293b; color: white; }
+    .app-title { font-weight: 600; }
+    .app-header nav { flex: 1; }
+    .app-header nav a { color: #cbd5e1; text-decoration: none; margin-right: 1rem; }
+    .app-header nav a:hover { color: white; }
+    .app-user { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; }
+    .app-user form { margin: 0; }
+    .app-user button { background: transparent; border: 1px solid #475569; color: #e2e8f0; padding: 0.3rem 0.7rem; border-radius: 4px; cursor: pointer; }
+    .app-body { padding: 1.5rem; }
+</style>
+
+@code {
+    [CascadingParameter]
+    private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask is not null)
+        {
+            var authState = await AuthStateTask;
+            // Set once per circuit so ICurrentUser (via ClaimsCurrentUser)
+            // resolves correctly for services invoked later by interaction,
+            // when IHttpContextAccessor.HttpContext is no longer reliable.
+            CurrentUserAccessor.Principal = authState.User;
+        }
+    }
+}

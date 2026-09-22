@@ -1,0 +1,57 @@
+using PhysioTrac.Application.Auth;
+using PhysioTrac.Domain.Entities;
+
+namespace PhysioTrac.Application.Clinical;
+
+/// <summary>Direct port of `care/note_management.py` — clinical note
+/// lifecycle: permission predicates plus the create/sign/cosign/addendum
+/// transition functions. Both permission checks and mutations live behind
+/// this one interface so a controller (or a future legacy surface) can't
+/// duplicate the rules.</summary>
+public interface IClinicalNoteService
+{
+    bool CanViewNote(ICurrentUser user, ClinicalNote note);
+
+    /// <summary>A signed note is never editable; otherwise the author, or an admin/director.</summary>
+    bool CanEditNote(ICurrentUser user, ClinicalNote note);
+
+    /// <summary>Who may sign this specific note. Admin/director always; the
+    /// owning therapist if their role carries sign-notes capability; the
+    /// owning PTA/Assistant too — landing on ReviewRequired instead of
+    /// Signed when the note requires cosign (see <see cref="SignNoteAsync"/>).</summary>
+    bool CanFinalizeNote(ICurrentUser user, ClinicalNote note);
+
+    /// <summary>Who may cosign a PTA-authored note awaiting review — a
+    /// supervising admin/director/therapist, never the note's own author.</summary>
+    bool CanCosignNote(ICurrentUser user, ClinicalNote note);
+
+    bool CanCreateAddendum(ICurrentUser user, ClinicalNote note);
+
+    Task<ClinicalNote> CreateDraftAsync(CreateNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Throws <see cref="Common.ForbiddenException"/> if the note
+    /// is signed or the caller isn't the author/an admin/director — callers
+    /// must check <see cref="CanEditNote"/> themselves for a friendlier error,
+    /// this is the last-line enforcement.</summary>
+    Task<ClinicalNote> UpdateDraftAsync(Guid noteId, UpdateNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<ClinicalNote> GetAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ClinicalNote>> ListForPatientAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Finalizes a note. Caller must have already checked
+    /// <see cref="CanFinalizeNote"/>. Throws if the compliance-finding
+    /// blockers aren't resolved, or attestation isn't confirmed.</summary>
+    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Completes a PTA-authored note awaiting cosign. Caller must
+    /// have already checked <see cref="CanCosignNote"/>.</summary>
+    Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Attach a correction to a signed note. The original note is never touched.</summary>
+    Task<NoteAddendum> CreateAddendumAsync(Guid noteId, CreateAddendumRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<NoteIntervention> AddInterventionAsync(Guid noteId, CreateInterventionRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<IReadOnlyList<NoteIntervention>> ListInterventionsAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+}

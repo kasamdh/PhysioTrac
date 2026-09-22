@@ -1,0 +1,47 @@
+@page "/login"
+@layout PhysioTrac.Web.Components.Layout.EmptyLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Sign in — PhysioTrac</PageTitle>
+
+<div class="login-page">
+    <div class="login-card">
+        <h1>PhysioTrac</h1>
+        @if (HasError)
+        {
+            <p class="login-error">Invalid username or password.</p>
+        }
+        <form method="post" action="/account/login">
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+            <label>
+                Username
+                <input type="text" name="username" autocomplete="username" required />
+            </label>
+            <label>
+                Password
+                <input type="password" name="password" autocomplete="current-password" required />
+            </label>
+            <button type="submit">Sign in</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f4f6f8; }
+    .login-card { background: white; padding: 2.5rem; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); width: 320px; }
+    .login-card h1 { margin: 0 0 1.5rem; font-size: 1.5rem; }
+    .login-card label { display: block; margin-bottom: 1rem; font-size: 0.9rem; }
+    .login-card input { width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; }
+    .login-card button { width: 100%; padding: 0.6rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .login-error { color: #dc2626; font-size: 0.9rem; }
+</style>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private bool HasError => Error == "1";
+}

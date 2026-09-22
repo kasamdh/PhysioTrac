@@ -1,0 +1,6 @@
+@PhysioTrac.Api_HostAddress = http://localhost:5095
+
+GET {{PhysioTrac.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

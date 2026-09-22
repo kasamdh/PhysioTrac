@@ -1,0 +1,79 @@
+@page "/patients"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject NavigationManager Navigation
+
+<PageTitle>Patients — PhysioTrac</PageTitle>
+
+<h1>Patients</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_patients is null)
+{
+    <p>Loading…</p>
+}
+else if (_patients.Count == 0)
+{
+    <p>No patients found for your caseload.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>MRN</th>
+                <th>Name</th>
+                <th>Date of birth</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var patient in _patients)
+            {
+                <tr @onclick="() => GoToPatient(patient.Id)">
+                    <td>@patient.MedicalRecordNumber</td>
+                    <td>@patient.FullName</td>
+                    <td>@patient.DateOfBirth.ToString("yyyy-MM-dd")</td>
+                    <td>@patient.Status</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<style>
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f8fafc; }
+    .error { color: #dc2626; }
+</style>
+
+@code {
+    private List<Patient>? _patients;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _patients = await TenantAccess.PatientsFor(CurrentUser)
+                .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
+                .ToListAsync();
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void GoToPatient(Guid patientId) => Navigation.NavigateTo($"/patients/{patientId}");
+}
