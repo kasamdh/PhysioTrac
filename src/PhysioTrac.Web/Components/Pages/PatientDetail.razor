@@ -1,16 +1,21 @@
 @page "/patients/{PatientId:guid}"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
 @using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Billing
 @using PhysioTrac.Application.Clinical
 @using PhysioTrac.Application.Tenancy
 @using PhysioTrac.Domain.Entities
 @using PhysioTrac.Domain.Enums
+@using PhysioTrac.Infrastructure.Persistence
 @inject ICurrentUser CurrentUser
 @inject ITenantAccessService TenantAccess
 @inject IClinicalNoteService NoteService
 @inject IFunctionalGoalService GoalService
 @inject IOutcomeScoreService OutcomeService
+@inject IChargeService ChargeService
+@inject PhysioTracDbContext Db
 @inject NavigationManager Navigation
 
 <PageTitle>@(_patient?.FullName ?? "Patient") — PhysioTrac</PageTitle>
@@ -216,6 +221,148 @@ else
             </table>
         }
     </section>
+
+    <section>
+        <h2>Insurance</h2>
+        @if (CanBill)
+        {
+            <button class="primary" @onclick="() => _showInsuranceForm = !_showInsuranceForm">@(_showInsuranceForm ? "Cancel" : "Add policy")</button>
+            @if (_showInsuranceForm)
+            {
+                <div class="form-card">
+                    @if (_insuranceError is not null)
+                    {
+                        <p class="error">@_insuranceError</p>
+                    }
+                    <label>
+                        Payer
+                        <select @bind="_newInsurancePayerId">
+                            <option value="">Select payer…</option>
+                            @foreach (var payer in _payerOptions)
+                            {
+                                <option value="@payer.Id">@payer.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        Rank
+                        <select @bind="_newInsuranceRank">
+                            @foreach (var rank in Enum.GetValues<InsuranceRank>())
+                            {
+                                <option value="@rank">@rank</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Member ID <input @bind="_newInsuranceMemberId" /></label>
+                    <label>Group number (optional) <input @bind="_newInsuranceGroupNumber" /></label>
+                    <label>Effective date <input type="date" @bind="_newInsuranceEffectiveDate" /></label>
+                    <label>Termination date (optional) <input type="date" @bind="_newInsuranceTerminationDate" /></label>
+                    <label>Copay (optional) <input type="number" min="0" step="0.01" @bind="_newInsuranceCopay" /></label>
+                    <button class="primary" @onclick="CreateInsurance">Save</button>
+                </div>
+            }
+        }
+        @if (_insurancePolicies is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_insurancePolicies.Count == 0)
+        {
+            <p>No insurance policies on file.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Payer</th><th>Rank</th><th>Member ID</th><th>Effective</th><th>Termination</th><th>Active</th></tr></thead>
+                <tbody>
+                    @foreach (var policy in _insurancePolicies)
+                    {
+                        <tr>
+                            <td>@PayerName(policy.PayerId)</td>
+                            <td>@policy.Rank</td>
+                            <td>@policy.MemberId</td>
+                            <td>@policy.EffectiveDate.ToString("yyyy-MM-dd")</td>
+                            <td>@(policy.TerminationDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                            <td>@(policy.IsActive ? "Yes" : "No")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section>
+        <h2>Charges</h2>
+        @if (CanBill)
+        {
+            <button class="primary" @onclick="ToggleChargeForm">@(_showChargeForm ? "Cancel" : "New charge")</button>
+            @if (_showChargeForm)
+            {
+                <div class="form-card">
+                    @if (_chargeError is not null)
+                    {
+                        <p class="error">@_chargeError</p>
+                    }
+                    <label>CPT code <input @bind="_newChargeCptCode" maxlength="5" placeholder="e.g. 97110" /></label>
+                    <label>
+                        Rendering provider
+                        <select @bind="_newChargeProviderId">
+                            <option value="">Select provider…</option>
+                            @foreach (var provider in _providerOptions)
+                            {
+                                <option value="@provider.Id">@provider.FullName</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        Linked note (optional)
+                        <select @bind="_newChargeNoteId">
+                            <option value="">None</option>
+                            @if (_notes is not null)
+                            {
+                                @foreach (var note in _notes)
+                                {
+                                    <option value="@note.Id">@note.NoteType - @note.ServiceDate.ToString("yyyy-MM-dd")</option>
+                                }
+                            }
+                        </select>
+                    </label>
+                    <label>Service date <input type="date" @bind="_newChargeServiceDate" /></label>
+                    <label>Units <input type="number" min="1" @bind="_newChargeUnits" /></label>
+                    <label>Minutes documented (optional) <input type="number" min="0" @bind="_newChargeMinutes" /></label>
+                    <label>Units override reason (required if units differ from the 8-minute-rule recommendation) <input @bind="_newChargeOverrideReason" /></label>
+                    <label>Charge amount <input type="number" min="0" step="0.01" @bind="_newChargeAmount" /></label>
+                    <button class="primary" @onclick="CreateCharge">Save</button>
+                </div>
+            }
+        }
+        @if (_charges is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_charges.Count == 0)
+        {
+            <p>No charges yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Service date</th><th>CPT</th><th>Units</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var charge in _charges)
+                    {
+                        <tr>
+                            <td>@charge.ServiceDate.ToString("yyyy-MM-dd")</td>
+                            <td>@charge.CptCode</td>
+                            <td>@charge.Units</td>
+                            <td>@charge.ChargeAmount.ToString("C")</td>
+                            <td>@charge.Status</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
 }
 
 <style>
@@ -264,8 +411,35 @@ else
     private decimal _newOutcomeScore;
     private decimal? _newOutcomeMax;
 
+    private List<PatientInsurance>? _insurancePolicies;
+    private List<Payer> _payerOptions = new();
+    private Dictionary<Guid, string> _payerNamesById = new();
+    private bool _showInsuranceForm;
+    private string? _insuranceError;
+    private Guid? _newInsurancePayerId;
+    private InsuranceRank _newInsuranceRank = InsuranceRank.Primary;
+    private string _newInsuranceMemberId = string.Empty;
+    private string? _newInsuranceGroupNumber;
+    private DateOnly _newInsuranceEffectiveDate = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly? _newInsuranceTerminationDate;
+    private decimal? _newInsuranceCopay;
+
+    private List<Charge>? _charges;
+    private List<Provider> _providerOptions = new();
+    private bool _showChargeForm;
+    private string? _chargeError;
+    private string _newChargeCptCode = string.Empty;
+    private Guid? _newChargeProviderId;
+    private Guid? _newChargeNoteId;
+    private DateOnly _newChargeServiceDate = DateOnly.FromDateTime(DateTime.Today);
+    private int _newChargeUnits = 1;
+    private int? _newChargeMinutes;
+    private string? _newChargeOverrideReason;
+    private decimal _newChargeAmount;
+
     private bool CanDocument => RoleSets.Clinical.Contains(CurrentUser.Role);
     private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
+    private bool CanBill => RoleSets.Billing.Contains(CurrentUser.Role);
 
     protected override async Task OnInitializedAsync()
     {
@@ -282,6 +456,8 @@ else
         await ReloadNotesAsync();
         await ReloadGoalsAsync();
         await ReloadOutcomesAsync();
+        await ReloadInsuranceAsync();
+        await ReloadChargesAsync();
     }
 
     private async Task ReloadNotesAsync() =>
@@ -387,5 +563,112 @@ else
         _newOutcomeMax = null;
         _showOutcomeForm = false;
         await ReloadOutcomesAsync();
+    }
+
+    private async Task ReloadInsuranceAsync()
+    {
+        var organizationId = _patient!.OrganizationId;
+        _insurancePolicies = await Db.PatientInsurancePolicies.Where(i => i.PatientId == PatientId)
+            .OrderBy(i => i.Rank).ThenByDescending(i => i.EffectiveDate).ToListAsync();
+        var payers = await Db.Payers.Where(p => p.OrganizationId == organizationId).OrderBy(p => p.Name).ToListAsync();
+        _payerNamesById = payers.ToDictionary(p => p.Id, p => p.Name);
+        if (CanBill) _payerOptions = payers;
+    }
+
+    private string PayerName(Guid payerId) => _payerNamesById.TryGetValue(payerId, out var name) ? name : "Unknown payer";
+
+    private async Task CreateInsurance()
+    {
+        _insuranceError = null;
+        if (_newInsurancePayerId is null || string.IsNullOrWhiteSpace(_newInsuranceMemberId))
+        {
+            _insuranceError = "Payer and member ID are required.";
+            return;
+        }
+        if (_newInsuranceTerminationDate is DateOnly termination && termination < _newInsuranceEffectiveDate)
+        {
+            _insuranceError = "Termination date cannot be before the effective date.";
+            return;
+        }
+
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Billing);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _insuranceError = ex.Message; return; }
+
+        var policy = new PatientInsurance
+        {
+            OrganizationId = _patient!.OrganizationId,
+            PatientId = PatientId,
+            PayerId = _newInsurancePayerId.Value,
+            Rank = _newInsuranceRank,
+            MemberId = _newInsuranceMemberId.Trim(),
+            GroupNumber = string.IsNullOrWhiteSpace(_newInsuranceGroupNumber) ? null : _newInsuranceGroupNumber.Trim(),
+            EffectiveDate = _newInsuranceEffectiveDate,
+            TerminationDate = _newInsuranceTerminationDate,
+            Copay = _newInsuranceCopay,
+            CreatedById = CurrentUser.UserId,
+        };
+        Db.PatientInsurancePolicies.Add(policy);
+        await Db.SaveChangesAsync();
+
+        _newInsurancePayerId = null;
+        _newInsuranceMemberId = string.Empty;
+        _newInsuranceGroupNumber = null;
+        _newInsuranceEffectiveDate = DateOnly.FromDateTime(DateTime.Today);
+        _newInsuranceTerminationDate = null;
+        _newInsuranceCopay = null;
+        _showInsuranceForm = false;
+        await ReloadInsuranceAsync();
+    }
+
+    private async Task ReloadChargesAsync()
+    {
+        _charges = (await ChargeService.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+        if (CanBill)
+        {
+            _providerOptions = await Db.Providers.Where(p => p.OrganizationId == _patient!.OrganizationId && p.IsActive)
+                .OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToListAsync();
+        }
+    }
+
+    private void ToggleChargeForm() => _showChargeForm = !_showChargeForm;
+
+    private async Task CreateCharge()
+    {
+        _chargeError = null;
+        if (string.IsNullOrWhiteSpace(_newChargeCptCode) || _newChargeProviderId is null)
+        {
+            _chargeError = "CPT code and rendering provider are required.";
+            return;
+        }
+
+        var request = new CreateChargeRequest(
+            PatientId, _newChargeNoteId, _newChargeProviderId.Value, null,
+            _newChargeServiceDate, _newChargeCptCode.Trim().ToUpperInvariant(), null, _newChargeUnits, _newChargeMinutes,
+            string.IsNullOrWhiteSpace(_newChargeOverrideReason) ? null : _newChargeOverrideReason.Trim(), _newChargeAmount, null);
+
+        try
+        {
+            await ChargeService.CreateAsync(request, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException
+            or PhysioTrac.Application.Common.NotFoundException or InvalidOperationException)
+        {
+            _chargeError = ex.Message;
+            return;
+        }
+
+        _newChargeCptCode = string.Empty;
+        _newChargeProviderId = null;
+        _newChargeNoteId = null;
+        _newChargeServiceDate = DateOnly.FromDateTime(DateTime.Today);
+        _newChargeUnits = 1;
+        _newChargeMinutes = null;
+        _newChargeOverrideReason = null;
+        _newChargeAmount = 0;
+        _showChargeForm = false;
+        await ReloadChargesAsync();
     }
 }

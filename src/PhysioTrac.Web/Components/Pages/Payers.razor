@@ -1,0 +1,169 @@
+@page "/payers"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Infrastructure.Persistence
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject PhysioTracDbContext Db
+
+<PageTitle>Payers — PhysioTrac</PageTitle>
+
+<h1>Insurance payers</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_payers is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    @if (CanManage)
+    {
+        <button class="primary" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New payer")</button>
+
+        @if (_showForm)
+        {
+            <div class="form-card">
+                @if (_formError is not null)
+                {
+                    <p class="error">@_formError</p>
+                }
+                <label>Name <input @bind="_name" /></label>
+                <label>Payer ID (optional) <input @bind="_payerId" /></label>
+                <label>Electronic payer ID (optional) <input @bind="_electronicPayerId" /></label>
+                <label>Timely filing days <input type="number" min="1" @bind="_timelyFilingDays" /></label>
+                <label class="checkbox">
+                    <input type="checkbox" @bind="_authorizationRequired" />
+                    Authorization required
+                </label>
+                <label>Authorization notes (optional) <input @bind="_authorizationNotes" /></label>
+                <label>Notes (optional) <input @bind="_notes" /></label>
+                <button class="primary" @onclick="CreatePayer">Save</button>
+            </div>
+        }
+    }
+
+    @if (_payers.Count == 0)
+    {
+        <p>No payers yet.</p>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Payer ID</th><th>Timely filing</th><th>Auth required</th><th>Active</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var payer in _payers)
+                {
+                    <tr>
+                        <td>@payer.Name</td>
+                        <td>@(payer.PayerId ?? "—")</td>
+                        <td>@payer.TimelyFilingDays days</td>
+                        <td>@(payer.AuthorizationRequired ? "Yes" : "No")</td>
+                        <td>@(payer.IsActive ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+<style>
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    .error { color: #dc2626; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card label.checkbox { display: flex; align-items: center; gap: 0.5rem; }
+    .form-card label.checkbox input { width: auto; }
+    .form-card input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+</style>
+
+@code {
+    private List<Payer>? _payers;
+    private string? _error;
+    private string? _formError;
+    private bool _showForm;
+    private Guid _organizationId;
+
+    private string _name = string.Empty;
+    private string? _payerId;
+    private string? _electronicPayerId;
+    private int _timelyFilingDays = 90;
+    private bool _authorizationRequired;
+    private string? _authorizationNotes;
+    private string? _notes;
+
+    private bool CanManage => RoleSets.Billing.Contains(CurrentUser.Role);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+            _organizationId = organization.Id;
+            _payers = await Db.Payers.Where(p => p.OrganizationId == organization.Id)
+                .OrderBy(p => p.Name).ToListAsync();
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task CreatePayer()
+    {
+        _formError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Billing);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _formError = ex.Message;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _formError = "Name is required.";
+            return;
+        }
+
+        var payer = new Payer
+        {
+            OrganizationId = _organizationId,
+            Name = _name.Trim(),
+            PayerId = string.IsNullOrWhiteSpace(_payerId) ? null : _payerId.Trim(),
+            ElectronicPayerId = string.IsNullOrWhiteSpace(_electronicPayerId) ? null : _electronicPayerId.Trim(),
+            TimelyFilingDays = _timelyFilingDays <= 0 ? 90 : _timelyFilingDays,
+            AuthorizationRequired = _authorizationRequired,
+            AuthorizationNotes = string.IsNullOrWhiteSpace(_authorizationNotes) ? null : _authorizationNotes.Trim(),
+            Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+            CreatedById = CurrentUser.UserId,
+        };
+        Db.Payers.Add(payer);
+        await Db.SaveChangesAsync();
+
+        _name = string.Empty;
+        _payerId = null;
+        _electronicPayerId = null;
+        _timelyFilingDays = 90;
+        _authorizationRequired = false;
+        _authorizationNotes = null;
+        _notes = null;
+        _showForm = false;
+        await LoadAsync();
+    }
+}

@@ -1,0 +1,195 @@
+@page "/service-prices"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Domain.Enums
+@using PhysioTrac.Infrastructure.Persistence
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject PhysioTracDbContext Db
+
+<PageTitle>Service prices — PhysioTrac</PageTitle>
+
+<h1>Service prices</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_prices is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    @if (CanManage)
+    {
+        <button class="primary" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New price")</button>
+
+        @if (_showForm)
+        {
+            <div class="form-card">
+                @if (_formError is not null)
+                {
+                    <p class="error">@_formError</p>
+                }
+                <label>CPT code <input @bind="_cptCode" maxlength="10" /></label>
+                <label>Label <input @bind="_label" /></label>
+                <label>Price <input type="number" min="0" step="0.01" @bind="_price" /></label>
+                <label>
+                    Home-visit kind (optional)
+                    <select @bind="_homeVisitKind">
+                        <option value="">None</option>
+                        @foreach (var kind in Enum.GetValues<AppointmentKind>())
+                        {
+                            <option value="@kind">@kind</option>
+                        }
+                    </select>
+                </label>
+                <label class="checkbox">
+                    <input type="checkbox" @bind="_isHomeVisitTravelFee" />
+                    This is the home-visit travel fee
+                </label>
+                <label>Deposit amount (home-visit kind only, optional) <input type="number" min="0" step="0.01" @bind="_depositAmount" /></label>
+                <button class="primary" @onclick="CreatePrice">Save</button>
+            </div>
+        }
+    }
+
+    @if (_prices.Count == 0)
+    {
+        <p>No service prices yet.</p>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr><th>CPT code</th><th>Label</th><th>Price</th><th>Home-visit kind</th><th>Travel fee</th><th>Deposit</th><th>Active</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var price in _prices)
+                {
+                    <tr>
+                        <td>@price.CptCode</td>
+                        <td>@price.Label</td>
+                        <td>@price.Price.ToString("C")</td>
+                        <td>@(price.HomeVisitKind?.ToString() ?? "—")</td>
+                        <td>@(price.IsHomeVisitTravelFee ? "Yes" : "No")</td>
+                        <td>@(price.DepositAmount is { } d ? d.ToString("C") : "—")</td>
+                        <td>@(price.IsActive ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+<style>
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    .error { color: #dc2626; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card label.checkbox { display: flex; align-items: center; gap: 0.5rem; }
+    .form-card label.checkbox input { width: auto; }
+    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+</style>
+
+@code {
+    private List<ServicePrice>? _prices;
+    private string? _error;
+    private string? _formError;
+    private bool _showForm;
+    private Guid _organizationId;
+
+    private string _cptCode = string.Empty;
+    private string _label = string.Empty;
+    private decimal _price;
+    private AppointmentKind? _homeVisitKind;
+    private bool _isHomeVisitTravelFee;
+    private decimal? _depositAmount;
+
+    private bool CanManage => RoleSets.Billing.Contains(CurrentUser.Role);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+            _organizationId = organization.Id;
+            _prices = await Db.ServicePrices.Where(s => s.OrganizationId == organization.Id)
+                .OrderBy(s => s.CptCode).ToListAsync();
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task CreatePrice()
+    {
+        _formError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Billing);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _formError = ex.Message;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_cptCode) || string.IsNullOrWhiteSpace(_label))
+        {
+            _formError = "CPT code and label are required.";
+            return;
+        }
+        if (_homeVisitKind is not null && _isHomeVisitTravelFee)
+        {
+            _formError = "A price row can be tagged as a home-visit kind or the travel fee, not both.";
+            return;
+        }
+        if (_depositAmount is decimal deposit)
+        {
+            if (_isHomeVisitTravelFee || _homeVisitKind is null)
+            {
+                _formError = "A deposit can only be set on a home-visit-kind price.";
+                return;
+            }
+            if (deposit <= 0)
+            {
+                _formError = "Enter a deposit amount greater than zero.";
+                return;
+            }
+        }
+
+        var price = new ServicePrice
+        {
+            OrganizationId = _organizationId,
+            CptCode = _cptCode.Trim(),
+            Label = _label.Trim(),
+            Price = _price,
+            HomeVisitKind = _homeVisitKind,
+            IsHomeVisitTravelFee = _isHomeVisitTravelFee,
+            DepositAmount = _depositAmount,
+            CreatedById = CurrentUser.UserId,
+        };
+        Db.ServicePrices.Add(price);
+        await Db.SaveChangesAsync();
+
+        _cptCode = string.Empty;
+        _label = string.Empty;
+        _price = 0;
+        _homeVisitKind = null;
+        _isHomeVisitTravelFee = false;
+        _depositAmount = null;
+        _showForm = false;
+        await LoadAsync();
+    }
+}
