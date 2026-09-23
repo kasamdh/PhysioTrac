@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PhysioTrac.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using PhysioTrac.Infrastructure.Persistence;
 namespace PhysioTrac.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PhysioTracDbContext))]
-    partial class PhysioTracDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923024434_AddReferringProviders")]
+    partial class AddReferringProviders
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1208,57 +1211,6 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.HasIndex("LocationId", "StartDateTime", "EndDateTime");
 
                     b.ToTable("LocationClosures");
-                });
-
-            modelBuilder.Entity("PhysioTrac.Domain.Entities.Message", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<bool>("IsFromPatient")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("ReadAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("ReadById")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("SenderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("SenderRole")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTimeOffset>("SentAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganizationId");
-
-                    b.HasIndex("PatientId", "SentAt");
-
-                    b.ToTable("Messages");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteAddendum", b =>
@@ -2951,25 +2903,6 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Location");
                 });
 
-            modelBuilder.Entity("PhysioTrac.Domain.Entities.Message", b =>
-                {
-                    b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
-                        .WithMany()
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
-                        .WithMany("Messages")
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Organization");
-
-                    b.Navigation("Patient");
-                });
-
             modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteAddendum", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
@@ -3331,8 +3264,6 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Goals");
 
                     b.Navigation("HomeExercisePrograms");
-
-                    b.Navigation("Messages");
 
                     b.Navigation("Notes");
 

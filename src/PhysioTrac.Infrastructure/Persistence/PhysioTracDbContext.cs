@@ -48,6 +48,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<Consent> Consents => Set<Consent>();
     public DbSet<HomeExerciseProgram> HomeExercisePrograms => Set<HomeExerciseProgram>();
     public DbSet<HomeExerciseItem> HomeExerciseItems => Set<HomeExerciseItem>();
+    public DbSet<ReferringProvider> ReferringProviders => Set<ReferringProvider>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -105,6 +107,25 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(p => p.PreferredContactMethod).HasConversion<string>().HasMaxLength(16);
             e.HasOne(p => p.Organization).WithMany(o => o.Patients)
                 .HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.ReferringProvider).WithMany()
+                .HasForeignKey(p => p.ReferringProviderId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<ReferringProvider>(e =>
+        {
+            e.HasIndex(r => new { r.OrganizationId, r.LastName, r.FirstName });
+            e.HasOne(r => r.Organization).WithMany()
+                .HasForeignKey(r => r.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Message>(e =>
+        {
+            e.HasIndex(m => new { m.PatientId, m.SentAt });
+            e.Property(m => m.SenderRole).HasConversion<string>().HasMaxLength(20);
+            e.HasOne(m => m.Organization).WithMany()
+                .HasForeignKey(m => m.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(m => m.Patient).WithMany(p => p.Messages)
+                .HasForeignKey(m => m.PatientId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<AuditEvent>(e =>

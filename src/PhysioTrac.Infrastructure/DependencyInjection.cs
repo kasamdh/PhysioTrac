@@ -8,6 +8,7 @@ using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Configuration;
 using PhysioTrac.Application.Consents;
 using PhysioTrac.Application.Documents;
+using PhysioTrac.Application.Messaging;
 using PhysioTrac.Application.Scheduling;
 using PhysioTrac.Application.Sessions;
 using PhysioTrac.Application.SuperAdmin;
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConsentService, ConsentService>();
         services.AddScoped<IHomeExerciseProgramService, HomeExerciseProgramService>();
+        services.AddScoped<IMessageService, MessageService>();
 
         return services;
     }

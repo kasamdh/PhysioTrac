@@ -33,7 +33,7 @@ public class DocumentService : IDocumentService
     public async Task<PatientDocument> UploadAsync(UploadDocumentRequest request, ICurrentUser actor, CancellationToken ct = default)
     {
         _tenantAccess.RequireRole(actor, RoleSets.DocumentManagement);
-        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, request.PatientId, clinical: false, ct: ct);
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, request.PatientId, ct: ct);
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
 
         if (request.FileSizeBytes <= 0 || request.FileSizeBytes > _options.MaxUploadBytes)
@@ -76,7 +76,7 @@ public class DocumentService : IDocumentService
 
     public async Task<IReadOnlyList<PatientDocument>> ListForPatientAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default)
     {
-        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, clinical: false, ct: ct);
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, ct: ct);
         return await _db.PatientDocuments
             .Where(d => d.PatientId == patient.Id && d.DeletedAt == null)
             .OrderByDescending(d => d.CreatedAt)
@@ -86,7 +86,7 @@ public class DocumentService : IDocumentService
     public async Task<(PatientDocument Document, Stream Content)> DownloadAsync(Guid documentId, ICurrentUser actor, CancellationToken ct = default)
     {
         var document = await LoadDocumentInOrgAsync(documentId, actor, ct);
-        await _tenantAccess.RequirePatientAccessAsync(actor, document.PatientId, clinical: false, ct: ct);
+        await _tenantAccess.RequirePatientAccessAsync(actor, document.PatientId, ct: ct);
 
         var stream = await _fileStorage.OpenReadAsync(document.StorageKey, ct);
 
@@ -101,7 +101,7 @@ public class DocumentService : IDocumentService
     {
         _tenantAccess.RequireRole(actor, RoleSets.DocumentManagement);
         var document = await LoadDocumentInOrgAsync(documentId, actor, ct);
-        await _tenantAccess.RequirePatientAccessAsync(actor, document.PatientId, clinical: false, ct: ct);
+        await _tenantAccess.RequirePatientAccessAsync(actor, document.PatientId, ct: ct);
 
         if (document.IsDeleted)
         {

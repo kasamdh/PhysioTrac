@@ -36,6 +36,13 @@ public class Patient : BaseEntity
 
     public Guid? AssignedTherapistId { get; set; }
 
+    /// <summary>The outside physician who referred this patient in, if any --
+    /// distinct from PrimaryCareProviderId (not yet a separate field; a
+    /// patient's PCP and referring provider are often, but not always, the
+    /// same person -- this codebase doesn't yet distinguish them).</summary>
+    public Guid? ReferringProviderId { get; set; }
+    public ReferringProvider? ReferringProvider { get; set; }
+
     /// <summary>The login identity (role=Patient) this chart's portal account
     /// uses, if one has been issued.</summary>
     public Guid? PortalUserId { get; set; }
@@ -63,4 +70,5 @@ public class Patient : BaseEntity
     public ICollection<PatientDocument> Documents { get; set; } = new List<PatientDocument>();
     public ICollection<Consent> Consents { get; set; } = new List<Consent>();
     public ICollection<HomeExerciseProgram> HomeExercisePrograms { get; set; } = new List<HomeExerciseProgram>();
+    public ICollection<Message> Messages { get; set; } = new List<Message>();
 }

@@ -74,7 +74,17 @@ public class TenantAccessService : ITenantAccessService
             return query;
         }
 
-        if (user.Role is UserRole.Admin or UserRole.Director or UserRole.Compliance)
+        // Admin/Director/Compliance/Scheduler/Biller are all administrative-
+        // facing roles whose job (oversight, front-desk registration and
+        // scheduling, billing) inherently requires seeing the whole roster,
+        // not a caseload -- "clinical" narrowing only means something for a
+        // role that actually has a caseload to narrow to. Discovered as a
+        // real bug: this used to fall through to `Where(_ => false)` for
+        // Scheduler/Biller, silently returning zero patients from every
+        // patient-scoped read (GET /api/v1/patients, document/consent/
+        // message listing) despite registration/scheduling/billing being
+        // those roles' entire job per the spec.
+        if (user.Role is UserRole.Admin or UserRole.Director or UserRole.Compliance or UserRole.Scheduler or UserRole.Biller)
         {
             return query;
         }

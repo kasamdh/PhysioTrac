@@ -113,6 +113,46 @@ public class TenantAccessServiceTests
     }
 
     [Fact]
+    public void PatientsFor_SchedulerAndBiller_SeeWholeOrganization()
+    {
+        // Regression test: Scheduler/Biller used to fall through to
+        // Where(_ => false) here, silently returning zero patients from
+        // every read that uses PatientsFor's default (clinical: true) --
+        // e.g. GET /api/v1/patients -- despite front-desk registration and
+        // billing being those roles' entire job per the spec.
+        var (db, orgA, _, patientA, _, _) = SeedTwoTenants();
+        var audit = new AuditService(db);
+        var service = new TenantAccessService(db, audit);
+        var scheduler = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = orgA.Id, Role = UserRole.Scheduler };
+        var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = orgA.Id, Role = UserRole.Biller };
+
+        Assert.Equal(patientA.Id, Assert.Single(service.PatientsFor(scheduler).ToList()).Id);
+        Assert.Equal(patientA.Id, Assert.Single(service.PatientsFor(biller).ToList()).Id);
+    }
+
+    [Fact]
+    public async Task PatientsFor_Therapist_StaysCaseloadScoped_EvenAfterSchedulerBillerFix()
+    {
+        // Guards against fixing the above by loosening clinical narrowing
+        // for everyone instead of specifically Scheduler/Biller -- a
+        // Therapist must never see a colleague's patient just because
+        // Scheduler/Biller now do.
+        var (db, orgA, _, patientA, _, therapistAId) = SeedTwoTenants();
+        var unassigned = new Patient { OrganizationId = orgA.Id, FirstName = "Carl", LastName = "Clark", DateOfBirth = new DateOnly(1970, 1, 1) };
+        db.Patients.Add(unassigned);
+        await db.SaveChangesAsync();
+
+        var audit = new AuditService(db);
+        var service = new TenantAccessService(db, audit);
+        var therapist = new TestCurrentUser { UserId = therapistAId, OrganizationId = orgA.Id, Role = UserRole.Therapist };
+
+        var visible = service.PatientsFor(therapist).ToList();
+
+        Assert.Single(visible);
+        Assert.Equal(patientA.Id, visible[0].Id);
+    }
+
+    [Fact]
     public void PatientsFor_PatientRole_IsScopedToOwnChartRegardlessOfClinicalFlag()
     {
         var db = NewDb();

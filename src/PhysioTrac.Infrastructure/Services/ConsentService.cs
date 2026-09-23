@@ -25,7 +25,7 @@ public class ConsentService : IConsentService
     public async Task<Consent> RecordAsync(RecordConsentRequest request, ICurrentUser actor, string? ipAddress, CancellationToken ct = default)
     {
         _tenantAccess.RequireRole(actor, RoleSets.DocumentManagement);
-        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, request.PatientId, clinical: false, ct: ct);
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, request.PatientId, ct: ct);
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
 
         if (string.IsNullOrWhiteSpace(request.SignedByName))
@@ -55,7 +55,7 @@ public class ConsentService : IConsentService
 
     public async Task<IReadOnlyList<Consent>> ListForPatientAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default)
     {
-        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, clinical: false, ct: ct);
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, ct: ct);
         return await _db.Consents.Where(c => c.PatientId == patient.Id)
             .OrderByDescending(c => c.SignedAt).ToListAsync(ct);
     }
