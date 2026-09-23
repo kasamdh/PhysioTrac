@@ -1,0 +1,37 @@
+@* Generic status badge shared across every status enum in this app
+   (Patient/Appointment/Note/Goal/Charge/Claim/Superbill/Payment status
+   values). Colors are picked by word-matching common status vocabulary
+   rather than one switch per enum type, since the same words ("Active",
+   "Draft", "Cancelled"...) recur across all of them with the same meaning. *@
+
+<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium @ColorClasses">
+    @Text
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    private static readonly HashSet<string> Success = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Active", "Signed", "Paid", "Succeeded", "Completed", "Accepted", "Met", "Approved", "Ready",
+    };
+
+    private static readonly HashSet<string> Warning = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Draft", "Pending", "ReviewRequired", "Processing", "PartialPayment", "Submitted", "CheckedIn", "Appealed",
+    };
+
+    private static readonly HashSet<string> Danger = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Cancelled", "Denied", "Failed", "Suspended", "Void", "Rejected", "NoShow", "ValidationError", "Discontinued", "LockedOut", "Deleted",
+    };
+
+    private string ColorClasses => Text switch
+    {
+        _ when Success.Contains(Text) => "bg-success-light text-success",
+        _ when Warning.Contains(Text) => "bg-warning-light text-warning",
+        _ when Danger.Contains(Text) => "bg-danger-light text-danger",
+        _ => "bg-surface-muted text-text-muted",
+    };
+}

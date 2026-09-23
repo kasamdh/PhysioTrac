@@ -21,223 +21,233 @@
 
 <PageTitle>@(_patient?.FullName ?? "Patient") — PhysioTrac</PageTitle>
 
-<a href="/patients">&larr; Back to patients</a>
+<a href="/patients" class="text-sm text-text-muted no-underline hover:text-primary">&larr; Back to patients</a>
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="alert-error mt-3">@_error</p>
 }
 else if (_patient is null)
 {
-    <p>Loading…</p>
+    <p class="mt-3 text-text-muted">Loading…</p>
 }
 else
 {
-    <h1>@_patient.FullName</h1>
-    <dl>
-        <dt>MRN</dt>
-        <dd>@_patient.MedicalRecordNumber</dd>
-        <dt>Date of birth</dt>
-        <dd>@_patient.DateOfBirth.ToString("yyyy-MM-dd") (age @_patient.Age)</dd>
-        <dt>Status</dt>
-        <dd>@_patient.Status</dd>
-        <dt>Phone</dt>
-        <dd>@(_patient.Phone ?? "—")</dd>
-        <dt>Email</dt>
-        <dd>@(_patient.Email ?? "—")</dd>
-    </dl>
+    <div class="card mt-3">
+        <h1 class="text-xl font-semibold text-text">@_patient.FullName</h1>
+        <dl class="mt-3 grid grid-cols-[140px_1fr] gap-y-2 text-sm">
+            <dt class="font-medium text-text-muted">MRN</dt>
+            <dd>@_patient.MedicalRecordNumber</dd>
+            <dt class="font-medium text-text-muted">Date of birth</dt>
+            <dd>@_patient.DateOfBirth.ToString("yyyy-MM-dd") (age @_patient.Age)</dd>
+            <dt class="font-medium text-text-muted">Status</dt>
+            <dd><StatusPill Text="@_patient.Status.ToString()" /></dd>
+            <dt class="font-medium text-text-muted">Phone</dt>
+            <dd>@(_patient.Phone ?? "—")</dd>
+            <dt class="font-medium text-text-muted">Email</dt>
+            <dd>@(_patient.Email ?? "—")</dd>
+        </dl>
+    </div>
 
-    <section>
-        <h2>Clinical notes</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Clinical notes</h2>
         @if (CanDocument)
         {
-            <div class="inline-form">
-                <select @bind="_newNoteType">
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <select @bind="_newNoteType" class="field-input mt-0 w-auto">
                     @foreach (var type in Enum.GetValues<NoteType>())
                     {
                         <option value="@type">@type</option>
                     }
                 </select>
-                <input type="date" @bind="_newNoteServiceDate" />
-                <button class="primary" @onclick="StartNote">Start note</button>
+                <input type="date" @bind="_newNoteServiceDate" class="field-input mt-0 w-auto" />
+                <button class="btn-primary" @onclick="StartNote">Start note</button>
             </div>
             @if (_noteError is not null)
             {
-                <p class="error">@_noteError</p>
+                <p class="alert-error mb-3">@_noteError</p>
             }
         }
         @if (_notes is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_notes.Count == 0)
         {
-            <p>No clinical notes yet.</p>
+            <p class="text-text-muted">No clinical notes yet.</p>
         }
         else
         {
-            <table>
-                <thead>
-                    <tr><th>Service date</th><th>Type</th><th>Status</th><th></th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var note in _notes)
-                    {
-                        <tr>
-                            <td>@note.ServiceDate.ToString("yyyy-MM-dd")</td>
-                            <td>@note.NoteType</td>
-                            <td>@note.Status</td>
-                            <td><a href="/notes/@note.Id">Open</a></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Service date</th><th>Type</th><th>Status</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var note in _notes)
+                        {
+                            <tr>
+                                <td>@note.ServiceDate.ToString("yyyy-MM-dd")</td>
+                                <td>@note.NoteType</td>
+                                <td><StatusPill Text="@note.Status.ToString()" /></td>
+                                <td><a href="/notes/@note.Id" class="text-primary hover:underline">Open</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Functional goals</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Functional goals</h2>
         @if (CanDocument)
         {
-            <button class="primary" @onclick="() => _showGoalForm = !_showGoalForm">@(_showGoalForm ? "Cancel" : "New goal")</button>
+            <button class="btn-primary mb-3" @onclick="() => _showGoalForm = !_showGoalForm">@(_showGoalForm ? "Cancel" : "New goal")</button>
             @if (_showGoalForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_goalError is not null)
                     {
-                        <p class="error">@_goalError</p>
+                        <p class="alert-error mb-3">@_goalError</p>
                     }
-                    <label>Functional limitation <input @bind="_newGoalLimitation" /></label>
-                    <label>Functional task <input @bind="_newGoalTask" /></label>
-                    <label>Baseline value <input type="number" step="0.01" @bind="_newGoalBaseline" /></label>
-                    <label>Target value <input type="number" step="0.01" @bind="_newGoalTarget" /></label>
-                    <label>Unit <input @bind="_newGoalUnit" placeholder="e.g. degrees, reps" /></label>
-                    <label>Measurement method <input @bind="_newGoalMethod" /></label>
-                    <label>Target date <input type="date" @bind="_newGoalTargetDate" /></label>
-                    <button class="primary" @onclick="CreateGoal">Save</button>
+                    <label class="field-label">Functional limitation <input @bind="_newGoalLimitation" class="field-input" /></label>
+                    <label class="field-label">Functional task <input @bind="_newGoalTask" class="field-input" /></label>
+                    <label class="field-label">Baseline value <input type="number" step="0.01" @bind="_newGoalBaseline" class="field-input" /></label>
+                    <label class="field-label">Target value <input type="number" step="0.01" @bind="_newGoalTarget" class="field-input" /></label>
+                    <label class="field-label">Unit <input @bind="_newGoalUnit" placeholder="e.g. degrees, reps" class="field-input" /></label>
+                    <label class="field-label">Measurement method <input @bind="_newGoalMethod" class="field-input" /></label>
+                    <label class="field-label">Target date <input type="date" @bind="_newGoalTargetDate" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="CreateGoal">Save</button>
                 </div>
             }
         }
         @if (_goals is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_goals.Count == 0)
         {
-            <p>No functional goals yet.</p>
+            <p class="text-text-muted">No functional goals yet.</p>
         }
         else
         {
-            <table>
-                <thead>
-                    <tr><th>Limitation</th><th>Task</th><th>Baseline → Target</th><th>Current</th><th>Progress</th><th>Status</th><th></th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var goal in _goals)
-                    {
-                        <tr>
-                            <td>@goal.FunctionalLimitation</td>
-                            <td>@goal.FunctionalTask</td>
-                            <td>@goal.BaselineValue → @goal.TargetValue @goal.Unit</td>
-                            <td>
-                                @if (goal.Status == GoalStatus.Active)
-                                {
-                                    <input type="number" step="0.01" style="width:5rem"
-                                           value="@GoalProgressInput(goal.Id, goal.CurrentValue)"
-                                           @onchange="e => _goalProgressEdits[goal.Id] = e.Value?.ToString()" />
-                                    <button @onclick="() => UpdateGoalProgress(goal.Id)">Save</button>
-                                }
-                                else
-                                {
-                                    @(goal.CurrentValue?.ToString() ?? "—")
-                                }
-                            </td>
-                            <td>@(goal.ProgressPercent is { } p ? $"{p}%" : "—")</td>
-                            <td>@goal.Status</td>
-                            <td>
-                                @if (goal.Status == GoalStatus.Draft && CanApproveGoals)
-                                {
-                                    <button @onclick="() => ApproveGoal(goal.Id)">Approve</button>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Limitation</th><th>Task</th><th>Baseline → Target</th><th>Current</th><th>Progress</th><th>Status</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var goal in _goals)
+                        {
+                            <tr>
+                                <td>@goal.FunctionalLimitation</td>
+                                <td>@goal.FunctionalTask</td>
+                                <td>@goal.BaselineValue → @goal.TargetValue @goal.Unit</td>
+                                <td>
+                                    @if (goal.Status == GoalStatus.Active)
+                                    {
+                                        <div class="flex items-center gap-1.5">
+                                            <input type="number" step="0.01" class="field-input mt-0 w-20"
+                                                   value="@GoalProgressInput(goal.Id, goal.CurrentValue)"
+                                                   @onchange="e => _goalProgressEdits[goal.Id] = e.Value?.ToString()" />
+                                            <button class="btn-secondary" @onclick="() => UpdateGoalProgress(goal.Id)">Save</button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @(goal.CurrentValue?.ToString() ?? "—")
+                                    }
+                                </td>
+                                <td>@(goal.ProgressPercent is { } p ? $"{p}%" : "—")</td>
+                                <td><StatusPill Text="@goal.Status.ToString()" /></td>
+                                <td>
+                                    @if (goal.Status == GoalStatus.Draft && CanApproveGoals)
+                                    {
+                                        <button class="btn-secondary" @onclick="() => ApproveGoal(goal.Id)">Approve</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Outcome measures</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Outcome measures</h2>
         @if (CanDocument)
         {
-            <button class="primary" @onclick="() => _showOutcomeForm = !_showOutcomeForm">@(_showOutcomeForm ? "Cancel" : "Record score")</button>
+            <button class="btn-primary mb-3" @onclick="() => _showOutcomeForm = !_showOutcomeForm">@(_showOutcomeForm ? "Cancel" : "Record score")</button>
             @if (_showOutcomeForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_outcomeError is not null)
                     {
-                        <p class="error">@_outcomeError</p>
+                        <p class="alert-error mb-3">@_outcomeError</p>
                     }
-                    <label>
+                    <label class="field-label">
                         Measure
-                        <select @bind="_newOutcomeMeasure">
+                        <select @bind="_newOutcomeMeasure" class="field-input">
                             @foreach (var measure in Enum.GetValues<OutcomeMeasure>())
                             {
                                 <option value="@measure">@measure</option>
                             }
                         </select>
                     </label>
-                    <label>Measured on <input type="date" @bind="_newOutcomeDate" /></label>
-                    <label>Score <input type="number" step="0.01" @bind="_newOutcomeScore" /></label>
-                    <label>Maximum score (optional) <input type="number" step="0.01" @bind="_newOutcomeMax" /></label>
-                    <button class="primary" @onclick="RecordOutcome">Save</button>
+                    <label class="field-label">Measured on <input type="date" @bind="_newOutcomeDate" class="field-input" /></label>
+                    <label class="field-label">Score <input type="number" step="0.01" @bind="_newOutcomeScore" class="field-input" /></label>
+                    <label class="field-label">Maximum score (optional) <input type="number" step="0.01" @bind="_newOutcomeMax" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="RecordOutcome">Save</button>
                 </div>
             }
         }
         @if (_outcomes is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_outcomes.Count == 0)
         {
-            <p>No outcome scores yet.</p>
+            <p class="text-text-muted">No outcome scores yet.</p>
         }
         else
         {
-            <table>
-                <thead>
-                    <tr><th>Measure</th><th>Measured on</th><th>Score</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var outcome in _outcomes)
-                    {
-                        <tr>
-                            <td>@outcome.Measure</td>
-                            <td>@outcome.MeasuredOn.ToString("yyyy-MM-dd")</td>
-                            <td>@outcome.Score@(outcome.MaximumScore is { } max ? $" / {max}" : "")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Measure</th><th>Measured on</th><th>Score</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var outcome in _outcomes)
+                        {
+                            <tr>
+                                <td>@outcome.Measure</td>
+                                <td>@outcome.MeasuredOn.ToString("yyyy-MM-dd")</td>
+                                <td>@outcome.Score@(outcome.MaximumScore is { } max ? $" / {max}" : "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Insurance</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Insurance</h2>
         @if (CanBill)
         {
-            <button class="primary" @onclick="() => _showInsuranceForm = !_showInsuranceForm">@(_showInsuranceForm ? "Cancel" : "Add policy")</button>
+            <button class="btn-primary mb-3" @onclick="() => _showInsuranceForm = !_showInsuranceForm">@(_showInsuranceForm ? "Cancel" : "Add policy")</button>
             @if (_showInsuranceForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_insuranceError is not null)
                     {
-                        <p class="error">@_insuranceError</p>
+                        <p class="alert-error mb-3">@_insuranceError</p>
                     }
-                    <label>
+                    <label class="field-label">
                         Payer
-                        <select @bind="_newInsurancePayerId">
+                        <select @bind="_newInsurancePayerId" class="field-input">
                             <option value="">Select payer…</option>
                             @foreach (var payer in _payerOptions)
                             {
@@ -245,69 +255,71 @@ else
                             }
                         </select>
                     </label>
-                    <label>
+                    <label class="field-label">
                         Rank
-                        <select @bind="_newInsuranceRank">
+                        <select @bind="_newInsuranceRank" class="field-input">
                             @foreach (var rank in Enum.GetValues<InsuranceRank>())
                             {
                                 <option value="@rank">@rank</option>
                             }
                         </select>
                     </label>
-                    <label>Member ID <input @bind="_newInsuranceMemberId" /></label>
-                    <label>Group number (optional) <input @bind="_newInsuranceGroupNumber" /></label>
-                    <label>Effective date <input type="date" @bind="_newInsuranceEffectiveDate" /></label>
-                    <label>Termination date (optional) <input type="date" @bind="_newInsuranceTerminationDate" /></label>
-                    <label>Copay (optional) <input type="number" min="0" step="0.01" @bind="_newInsuranceCopay" /></label>
-                    <button class="primary" @onclick="CreateInsurance">Save</button>
+                    <label class="field-label">Member ID <input @bind="_newInsuranceMemberId" class="field-input" /></label>
+                    <label class="field-label">Group number (optional) <input @bind="_newInsuranceGroupNumber" class="field-input" /></label>
+                    <label class="field-label">Effective date <input type="date" @bind="_newInsuranceEffectiveDate" class="field-input" /></label>
+                    <label class="field-label">Termination date (optional) <input type="date" @bind="_newInsuranceTerminationDate" class="field-input" /></label>
+                    <label class="field-label">Copay (optional) <input type="number" min="0" step="0.01" @bind="_newInsuranceCopay" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="CreateInsurance">Save</button>
                 </div>
             }
         }
         @if (_insurancePolicies is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_insurancePolicies.Count == 0)
         {
-            <p>No insurance policies on file.</p>
+            <p class="text-text-muted">No insurance policies on file.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Payer</th><th>Rank</th><th>Member ID</th><th>Effective</th><th>Termination</th><th>Active</th></tr></thead>
-                <tbody>
-                    @foreach (var policy in _insurancePolicies)
-                    {
-                        <tr>
-                            <td>@PayerName(policy.PayerId)</td>
-                            <td>@policy.Rank</td>
-                            <td>@policy.MemberId</td>
-                            <td>@policy.EffectiveDate.ToString("yyyy-MM-dd")</td>
-                            <td>@(policy.TerminationDate?.ToString("yyyy-MM-dd") ?? "—")</td>
-                            <td>@(policy.IsActive ? "Yes" : "No")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Payer</th><th>Rank</th><th>Member ID</th><th>Effective</th><th>Termination</th><th>Active</th></tr></thead>
+                    <tbody>
+                        @foreach (var policy in _insurancePolicies)
+                        {
+                            <tr>
+                                <td>@PayerName(policy.PayerId)</td>
+                                <td>@policy.Rank</td>
+                                <td>@policy.MemberId</td>
+                                <td>@policy.EffectiveDate.ToString("yyyy-MM-dd")</td>
+                                <td>@(policy.TerminationDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                                <td><StatusPill Text="@(policy.IsActive ? "Active" : "Inactive")" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Charges</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Charges</h2>
         @if (CanBill)
         {
-            <button class="primary" @onclick="ToggleChargeForm">@(_showChargeForm ? "Cancel" : "New charge")</button>
+            <button class="btn-primary mb-3" @onclick="ToggleChargeForm">@(_showChargeForm ? "Cancel" : "New charge")</button>
             @if (_showChargeForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_chargeError is not null)
                     {
-                        <p class="error">@_chargeError</p>
+                        <p class="alert-error mb-3">@_chargeError</p>
                     }
-                    <label>CPT code <input @bind="_newChargeCptCode" maxlength="5" placeholder="e.g. 97110" /></label>
-                    <label>
+                    <label class="field-label">CPT code <input @bind="_newChargeCptCode" maxlength="5" placeholder="e.g. 97110" class="field-input" /></label>
+                    <label class="field-label">
                         Rendering provider
-                        <select @bind="_newChargeProviderId">
+                        <select @bind="_newChargeProviderId" class="field-input">
                             <option value="">Select provider…</option>
                             @foreach (var provider in _providerOptions)
                             {
@@ -315,9 +327,9 @@ else
                             }
                         </select>
                     </label>
-                    <label>
+                    <label class="field-label">
                         Linked note (optional)
-                        <select @bind="_newChargeNoteId">
+                        <select @bind="_newChargeNoteId" class="field-input">
                             <option value="">None</option>
                             @if (_notes is not null)
                             {
@@ -328,58 +340,60 @@ else
                             }
                         </select>
                     </label>
-                    <label>Service date <input type="date" @bind="_newChargeServiceDate" /></label>
-                    <label>Units <input type="number" min="1" @bind="_newChargeUnits" /></label>
-                    <label>Minutes documented (optional) <input type="number" min="0" @bind="_newChargeMinutes" /></label>
-                    <label>Units override reason (required if units differ from the 8-minute-rule recommendation) <input @bind="_newChargeOverrideReason" /></label>
-                    <label>Charge amount <input type="number" min="0" step="0.01" @bind="_newChargeAmount" /></label>
-                    <button class="primary" @onclick="CreateCharge">Save</button>
+                    <label class="field-label">Service date <input type="date" @bind="_newChargeServiceDate" class="field-input" /></label>
+                    <label class="field-label">Units <input type="number" min="1" @bind="_newChargeUnits" class="field-input" /></label>
+                    <label class="field-label">Minutes documented (optional) <input type="number" min="0" @bind="_newChargeMinutes" class="field-input" /></label>
+                    <label class="field-label">Units override reason (required if units differ from the 8-minute-rule recommendation) <input @bind="_newChargeOverrideReason" class="field-input" /></label>
+                    <label class="field-label">Charge amount <input type="number" min="0" step="0.01" @bind="_newChargeAmount" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="CreateCharge">Save</button>
                 </div>
             }
         }
         @if (_charges is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_charges.Count == 0)
         {
-            <p>No charges yet.</p>
+            <p class="text-text-muted">No charges yet.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Service date</th><th>CPT</th><th>Units</th><th>Amount</th><th>Status</th></tr></thead>
-                <tbody>
-                    @foreach (var charge in _charges)
-                    {
-                        <tr>
-                            <td>@charge.ServiceDate.ToString("yyyy-MM-dd")</td>
-                            <td>@charge.CptCode</td>
-                            <td>@charge.Units</td>
-                            <td>@charge.ChargeAmount.ToString("C")</td>
-                            <td>@charge.Status</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Service date</th><th>CPT</th><th>Units</th><th>Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var charge in _charges)
+                        {
+                            <tr>
+                                <td>@charge.ServiceDate.ToString("yyyy-MM-dd")</td>
+                                <td>@charge.CptCode</td>
+                                <td>@charge.Units</td>
+                                <td>@charge.ChargeAmount.ToString("C")</td>
+                                <td><StatusPill Text="@charge.Status.ToString()" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Insurance claims</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Insurance claims</h2>
         @if (CanBill)
         {
-            <button class="primary" @onclick="ToggleClaimForm">@(_showClaimForm ? "Cancel" : "New claim")</button>
+            <button class="btn-primary mb-3" @onclick="ToggleClaimForm">@(_showClaimForm ? "Cancel" : "New claim")</button>
             @if (_showClaimForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_claimError is not null)
                     {
-                        <p class="error">@_claimError</p>
+                        <p class="alert-error mb-3">@_claimError</p>
                     }
-                    <label>
+                    <label class="field-label">
                         Insurance policy
-                        <select @bind="_newClaimInsuranceId">
+                        <select @bind="_newClaimInsuranceId" class="field-input">
                             <option value="">Select policy…</option>
                             @if (_insurancePolicies is not null)
                             {
@@ -390,73 +404,77 @@ else
                             }
                         </select>
                     </label>
-                    <label>Unbilled charges</label>
+                    <p class="field-label mb-2">Unbilled charges</p>
                     @if (UnbilledCharges.Count == 0)
                     {
-                        <p>No unbilled charges available to attach.</p>
+                        <p class="mb-3 text-sm text-text-muted">No unbilled charges available to attach.</p>
                     }
                     else
                     {
-                        @foreach (var charge in UnbilledCharges)
-                        {
-                            <label class="checkbox">
-                                <input type="checkbox" checked="@_selectedChargeIds.Contains(charge.Id)"
-                                       @onchange="e => ToggleChargeSelection(charge.Id, (bool)e.Value!)" />
-                                @charge.ServiceDate.ToString("yyyy-MM-dd") — @charge.CptCode — @charge.ChargeAmount.ToString("C")
-                            </label>
-                        }
+                        <div class="mb-3 space-y-1.5">
+                            @foreach (var charge in UnbilledCharges)
+                            {
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" checked="@_selectedChargeIds.Contains(charge.Id)"
+                                           @onchange="e => ToggleChargeSelection(charge.Id, (bool)e.Value!)" />
+                                    @charge.ServiceDate.ToString("yyyy-MM-dd") — @charge.CptCode — @charge.ChargeAmount.ToString("C")
+                                </label>
+                            }
+                        </div>
                     }
-                    <button class="primary" @onclick="CreateClaim">Create claim</button>
+                    <button class="btn-primary" @onclick="CreateClaim">Create claim</button>
                 </div>
             }
         }
         @if (_claims is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_claims.Count == 0)
         {
-            <p>No insurance claims yet.</p>
+            <p class="text-text-muted">No insurance claims yet.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Payer</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
-                <tbody>
-                    @foreach (var claim in _claims)
-                    {
-                        <tr>
-                            <td>@PayerName(claim.PayerId)</td>
-                            <td>@claim.Status</td>
-                            <td>@(claim.SubmittedAt?.ToString("yyyy-MM-dd") ?? "—")</td>
-                            <td><a href="/claims/@claim.Id">Open</a></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Payer</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var claim in _claims)
+                        {
+                            <tr>
+                                <td>@PayerName(claim.PayerId)</td>
+                                <td><StatusPill Text="@claim.Status.ToString()" /></td>
+                                <td>@(claim.SubmittedAt?.ToString("yyyy-MM-dd") ?? "—")</td>
+                                <td><a href="/claims/@claim.Id" class="text-primary hover:underline">Open</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Payments collected</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Payments collected</h2>
         @if (CanCollectPayments)
         {
-            <button class="primary" @onclick="() => _showPaymentForm = !_showPaymentForm">@(_showPaymentForm ? "Cancel" : "Record payment")</button>
+            <button class="btn-primary mb-3" @onclick="() => _showPaymentForm = !_showPaymentForm">@(_showPaymentForm ? "Cancel" : "Record payment")</button>
             @if (_showPaymentForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_paymentError is not null)
                     {
-                        <p class="error">@_paymentError</p>
+                        <p class="alert-error mb-3">@_paymentError</p>
                     }
-                    <label>Amount <input type="number" min="0.01" step="0.01" @bind="_newPaymentAmount" /></label>
-                    <label>Received on <input type="date" @bind="_newPaymentReceivedOn" /></label>
-                    <label>Reference <input @bind="_newPaymentReference" placeholder="Check #, receipt #, etc." /></label>
+                    <label class="field-label">Amount <input type="number" min="0.01" step="0.01" @bind="_newPaymentAmount" class="field-input" /></label>
+                    <label class="field-label">Received on <input type="date" @bind="_newPaymentReceivedOn" class="field-input" /></label>
+                    <label class="field-label">Reference <input @bind="_newPaymentReference" placeholder="Check #, receipt #, etc." class="field-input" /></label>
                     @if (_superbills is { Count: > 0 })
                     {
-                        <label>
+                        <label class="field-label">
                             Apply to superbill (optional)
-                            <select @bind="_newPaymentSuperbillId">
+                            <select @bind="_newPaymentSuperbillId" class="field-input">
                                 <option value="">None</option>
                                 @foreach (var superbill in _superbills)
                                 {
@@ -465,78 +483,82 @@ else
                             </select>
                         </label>
                     }
-                    <button class="primary" @onclick="CreatePaymentRecord">Save</button>
+                    <button class="btn-primary" @onclick="CreatePaymentRecord">Save</button>
                 </div>
             }
         }
         @if (_paymentRecords is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_paymentRecords.Count == 0)
         {
-            <p>No payments recorded yet.</p>
+            <p class="text-text-muted">No payments recorded yet.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Received</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead>
-                <tbody>
-                    @foreach (var payment in _paymentRecords)
-                    {
-                        <tr>
-                            <td>@payment.ReceivedOn.ToString("yyyy-MM-dd")</td>
-                            <td>@payment.Amount.ToString("C")</td>
-                            <td>@payment.PaymentProcessorReference</td>
-                            <td>@payment.Status</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Received</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var payment in _paymentRecords)
+                        {
+                            <tr>
+                                <td>@payment.ReceivedOn.ToString("yyyy-MM-dd")</td>
+                                <td>@payment.Amount.ToString("C")</td>
+                                <td>@payment.PaymentProcessorReference</td>
+                                <td><StatusPill Text="@payment.Status.ToString()" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
 
-        <h3>Online payment attempts</h3>
+        <h3 class="mb-2 mt-5 text-sm font-semibold text-text">Online payment attempts</h3>
         @if (_patientPayments is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_patientPayments.Count == 0)
         {
-            <p>No online payment attempts.</p>
+            <p class="text-text-muted">No online payment attempts.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Attempted</th><th>Amount</th><th>Status</th></tr></thead>
-                <tbody>
-                    @foreach (var attempt in _patientPayments)
-                    {
-                        <tr>
-                            <td>@attempt.AttemptedAt.ToString("yyyy-MM-dd h:mm tt")</td>
-                            <td>@attempt.Amount.ToString("C")</td>
-                            <td>@attempt.Status</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Attempted</th><th>Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var attempt in _patientPayments)
+                        {
+                            <tr>
+                                <td>@attempt.AttemptedAt.ToString("yyyy-MM-dd h:mm tt")</td>
+                                <td>@attempt.Amount.ToString("C")</td>
+                                <td><StatusPill Text="@attempt.Status.ToString()" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Superbills (cash-pay)</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Superbills (cash-pay)</h2>
         @if (CanBill)
         {
-            <button class="primary" @onclick="() => _showSuperbillForm = !_showSuperbillForm">@(_showSuperbillForm ? "Cancel" : "New superbill")</button>
+            <button class="btn-primary mb-3" @onclick="() => _showSuperbillForm = !_showSuperbillForm">@(_showSuperbillForm ? "Cancel" : "New superbill")</button>
             @if (_showSuperbillForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_superbillError is not null)
                     {
-                        <p class="error">@_superbillError</p>
+                        <p class="alert-error mb-3">@_superbillError</p>
                     }
-                    <label>
+                    <label class="field-label">
                         Rendering clinician
-                        <select @bind="_newSuperbillClinicianId">
+                        <select @bind="_newSuperbillClinicianId" class="field-input">
                             <option value="">Select provider…</option>
                             @foreach (var provider in _providerOptions)
                             {
@@ -544,93 +566,83 @@ else
                             }
                         </select>
                     </label>
-                    <label>Service date <input type="date" @bind="_newSuperbillServiceDate" /></label>
-                    <label>Codes (comma-separated) <input @bind="_newSuperbillCodes" placeholder="97110, 97140" /></label>
-                    <label>Amount <input type="number" min="0" step="0.01" @bind="_newSuperbillAmount" /></label>
-                    <button class="primary" @onclick="CreateSuperbill">Save</button>
+                    <label class="field-label">Service date <input type="date" @bind="_newSuperbillServiceDate" class="field-input" /></label>
+                    <label class="field-label">Codes (comma-separated) <input @bind="_newSuperbillCodes" placeholder="97110, 97140" class="field-input" /></label>
+                    <label class="field-label">Amount <input type="number" min="0" step="0.01" @bind="_newSuperbillAmount" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="CreateSuperbill">Save</button>
                 </div>
             }
         }
         @if (_superbills is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_superbills.Count == 0)
         {
-            <p>No superbills yet.</p>
+            <p class="text-text-muted">No superbills yet.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Service date</th><th>Codes</th><th>Amount</th><th>Status</th></tr></thead>
-                <tbody>
-                    @foreach (var superbill in _superbills)
-                    {
-                        <tr>
-                            <td>@superbill.ServiceDate.ToString("yyyy-MM-dd")</td>
-                            <td>@string.Join(", ", superbill.Codes)</td>
-                            <td>@superbill.Amount.ToString("C")</td>
-                            <td>@superbill.Status</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Service date</th><th>Codes</th><th>Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var superbill in _superbills)
+                        {
+                            <tr>
+                                <td>@superbill.ServiceDate.ToString("yyyy-MM-dd")</td>
+                                <td>@string.Join(", ", superbill.Codes)</td>
+                                <td>@superbill.Amount.ToString("C")</td>
+                                <td><StatusPill Text="@superbill.Status.ToString()" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h2>Statements</h2>
+    <div class="card mt-4">
+        <h2 class="section-title">Statements</h2>
         @if (CanBill)
         {
-            <div class="inline-form">
-                <input type="date" @bind="_newStatementDueDate" />
-                <button class="primary" @onclick="GenerateStatement">Generate statement</button>
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <input type="date" @bind="_newStatementDueDate" class="field-input mt-0 w-auto" />
+                <button class="btn-primary" @onclick="GenerateStatement">Generate statement</button>
             </div>
             @if (_statementError is not null)
             {
-                <p class="error">@_statementError</p>
+                <p class="alert-error mb-3">@_statementError</p>
             }
         }
         @if (_statements is null)
         {
-            <p>Loading…</p>
+            <p class="text-text-muted">Loading…</p>
         }
         else if (_statements.Count == 0)
         {
-            <p>No statements generated yet.</p>
+            <p class="text-text-muted">No statements generated yet.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Statement date</th><th>Due date</th><th>Balance at generation</th></tr></thead>
-                <tbody>
-                    @foreach (var statement in _statements)
-                    {
-                        <tr>
-                            <td>@statement.StatementDate.ToString("yyyy-MM-dd")</td>
-                            <td>@statement.DueDate.ToString("yyyy-MM-dd")</td>
-                            <td>@statement.BalanceAtGeneration.ToString("C")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Statement date</th><th>Due date</th><th>Balance at generation</th></tr></thead>
+                    <tbody>
+                        @foreach (var statement in _statements)
+                        {
+                            <tr>
+                                <td>@statement.StatementDate.ToString("yyyy-MM-dd")</td>
+                                <td>@statement.DueDate.ToString("yyyy-MM-dd")</td>
+                                <td>@statement.BalanceAtGeneration.ToString("C")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 }
-
-<style>
-    dl { display: grid; grid-template-columns: 160px 1fr; row-gap: 0.5rem; max-width: 480px; }
-    dt { font-weight: 600; color: #475569; }
-    .error { color: #dc2626; }
-    section { margin-top: 2rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
-    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
-    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; }
-    .inline-form { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
-    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-top: 0.75rem; max-width: 420px; }
-    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
-</style>
 
 @code {
     [Parameter]

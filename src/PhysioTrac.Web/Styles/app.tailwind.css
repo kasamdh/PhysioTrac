@@ -33,3 +33,51 @@ body {
     color: var(--color-text);
     background: var(--color-surface-muted);
 }
+
+/* Shared page primitives -- every page in this app repeats the same
+   card/button/form/table shapes, so bundling them here keeps markup short
+   and keeps the look consistent without a full Razor component per shape. */
+@layer components {
+    .card {
+        @apply rounded-xl border border-border bg-surface p-5 shadow-sm;
+    }
+    .section-title {
+        @apply mb-3 text-base font-semibold text-text;
+    }
+    .btn-primary {
+        @apply inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:bg-primary-deep disabled:cursor-not-allowed disabled:opacity-50;
+    }
+    .btn-secondary {
+        @apply inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-muted transition hover:border-primary hover:text-primary;
+    }
+    .link-danger {
+        @apply cursor-pointer text-sm text-danger underline decoration-danger/40 hover:decoration-danger;
+    }
+    .field-label {
+        @apply mb-3 block text-sm font-medium text-text-muted;
+    }
+    .field-input {
+        @apply mt-1 w-full rounded-md border border-border px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary;
+    }
+    .alert-error {
+        @apply rounded-md bg-danger-light px-3 py-2 text-sm text-danger;
+    }
+    .alert-warning {
+        @apply rounded-md bg-warning-light px-3 py-2 text-sm text-warning;
+    }
+    .data-table {
+        @apply w-full text-sm;
+    }
+    .data-table thead tr {
+        @apply border-b border-border bg-surface-muted text-left text-xs uppercase tracking-wide text-text-subtle;
+    }
+    .data-table th {
+        @apply px-4 py-3 font-medium;
+    }
+    .data-table td {
+        @apply px-4 py-3 text-text;
+    }
+    .data-table tbody tr {
+        @apply border-b border-border last:border-0;
+    }
+}

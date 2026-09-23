@@ -10,52 +10,46 @@
 
 <PageTitle>Patients — PhysioTrac</PageTitle>
 
-<h1>Patients</h1>
+<h1 class="mb-4 text-xl font-semibold text-text">Patients</h1>
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="rounded-md bg-danger-light px-3 py-2 text-sm text-danger">@_error</p>
 }
 else if (_patients is null)
 {
-    <p>Loading…</p>
+    <p class="text-text-muted">Loading…</p>
 }
 else if (_patients.Count == 0)
 {
-    <p>No patients found for your caseload.</p>
+    <p class="text-text-muted">No patients found for your caseload.</p>
 }
 else
 {
-    <table>
-        <thead>
-            <tr>
-                <th>MRN</th>
-                <th>Name</th>
-                <th>Date of birth</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var patient in _patients)
-            {
-                <tr @onclick="() => GoToPatient(patient.Id)">
-                    <td>@patient.MedicalRecordNumber</td>
-                    <td>@patient.FullName</td>
-                    <td>@patient.DateOfBirth.ToString("yyyy-MM-dd")</td>
-                    <td>@patient.Status</td>
+    <div class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-border bg-surface-muted text-left text-xs uppercase tracking-wide text-text-subtle">
+                    <th class="px-4 py-3 font-medium">MRN</th>
+                    <th class="px-4 py-3 font-medium">Name</th>
+                    <th class="px-4 py-3 font-medium">Date of birth</th>
+                    <th class="px-4 py-3 font-medium">Status</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var patient in _patients)
+                {
+                    <tr @onclick="() => GoToPatient(patient.Id)" class="cursor-pointer border-b border-border last:border-0 hover:bg-surface-muted">
+                        <td class="px-4 py-3 text-text-muted">@patient.MedicalRecordNumber</td>
+                        <td class="px-4 py-3 font-medium text-text">@patient.FullName</td>
+                        <td class="px-4 py-3 text-text-muted">@patient.DateOfBirth.ToString("yyyy-MM-dd")</td>
+                        <td class="px-4 py-3"><StatusPill Text="@patient.Status.ToString()" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
-
-<style>
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
-    tbody tr { cursor: pointer; }
-    tbody tr:hover { background: #f8fafc; }
-    .error { color: #dc2626; }
-</style>
 
 @code {
     private List<Patient>? _patients;
