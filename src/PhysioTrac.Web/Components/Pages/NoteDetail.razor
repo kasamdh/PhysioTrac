@@ -13,35 +13,41 @@
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="alert-error">@_error</p>
 }
 else if (_note is null)
 {
-    <p>Loading…</p>
+    <p class="text-text-muted">Loading…</p>
 }
 else
 {
-    <a href="/patients/@_note.PatientId">&larr; Back to patient</a>
-    <h1>@_note.NoteType note — @_note.ServiceDate.ToString("yyyy-MM-dd")</h1>
-    <p class="status-line">Status: <strong>@_note.Status</strong>
-        @if (_note.IsSigned)
-        {
-            <span> · Signed by @_note.SignatureName on @_note.SignedAt?.ToString("yyyy-MM-dd h:mm tt")</span>
-        }
-        @if (_note.CosignedAt is not null)
-        {
-            <span> · Cosigned @_note.CosignedAt?.ToString("yyyy-MM-dd h:mm tt")</span>
-        }
-    </p>
+    <a href="/patients/@_note.PatientId" class="text-sm text-text-muted no-underline hover:text-primary">&larr; Back to patient</a>
+
+    <div class="card mt-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <h1 class="text-xl font-semibold text-text">@_note.NoteType note — @_note.ServiceDate.ToString("yyyy-MM-dd")</h1>
+            <StatusPill Text="@_note.Status.ToString()" />
+        </div>
+        <p class="mt-1 text-sm text-text-muted">
+            @if (_note.IsSigned)
+            {
+                <span>Signed by @_note.SignatureName on @_note.SignedAt?.ToString("yyyy-MM-dd h:mm tt")</span>
+            }
+            @if (_note.CosignedAt is not null)
+            {
+                <span> · Cosigned @_note.CosignedAt?.ToString("yyyy-MM-dd h:mm tt")</span>
+            }
+        </p>
+    </div>
 
     @if (_findings.Count > 0)
     {
-        <div class="findings">
-            <h3>Documentation checks</h3>
-            <ul>
+        <div class="mt-4 rounded-lg border border-warning-light bg-warning-light/40 p-4">
+            <h3 class="mb-2 text-sm font-semibold text-text">Documentation checks</h3>
+            <ul class="space-y-1 text-sm">
                 @foreach (var finding in _findings)
                 {
-                    <li class="@(finding.FinalizationBlocker ? "blocker" : "warning")">
+                    <li class="@(finding.FinalizationBlocker ? "text-danger" : "text-warning")">
                         <strong>@finding.Title</strong> — @finding.Detail
                     </li>
                 }
@@ -49,37 +55,39 @@ else
         </div>
     }
 
-    <div class="fields">
-        <label>
+    <div class="card mt-4 space-y-3">
+        <label class="field-label">
             Subjective
-            <textarea rows="3" disabled="@(!_canEdit)" @bind="_subjective"></textarea>
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_subjective" class="field-input disabled:bg-surface-muted"></textarea>
         </label>
-        <label>
+        <label class="field-label">
             Objective
-            <textarea rows="3" disabled="@(!_canEdit)" @bind="_objective"></textarea>
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_objective" class="field-input disabled:bg-surface-muted"></textarea>
         </label>
-        <label>
+        <label class="field-label">
             Interventions
-            <textarea rows="3" disabled="@(!_canEdit)" @bind="_interventions"></textarea>
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_interventions" class="field-input disabled:bg-surface-muted"></textarea>
         </label>
-        <label>
+        <label class="field-label">
             Assessment
-            <textarea rows="3" disabled="@(!_canEdit)" @bind="_assessment"></textarea>
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_assessment" class="field-input disabled:bg-surface-muted"></textarea>
         </label>
-        <label>
+        <label class="field-label">
             Plan
-            <textarea rows="3" disabled="@(!_canEdit)" @bind="_plan"></textarea>
+            <textarea rows="3" disabled="@(!_canEdit)" @bind="_plan" class="field-input disabled:bg-surface-muted"></textarea>
         </label>
 
         @if (_note.NoteType is NoteType.Evaluation or NoteType.Progress or NoteType.ReEvaluation)
         {
-            <fieldset>
-                <legend>Plan of care</legend>
-                <label>Start <input type="date" disabled="@(!_canEdit)" @bind="_pocStart" /></label>
-                <label>End <input type="date" disabled="@(!_canEdit)" @bind="_pocEnd" /></label>
-                <label>Frequency per week <input type="number" min="0" disabled="@(!_canEdit)" @bind="_frequencyPerWeek" /></label>
-                <label>Duration (weeks) <input type="number" min="0" disabled="@(!_canEdit)" @bind="_durationWeeks" /></label>
-                <label>Reassessment due <input type="date" disabled="@(!_canEdit)" @bind="_reassessmentDue" /></label>
+            <fieldset class="rounded-lg border border-border p-3">
+                <legend class="px-1 text-sm font-semibold text-text">Plan of care</legend>
+                <div class="flex flex-wrap gap-4">
+                    <label class="field-label">Start <input type="date" disabled="@(!_canEdit)" @bind="_pocStart" class="field-input disabled:bg-surface-muted" /></label>
+                    <label class="field-label">End <input type="date" disabled="@(!_canEdit)" @bind="_pocEnd" class="field-input disabled:bg-surface-muted" /></label>
+                    <label class="field-label">Frequency per week <input type="number" min="0" disabled="@(!_canEdit)" @bind="_frequencyPerWeek" class="field-input disabled:bg-surface-muted" /></label>
+                    <label class="field-label">Duration (weeks) <input type="number" min="0" disabled="@(!_canEdit)" @bind="_durationWeeks" class="field-input disabled:bg-surface-muted" /></label>
+                    <label class="field-label">Reassessment due <input type="date" disabled="@(!_canEdit)" @bind="_reassessmentDue" class="field-input disabled:bg-surface-muted" /></label>
+                </div>
             </fieldset>
         }
 
@@ -87,136 +95,113 @@ else
         {
             @if (_saveError is not null)
             {
-                <p class="error">@_saveError</p>
+                <p class="alert-error">@_saveError</p>
             }
-            <button class="primary" @onclick="SaveDraft">Save draft</button>
+            <button class="btn-primary" @onclick="SaveDraft">Save draft</button>
         }
     </div>
 
-    <section>
-        <h3>Treatment interventions</h3>
+    <div class="card mt-4">
+        <h3 class="section-title">Treatment interventions</h3>
         @if (_interventionItems.Count == 0)
         {
-            <p>No intervention line items yet.</p>
+            <p class="text-text-muted">No intervention line items yet.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Description</th><th>Body region</th><th>Category</th><th>Minutes</th><th>Units</th></tr></thead>
-                <tbody>
-                    @foreach (var item in _interventionItems)
-                    {
-                        <tr>
-                            <td>@item.Description</td>
-                            <td>@(item.BodyRegion ?? "—")</td>
-                            <td>@(item.Category?.ToString() ?? "—")</td>
-                            <td>@item.Minutes</td>
-                            <td>@(item.Units?.ToString() ?? "—")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            <p>Total minutes: @_interventionItems.Sum(i => i.Minutes)</p>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Description</th><th>Body region</th><th>Category</th><th>Minutes</th><th>Units</th></tr></thead>
+                    <tbody>
+                        @foreach (var item in _interventionItems)
+                        {
+                            <tr>
+                                <td>@item.Description</td>
+                                <td>@(item.BodyRegion ?? "—")</td>
+                                <td>@(item.Category?.ToString() ?? "—")</td>
+                                <td>@item.Minutes</td>
+                                <td>@(item.Units?.ToString() ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="mt-2 text-sm text-text-muted">Total minutes: @_interventionItems.Sum(i => i.Minutes)</p>
         }
 
         @if (_canEdit)
         {
-            <div class="inline-form">
-                <input placeholder="Description" @bind="_newInterventionDescription" style="flex:2" />
-                <input placeholder="Body region" @bind="_newInterventionBodyRegion" style="flex:1" />
-                <select @bind="_newInterventionCategory">
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <input placeholder="Description" @bind="_newInterventionDescription" class="field-input mt-0 flex-[2]" />
+                <input placeholder="Body region" @bind="_newInterventionBodyRegion" class="field-input mt-0 flex-1" />
+                <select @bind="_newInterventionCategory" class="field-input mt-0 w-auto">
                     <option value="">Uncategorized</option>
                     @foreach (var category in Enum.GetValues<InterventionCategory>())
                     {
                         <option value="@category">@category</option>
                     }
                 </select>
-                <input type="number" min="0" placeholder="Minutes" @bind="_newInterventionMinutes" style="width:5rem" />
-                <button @onclick="AddIntervention">Add</button>
+                <input type="number" min="0" placeholder="Minutes" @bind="_newInterventionMinutes" class="field-input mt-0 w-20" />
+                <button class="btn-secondary" @onclick="AddIntervention">Add</button>
             </div>
         }
-    </section>
+    </div>
 
     @if (_canFinalize && !_note.IsSigned)
     {
-        <section class="sign-panel">
-            <h3>Finalize note</h3>
-            <label class="checkbox">
+        <div class="card mt-4">
+            <h3 class="section-title">Finalize note</h3>
+            <label class="mb-3 flex items-center gap-2 text-sm">
                 <input type="checkbox" @bind="_attestationConfirmed" />
                 I confirm this note has been reviewed and is ready to sign.
             </label>
             @if (_signError is not null)
             {
-                <p class="error">@_signError</p>
+                <p class="alert-error mb-3">@_signError</p>
             }
-            <button class="primary" @onclick="SignNote">Sign note</button>
-        </section>
+            <button class="btn-primary" @onclick="SignNote">Sign note</button>
+        </div>
     }
 
     @if (_note.Status == NoteStatus.ReviewRequired && _canCosign)
     {
-        <section class="sign-panel">
-            <h3>Cosignature required</h3>
-            <p>This note was signed by the treating assistant and awaits a supervising cosignature.</p>
+        <div class="card mt-4">
+            <h3 class="section-title">Cosignature required</h3>
+            <p class="mb-3 text-sm text-text-muted">This note was signed by the treating assistant and awaits a supervising cosignature.</p>
             @if (_signError is not null)
             {
-                <p class="error">@_signError</p>
+                <p class="alert-error mb-3">@_signError</p>
             }
-            <button class="primary" @onclick="CosignNote">Cosign note</button>
-        </section>
+            <button class="btn-primary" @onclick="CosignNote">Cosign note</button>
+        </div>
     }
 
     @if (_note.IsSigned)
     {
-        <section>
-            <h3>Addenda</h3>
+        <div class="card mt-4">
+            <h3 class="section-title">Addenda</h3>
             @foreach (var addendum in _note.Addenda.OrderBy(a => a.CreatedAt))
             {
-                <div class="addendum">
+                <div class="mb-3 border-l-2 border-primary pl-3">
                     <strong>@addendum.Reason</strong> — @addendum.CreatedAt.ToString("yyyy-MM-dd h:mm tt")
-                    <p>@addendum.Body</p>
+                    <p class="text-sm text-text-muted">@addendum.Body</p>
                 </div>
             }
             @if (_canCreateAddendum)
             {
-                <div class="form-card">
+                <div class="mt-3 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_addendumError is not null)
                     {
-                        <p class="error">@_addendumError</p>
+                        <p class="alert-error mb-3">@_addendumError</p>
                     }
-                    <label>Reason <input @bind="_newAddendumReason" /></label>
-                    <label>Details <textarea rows="3" @bind="_newAddendumBody"></textarea></label>
-                    <button class="primary" @onclick="AddAddendum">Add addendum</button>
+                    <label class="field-label">Reason <input @bind="_newAddendumReason" class="field-input" /></label>
+                    <label class="field-label">Details <textarea rows="3" @bind="_newAddendumBody" class="field-input"></textarea></label>
+                    <button class="btn-primary" @onclick="AddAddendum">Add addendum</button>
                 </div>
             }
-        </section>
+        </div>
     }
 }
-
-<style>
-    .error { color: #dc2626; }
-    .status-line { color: #475569; }
-    .findings { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; }
-    .findings ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
-    .findings li.blocker { color: #b91c1c; }
-    .findings li.warning { color: #92400e; }
-    .fields label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .fields textarea, .fields input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; font-family: inherit; }
-    fieldset { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 1rem; }
-    fieldset label { display: inline-block; width: 220px; margin: 0.5rem; }
-    section { margin-top: 2rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
-    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #e2e8f0; }
-    .inline-form { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
-    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; }
-    .sign-panel { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; }
-    .sign-panel label.checkbox { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
-    .sign-panel label.checkbox input { width: auto; }
-    .addendum { border-left: 3px solid #2563eb; padding-left: 0.75rem; margin-bottom: 0.75rem; }
-    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-top: 0.75rem; max-width: 480px; }
-    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .form-card input, .form-card textarea { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
-</style>
 
 @code {
     [Parameter]

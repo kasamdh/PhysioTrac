@@ -12,91 +12,73 @@
 
 <PageTitle>Providers — PhysioTrac</PageTitle>
 
-<h1>Providers</h1>
+<h1 class="mb-4 text-xl font-semibold text-text">Providers</h1>
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="alert-error">@_error</p>
 }
 else if (_providers is null)
 {
-    <p>Loading…</p>
+    <p class="text-text-muted">Loading…</p>
 }
 else
 {
-    @if (CanManage)
-    {
-        <button class="primary" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New provider")</button>
-
-        @if (_showForm)
+    <div class="card">
+        @if (CanManage)
         {
-            <div class="form-card">
-                @if (_formError is not null)
-                {
-                    <p class="error">@_formError</p>
-                }
-                <label>
-                    First name
-                    <input @bind="_firstName" />
-                </label>
-                <label>
-                    Last name
-                    <input @bind="_lastName" />
-                </label>
-                <label>
-                    Specialty
-                    <input @bind="_specialty" />
-                </label>
-                <label>
-                    Credentials
-                    <input @bind="_credentials" />
-                </label>
-                <button class="primary" @onclick="CreateProvider">Save</button>
+            <button class="btn-primary mb-4" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New provider")</button>
+
+            @if (_showForm)
+            {
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
+                    @if (_formError is not null)
+                    {
+                        <p class="alert-error mb-3">@_formError</p>
+                    }
+                    <label class="field-label">First name <input @bind="_firstName" class="field-input" /></label>
+                    <label class="field-label">Last name <input @bind="_lastName" class="field-input" /></label>
+                    <label class="field-label">Specialty <input @bind="_specialty" class="field-input" /></label>
+                    <label class="field-label">Credentials <input @bind="_credentials" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="CreateProvider">Save</button>
+                </div>
+            }
+        }
+
+        @if (_providers.Count == 0)
+        {
+            <p class="text-text-muted">No providers yet.</p>
+        }
+        else
+        {
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Specialty</th>
+                            <th>Credentials</th>
+                            <th>Active</th>
+                            <th>Online booking</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var provider in _providers)
+                        {
+                            <tr>
+                                <td>@provider.FullName</td>
+                                <td>@(provider.Specialty ?? "—")</td>
+                                <td>@(provider.Credentials ?? "—")</td>
+                                <td><StatusPill Text="@(provider.IsActive ? "Active" : "Inactive")" /></td>
+                                <td>@(provider.OnlineBookingEnabled ? "Yes" : "No")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         }
-    }
-
-    @if (_providers.Count == 0)
-    {
-        <p>No providers yet.</p>
-    }
-    else
-    {
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Specialty</th>
-                    <th>Credentials</th>
-                    <th>Active</th>
-                    <th>Online booking</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var provider in _providers)
-                {
-                    <tr>
-                        <td>@provider.FullName</td>
-                        <td>@(provider.Specialty ?? "—")</td>
-                        <td>@(provider.Credentials ?? "—")</td>
-                        <td>@(provider.IsActive ? "Yes" : "No")</td>
-                        <td>@(provider.OnlineBookingEnabled ? "Yes" : "No")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    </div>
 }
-
-<style>
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
-    .error { color: #dc2626; }
-    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
-    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
-    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .form-card input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
-</style>
 
 @code {
     private List<Provider>? _providers;

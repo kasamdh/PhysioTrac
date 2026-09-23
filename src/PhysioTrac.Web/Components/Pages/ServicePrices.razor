@@ -13,91 +13,83 @@
 
 <PageTitle>Service prices — PhysioTrac</PageTitle>
 
-<h1>Service prices</h1>
+<h1 class="mb-4 text-xl font-semibold text-text">Service prices</h1>
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="alert-error">@_error</p>
 }
 else if (_prices is null)
 {
-    <p>Loading…</p>
+    <p class="text-text-muted">Loading…</p>
 }
 else
 {
-    @if (CanManage)
-    {
-        <button class="primary" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New price")</button>
-
-        @if (_showForm)
+    <div class="card">
+        @if (CanManage)
         {
-            <div class="form-card">
-                @if (_formError is not null)
-                {
-                    <p class="error">@_formError</p>
-                }
-                <label>CPT code <input @bind="_cptCode" maxlength="10" /></label>
-                <label>Label <input @bind="_label" /></label>
-                <label>Price <input type="number" min="0" step="0.01" @bind="_price" /></label>
-                <label>
-                    Home-visit kind (optional)
-                    <select @bind="_homeVisitKind">
-                        <option value="">None</option>
-                        @foreach (var kind in Enum.GetValues<AppointmentKind>())
+            <button class="btn-primary mb-4" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New price")</button>
+
+            @if (_showForm)
+            {
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
+                    @if (_formError is not null)
+                    {
+                        <p class="alert-error mb-3">@_formError</p>
+                    }
+                    <label class="field-label">CPT code <input @bind="_cptCode" maxlength="10" class="field-input" /></label>
+                    <label class="field-label">Label <input @bind="_label" class="field-input" /></label>
+                    <label class="field-label">Price <input type="number" min="0" step="0.01" @bind="_price" class="field-input" /></label>
+                    <label class="field-label">
+                        Home-visit kind (optional)
+                        <select @bind="_homeVisitKind" class="field-input">
+                            <option value="">None</option>
+                            @foreach (var kind in Enum.GetValues<AppointmentKind>())
+                            {
+                                <option value="@kind">@kind</option>
+                            }
+                        </select>
+                    </label>
+                    <label class="mb-3 flex items-center gap-2 text-sm">
+                        <input type="checkbox" @bind="_isHomeVisitTravelFee" />
+                        This is the home-visit travel fee
+                    </label>
+                    <label class="field-label">Deposit amount (home-visit kind only, optional) <input type="number" min="0" step="0.01" @bind="_depositAmount" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="CreatePrice">Save</button>
+                </div>
+            }
+        }
+
+        @if (_prices.Count == 0)
+        {
+            <p class="text-text-muted">No service prices yet.</p>
+        }
+        else
+        {
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>CPT code</th><th>Label</th><th>Price</th><th>Home-visit kind</th><th>Travel fee</th><th>Deposit</th><th>Active</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var price in _prices)
                         {
-                            <option value="@kind">@kind</option>
+                            <tr>
+                                <td>@price.CptCode</td>
+                                <td>@price.Label</td>
+                                <td>@price.Price.ToString("C")</td>
+                                <td>@(price.HomeVisitKind?.ToString() ?? "—")</td>
+                                <td>@(price.IsHomeVisitTravelFee ? "Yes" : "No")</td>
+                                <td>@(price.DepositAmount is { } d ? d.ToString("C") : "—")</td>
+                                <td><StatusPill Text="@(price.IsActive ? "Active" : "Inactive")" /></td>
+                            </tr>
                         }
-                    </select>
-                </label>
-                <label class="checkbox">
-                    <input type="checkbox" @bind="_isHomeVisitTravelFee" />
-                    This is the home-visit travel fee
-                </label>
-                <label>Deposit amount (home-visit kind only, optional) <input type="number" min="0" step="0.01" @bind="_depositAmount" /></label>
-                <button class="primary" @onclick="CreatePrice">Save</button>
+                    </tbody>
+                </table>
             </div>
         }
-    }
-
-    @if (_prices.Count == 0)
-    {
-        <p>No service prices yet.</p>
-    }
-    else
-    {
-        <table>
-            <thead>
-                <tr><th>CPT code</th><th>Label</th><th>Price</th><th>Home-visit kind</th><th>Travel fee</th><th>Deposit</th><th>Active</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var price in _prices)
-                {
-                    <tr>
-                        <td>@price.CptCode</td>
-                        <td>@price.Label</td>
-                        <td>@price.Price.ToString("C")</td>
-                        <td>@(price.HomeVisitKind?.ToString() ?? "—")</td>
-                        <td>@(price.IsHomeVisitTravelFee ? "Yes" : "No")</td>
-                        <td>@(price.DepositAmount is { } d ? d.ToString("C") : "—")</td>
-                        <td>@(price.IsActive ? "Yes" : "No")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    </div>
 }
-
-<style>
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
-    .error { color: #dc2626; }
-    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
-    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
-    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .form-card label.checkbox { display: flex; align-items: center; gap: 0.5rem; }
-    .form-card label.checkbox input { width: auto; }
-    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
-</style>
 
 @code {
     private List<ServicePrice>? _prices;

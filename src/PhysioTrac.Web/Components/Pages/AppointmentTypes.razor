@@ -12,103 +12,83 @@
 
 <PageTitle>Appointment types — PhysioTrac</PageTitle>
 
-<h1>Appointment types</h1>
+<h1 class="mb-4 text-xl font-semibold text-text">Appointment types</h1>
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="alert-error">@_error</p>
 }
 else if (_types is null)
 {
-    <p>Loading…</p>
+    <p class="text-text-muted">Loading…</p>
 }
 else
 {
-    @if (CanManage)
-    {
-        <button class="primary" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New appointment type")</button>
-
-        @if (_showForm)
+    <div class="card">
+        @if (CanManage)
         {
-            <div class="form-card">
-                @if (_formError is not null)
-                {
-                    <p class="error">@_formError</p>
-                }
-                <label>
-                    Name
-                    <input @bind="_name" />
-                </label>
-                <label>
-                    Description
-                    <input @bind="_description" />
-                </label>
-                <label>
-                    Default duration (minutes)
-                    <input type="number" min="5" step="5" @bind="_durationMinutes" />
-                </label>
-                <label>
-                    Price
-                    <input type="number" min="0" step="0.01" @bind="_price" />
-                </label>
-                <label class="checkbox">
-                    <input type="checkbox" @bind="_onlineBookingEnabled" />
-                    Online booking enabled
-                </label>
-                <label class="checkbox">
-                    <input type="checkbox" @bind="_requiresNewPatient" />
-                    Requires new patient (e.g. Initial Evaluation)
-                </label>
-                <button class="primary" @onclick="CreateType">Save</button>
+            <button class="btn-primary mb-4" @onclick="() => _showForm = !_showForm">@(_showForm ? "Cancel" : "New appointment type")</button>
+
+            @if (_showForm)
+            {
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
+                    @if (_formError is not null)
+                    {
+                        <p class="alert-error mb-3">@_formError</p>
+                    }
+                    <label class="field-label">Name <input @bind="_name" class="field-input" /></label>
+                    <label class="field-label">Description <input @bind="_description" class="field-input" /></label>
+                    <label class="field-label">Default duration (minutes) <input type="number" min="5" step="5" @bind="_durationMinutes" class="field-input" /></label>
+                    <label class="field-label">Price <input type="number" min="0" step="0.01" @bind="_price" class="field-input" /></label>
+                    <label class="mb-3 flex items-center gap-2 text-sm">
+                        <input type="checkbox" @bind="_onlineBookingEnabled" />
+                        Online booking enabled
+                    </label>
+                    <label class="mb-3 flex items-center gap-2 text-sm">
+                        <input type="checkbox" @bind="_requiresNewPatient" />
+                        Requires new patient (e.g. Initial Evaluation)
+                    </label>
+                    <button class="btn-primary" @onclick="CreateType">Save</button>
+                </div>
+            }
+        }
+
+        @if (_types.Count == 0)
+        {
+            <p class="text-text-muted">No appointment types yet.</p>
+        }
+        else
+        {
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Duration</th>
+                            <th>Price</th>
+                            <th>Active</th>
+                            <th>Online booking</th>
+                            <th>New patient only</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var type in _types)
+                        {
+                            <tr>
+                                <td>@type.Name</td>
+                                <td>@type.DefaultDurationMinutes min</td>
+                                <td>@(type.Price is { } price ? price.ToString("C") : "—")</td>
+                                <td><StatusPill Text="@(type.IsActive ? "Active" : "Inactive")" /></td>
+                                <td>@(type.OnlineBookingEnabled ? "Yes" : "No")</td>
+                                <td>@(type.RequiresNewPatient ? "Yes" : "No")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         }
-    }
-
-    @if (_types.Count == 0)
-    {
-        <p>No appointment types yet.</p>
-    }
-    else
-    {
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Duration</th>
-                    <th>Price</th>
-                    <th>Active</th>
-                    <th>Online booking</th>
-                    <th>New patient only</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var type in _types)
-                {
-                    <tr>
-                        <td>@type.Name</td>
-                        <td>@type.DefaultDurationMinutes min</td>
-                        <td>@(type.Price is { } price ? price.ToString("C") : "—")</td>
-                        <td>@(type.IsActive ? "Yes" : "No")</td>
-                        <td>@(type.OnlineBookingEnabled ? "Yes" : "No")</td>
-                        <td>@(type.RequiresNewPatient ? "Yes" : "No")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    </div>
 }
-
-<style>
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
-    .error { color: #dc2626; }
-    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
-    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
-    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .form-card label.checkbox { display: flex; align-items: center; gap: 0.5rem; }
-    .form-card label.checkbox input { width: auto; }
-    .form-card input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
-</style>
 
 @code {
     private List<AppointmentType>? _types;
