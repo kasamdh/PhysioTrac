@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Serilog file sink output
+src/PhysioTrac.Api/logs/
+
 # User-specific files
 *.rsuser
 *.suo

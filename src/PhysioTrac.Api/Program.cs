@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Api.Auth;
 using PhysioTrac.Api.Filters;
+using PhysioTrac.Api.Logging;
+using PhysioTrac.Api.Middleware;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Configuration;
 using PhysioTrac.Application.Patients;
@@ -10,10 +12,25 @@ using PhysioTrac.Infrastructure;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
 using PhysioTrac.Infrastructure.Seed;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 const string FrontendCorsPolicy = "Frontend";
+
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Destructure.With<PhiRedactingDestructuringPolicy>()
+    .Enrich.FromLogContext()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", Serilog.Events.LogEventLevel.Warning)
+    .WriteTo.Console()
+    .WriteTo.File(
+        Path.Combine(context.HostingEnvironment.ContentRootPath, "logs", "physiotrac-.log"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14));
 
 builder.Services.AddControllers(options => options.Filters.Add<FluentValidationActionFilter>());
 builder.Services.AddEndpointsApiExplorer();
@@ -96,6 +113,9 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseSerilogRequestLogging();
 
 // Applies pending migrations and seeds the demo dataset on startup.
 // Development-only, deliberately: a production database is never

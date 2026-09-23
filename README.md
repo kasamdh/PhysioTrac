@@ -173,6 +173,29 @@ conflicts, missing migrations) only surface against a real SQL Server
 instance. If you're changing the data model, apply the migration and
 exercise it against a real database before considering the change verified.
 
+## Logging
+
+`PhysioTrac.Api` logs through Serilog (console + a rolling daily file under
+`src/PhysioTrac.Api/logs/`, gitignored) instead of the default
+`Microsoft.Extensions.Logging` console formatter — structured, and
+consistent between `dotnet run` and Docker.
+
+A custom `PhiRedactingDestructuringPolicy` masks likely-PHI property values
+(name, DOB, email, phone, SSN, address, diagnosis, etc., matched by property
+name) whenever an object is logged with structured (`{@Thing}`) destructuring.
+This is a best-effort safety net, not a compliance guarantee: it only
+catches structured destructuring, not PHI interpolated directly into a log
+message string — that still requires callers not to do it. See
+`src/PhysioTrac.Api/Logging/PhiRedactingDestructuringPolicy.cs` and its
+tests in `tests/PhysioTrac.Tests/PhiRedactingDestructuringPolicyTests.cs`.
+
+Any exception that escapes a controller's own handling (most already catch
+`ForbiddenException`/`NotFoundException`) is caught by a global
+`ExceptionHandlingMiddleware`, logged in full server-side, and returned to
+the client as a fixed generic `{ "detail": "An unexpected error occurred." }`
+— never the exception's own message or stack trace, since either could
+echo PHI back to the client.
+
 ## Production considerations
 
 This is a HIPAA-oriented application **foundation**, not a certified-
