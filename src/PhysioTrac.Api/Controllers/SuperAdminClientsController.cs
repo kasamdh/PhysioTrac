@@ -42,7 +42,7 @@ public class SuperAdminClientsController : ControllerBase
             var result = await _clients.ListClientsAsync(new ClientListQuery(query, status, includeArchived, page, pageSize), HttpContext.RequestAborted);
             return Ok(new { clients = result.Items, total = result.Total, page = result.Page, pageSize = result.PageSize });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -60,7 +60,7 @@ public class SuperAdminClientsController : ControllerBase
                 invitationUrl = result.InvitationUrl,
             });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
@@ -73,7 +73,7 @@ public class SuperAdminClientsController : ControllerBase
             var client = await _clients.GetClientAsync(clientNumber, HttpContext.RequestAborted);
             return client is null ? NotFound(new { detail = "Client was not found." }) : Ok(new { client });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPatch("{clientNumber:long}")]
@@ -85,7 +85,7 @@ public class SuperAdminClientsController : ControllerBase
             var client = await _clients.UpdateClientAsync(clientNumber, request, _currentUser, HttpContext.RequestAborted);
             return Ok(new { client });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -98,7 +98,7 @@ public class SuperAdminClientsController : ControllerBase
             var client = await _clients.ArchiveClientAsync(clientNumber, request?.Reason, _currentUser, HttpContext.RequestAborted);
             return Ok(new { client });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -112,7 +112,7 @@ public class SuperAdminClientsController : ControllerBase
             var client = await _clients.SuspendClientAsync(clientNumber, request.Reason, _currentUser, HttpContext.RequestAborted);
             return Ok(new { client });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -126,7 +126,7 @@ public class SuperAdminClientsController : ControllerBase
             var client = await _clients.ActivateClientAsync(clientNumber, _currentUser, HttpContext.RequestAborted);
             return Ok(new { client });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -140,7 +140,7 @@ public class SuperAdminClientsController : ControllerBase
             var (_, activationUrl) = await _clients.ResendAdminInvitationAsync(clientNumber, HttpContext.RequestAborted);
             return Ok(new { detail = "A new invitation was generated.", invitationUrl = activationUrl });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }

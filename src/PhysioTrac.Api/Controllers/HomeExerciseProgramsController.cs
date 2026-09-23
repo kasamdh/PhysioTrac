@@ -29,7 +29,7 @@ public class HomeExerciseProgramsController : ControllerBase
             var programs = await _programs.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(programs.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -40,7 +40,7 @@ public class HomeExerciseProgramsController : ControllerBase
             var program = await _programs.CreateAsync(request with { PatientId = patientId }, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), new { patientId }, ToDto(program));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -55,7 +55,7 @@ public class HomeExerciseProgramsController : ControllerBase
                 item.Id, item.Name, item.Description, item.Sets, item.Reps, item.HoldSeconds, item.FrequencyPerDay, item.Notes, item.Order);
             return CreatedAtAction(nameof(List), new { patientId }, dto);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -68,7 +68,7 @@ public class HomeExerciseProgramsController : ControllerBase
             await _programs.RemoveItemAsync(programId, itemId, _currentUser, HttpContext.RequestAborted);
             return NoContent();
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -80,7 +80,7 @@ public class HomeExerciseProgramsController : ControllerBase
             var program = await _programs.DiscontinueAsync(programId, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(program));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }

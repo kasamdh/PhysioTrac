@@ -36,7 +36,7 @@ public class SuperbillsController : ControllerBase
                 .OrderByDescending(s => s.ServiceDate).ToListAsync(HttpContext.RequestAborted);
             return Ok(superbills);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -73,7 +73,7 @@ public class SuperbillsController : ControllerBase
 
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, superbill);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 }
 

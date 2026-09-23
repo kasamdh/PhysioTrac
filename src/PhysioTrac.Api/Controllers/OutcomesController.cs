@@ -29,7 +29,7 @@ public class OutcomesController : ControllerBase
             var scores = await _outcomes.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(scores.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -40,7 +40,7 @@ public class OutcomesController : ControllerBase
             var score = await _outcomes.RecordAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListForPatient), new { patientId = score.PatientId }, ToDto(score));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 

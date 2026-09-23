@@ -35,7 +35,7 @@ public class ServicePricesController : ControllerBase
                 .OrderBy(s => s.CptCode).ToListAsync(HttpContext.RequestAborted);
             return Ok(prices);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -80,7 +80,7 @@ public class ServicePricesController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), null, price);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 }
 

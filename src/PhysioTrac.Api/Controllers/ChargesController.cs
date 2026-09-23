@@ -30,7 +30,7 @@ public class ChargesController : ControllerBase
             var charges = await _charges.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(charges.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpGet("{id:guid}")]
@@ -41,7 +41,7 @@ public class ChargesController : ControllerBase
             var charge = await _charges.GetAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(charge));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -53,7 +53,7 @@ public class ChargesController : ControllerBase
             var charge = await _charges.CreateAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(Get), new { id = charge.Id }, ToDto(charge));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -66,7 +66,7 @@ public class ChargesController : ControllerBase
             var charge = await _charges.UpdateStatusAsync(id, request, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(charge));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 

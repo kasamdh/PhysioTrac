@@ -39,7 +39,7 @@ public class AvailabilityController : ControllerBase
                 organization.Id, locationId, appointmentTypeId, date, providerId, excludeAppointmentId, HttpContext.RequestAborted);
             return Ok(slots);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 }

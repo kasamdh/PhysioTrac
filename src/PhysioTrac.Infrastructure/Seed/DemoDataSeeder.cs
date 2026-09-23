@@ -8,11 +8,13 @@ using PhysioTrac.Infrastructure.Persistence;
 
 namespace PhysioTrac.Infrastructure.Seed;
 
-/// <summary>Idempotent local/demo dataset -- one clinic (Source Motion
-/// Physical Therapy, this app's reference tenant), one login per staff
-/// role with a known password, two patients, and the minimum billing
-/// configuration (a payer, two service prices, two appointment types) so
-/// every page in the app has something real to show on a fresh database.
+/// <summary>Idempotent local/demo dataset -- two independent tenants
+/// (Source Motion Physical Therapy, org 1000, and Total Motion PT, org
+/// 1001) with their own logins, patients, appointments, and clinical notes.
+/// Two separate organizations exist specifically to prove tenant isolation:
+/// every id below is generated independently per org, so an org-1000 user
+/// who somehow ended up with an org-1001 record's id would hit
+/// ITenantAccessService's cross-org rejection, not silently succeed.
 ///
 /// Deliberately bypasses the real client-provisioning flow
 /// (<c>IClientProvisioningService.ProvisionClientAsync</c>), which issues an
@@ -22,42 +24,79 @@ namespace PhysioTrac.Infrastructure.Seed;
 /// production database is never auto-seeded with fake credentials.</summary>
 public static class DemoDataSeeder
 {
-    public const string DemoOrganizationSlug = "source-motion-pt";
     public const string DemoPassword = "DemoPass123!";
+
+    private const string SourceMotionSlug = "source-motion-pt";
+    private const string TotalMotionSlug = "total-motion-pt";
 
     public static async Task SeedAsync(IServiceProvider services, CancellationToken ct = default)
     {
         var db = services.GetRequiredService<PhysioTracDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
-        if (await db.Organizations.AnyAsync(o => o.Slug == DemoOrganizationSlug, ct))
+        if (await db.Organizations.AnyAsync(o => o.Slug == SourceMotionSlug, ct))
         {
             return;
         }
 
+        await SeedSourceMotionAsync(db, userManager, ct);
+        await SeedTotalMotionAsync(db, userManager, ct);
+    }
+
+    /// <summary>Org 1000 -- the first real customer. Two physical locations
+    /// (matching Source Motion's actual footprint) so multi-location
+    /// scheduling/reporting has something real to show, not just one
+    /// headquarters address standing in for everything.</summary>
+    private static async Task SeedSourceMotionAsync(PhysioTracDbContext db, UserManager<ApplicationUser> userManager, CancellationToken ct)
+    {
         var organization = new Organization
         {
+            ClientNumber = 1000,
             Name = "Source Motion Physical Therapy",
-            Slug = DemoOrganizationSlug,
+            Slug = SourceMotionSlug,
             SubscriptionTier = SubscriptionTier.Professional,
             Timezone = "America/New_York",
             SupportEmail = "support@sourcemotionpt.test",
             AddressLine1 = "100 Rehab Way",
-            City = "Boston",
-            State = "MA",
-            ZipCode = "02110",
+            City = "Fuquay-Varina",
+            State = "NC",
+            ZipCode = "27526",
         };
         db.Organizations.Add(organization);
         await db.SaveChangesAsync(ct);
 
+        var fuquayVarina = new Location
+        {
+            OrganizationId = organization.Id,
+            Name = "Fuquay-Varina",
+            AddressLine1 = "100 Rehab Way",
+            City = "Fuquay-Varina",
+            State = "NC",
+            ZipCode = "27526",
+            Phone = "919-555-0110",
+            Timezone = "America/New_York",
+        };
+        var raleigh = new Location
+        {
+            OrganizationId = organization.Id,
+            Name = "Raleigh",
+            AddressLine1 = "500 Wellness Blvd",
+            City = "Raleigh",
+            State = "NC",
+            ZipCode = "27601",
+            Phone = "919-555-0199",
+            Timezone = "America/New_York",
+        };
+        db.Locations.AddRange(fuquayVarina, raleigh);
+
         var admin = await CreateUserAsync(userManager, organization.Id, "admin", "admin@sourcemotionpt.test",
-            "Alex", "Rivera", UserRole.Admin);
+            "Alex", "Rivera", UserRole.Admin, ct);
         var therapist = await CreateUserAsync(userManager, organization.Id, "therapist", "therapist@sourcemotionpt.test",
-            "Jamie", "Chen", UserRole.Therapist, credential: "PT, DPT");
+            "Jamie", "Chen", UserRole.Therapist, ct, credential: "PT, DPT");
         await CreateUserAsync(userManager, organization.Id, "scheduler", "scheduler@sourcemotionpt.test",
-            "Morgan", "Patel", UserRole.Scheduler);
+            "Morgan", "Patel", UserRole.Scheduler, ct);
         await CreateUserAsync(userManager, organization.Id, "biller", "biller@sourcemotionpt.test",
-            "Casey", "Nguyen", UserRole.Biller);
+            "Casey", "Nguyen", UserRole.Biller, ct);
 
         var provider = new Provider
         {
@@ -68,7 +107,21 @@ public static class DemoDataSeeder
             Specialty = "Orthopedic Physical Therapy",
             Credentials = "PT, DPT",
         };
+        provider.Locations.Add(fuquayVarina);
+        provider.Locations.Add(raleigh);
         db.Providers.Add(provider);
+        await db.SaveChangesAsync(ct);
+
+        db.ProviderLicenses.Add(new ProviderLicense
+        {
+            ProviderId = provider.Id,
+            State = "NC",
+            LicenseNumber = "NC-PT-88421",
+            IssueDate = new DateOnly(2019, 6, 1),
+            ExpirationDate = DateOnly.FromDateTime(DateTime.Today.AddYears(2)),
+            Status = ProviderLicenseStatus.Active,
+            IsCompactPrivilege = false,
+        });
 
         db.Patients.AddRange(
             new Patient
@@ -131,9 +184,127 @@ public static class DemoDataSeeder
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Org 1001 -- a second, wholly independent tenant used only to
+    /// prove isolation: its own admin/therapist logins, its own patient, its
+    /// own appointment, and its own clinical note. None of these ids are
+    /// derived from or shared with Source Motion's data in any way.</summary>
+    private static async Task SeedTotalMotionAsync(PhysioTracDbContext db, UserManager<ApplicationUser> userManager, CancellationToken ct)
+    {
+        var organization = new Organization
+        {
+            ClientNumber = 1001,
+            Name = "Total Motion PT",
+            Slug = TotalMotionSlug,
+            SubscriptionTier = SubscriptionTier.Starter,
+            Timezone = "America/Chicago",
+            SupportEmail = "support@totalmotionpt.test",
+            AddressLine1 = "42 Recovery Lane",
+            City = "Austin",
+            State = "TX",
+            ZipCode = "78701",
+        };
+        db.Organizations.Add(organization);
+        await db.SaveChangesAsync(ct);
+
+        var austin = new Location
+        {
+            OrganizationId = organization.Id,
+            Name = "Austin",
+            AddressLine1 = "42 Recovery Lane",
+            City = "Austin",
+            State = "TX",
+            ZipCode = "78701",
+            Phone = "512-555-0142",
+            Timezone = "America/Chicago",
+        };
+        db.Locations.Add(austin);
+
+        var admin = await CreateUserAsync(userManager, organization.Id, "tm.admin", "admin@totalmotionpt.test",
+            "David", "Okafor", UserRole.Admin, ct);
+        var therapist = await CreateUserAsync(userManager, organization.Id, "tm.therapist", "therapist@totalmotionpt.test",
+            "Priya", "Sharma", UserRole.Therapist, ct, credential: "PT, DPT");
+
+        var provider = new Provider
+        {
+            OrganizationId = organization.Id,
+            UserId = therapist.Id,
+            FirstName = therapist.FirstName,
+            LastName = therapist.LastName,
+            Specialty = "Sports Physical Therapy",
+            Credentials = "PT, DPT",
+        };
+        provider.Locations.Add(austin);
+        db.Providers.Add(provider);
+        await db.SaveChangesAsync(ct);
+
+        db.ProviderLicenses.Add(new ProviderLicense
+        {
+            ProviderId = provider.Id,
+            State = "TX",
+            LicenseNumber = "TX-PT-55210",
+            IssueDate = new DateOnly(2021, 3, 15),
+            ExpirationDate = DateOnly.FromDateTime(DateTime.Today.AddYears(2)),
+            Status = ProviderLicenseStatus.Active,
+            IsCompactPrivilege = false,
+        });
+
+        var patient = new Patient
+        {
+            OrganizationId = organization.Id,
+            FirstName = "Jordan",
+            LastName = "Ellis",
+            DateOfBirth = new DateOnly(1990, 8, 22),
+            Phone = "512-555-0177",
+            Email = "jordan.ellis@example.test",
+            Diagnoses = "Rotator cuff tendinopathy",
+            AssignedTherapistId = therapist.Id,
+        };
+        db.Patients.Add(patient);
+
+        var appointmentType = new AppointmentType
+        {
+            OrganizationId = organization.Id,
+            Name = "Initial Evaluation",
+            Description = "New patient evaluation and plan of care",
+            DefaultDurationMinutes = 60,
+            Price = 165.00m,
+            RequiresNewPatient = true,
+            DefaultKind = AppointmentKind.Evaluation,
+        };
+        db.AppointmentTypes.Add(appointmentType);
+        await db.SaveChangesAsync(ct);
+
+        var appointmentStart = DateTimeOffset.UtcNow.Date.AddDays(1).AddHours(9);
+        db.Appointments.Add(new Appointment
+        {
+            PatientId = patient.Id,
+            TherapistId = therapist.Id,
+            ProviderId = provider.Id,
+            AppointmentTypeId = appointmentType.Id,
+            Kind = AppointmentKind.Evaluation,
+            Status = AppointmentStatus.Scheduled,
+            StartsAt = appointmentStart,
+            EndsAt = appointmentStart.AddMinutes(60),
+            CreatedById = admin.Id,
+        });
+
+        db.ClinicalNotes.Add(new ClinicalNote
+        {
+            PatientId = patient.Id,
+            TherapistId = therapist.Id,
+            NoteType = NoteType.Evaluation,
+            Status = NoteStatus.Draft,
+            ServiceDate = DateOnly.FromDateTime(DateTime.Today),
+            DiagnosisSnapshot = patient.Diagnoses,
+            Subjective = "Patient reports right shoulder pain with overhead activity, onset 6 weeks ago.",
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+
     private static async Task<ApplicationUser> CreateUserAsync(
         UserManager<ApplicationUser> userManager, Guid organizationId, string userName, string email,
-        string firstName, string lastName, UserRole role, string? credential = null)
+        string firstName, string lastName, UserRole role, CancellationToken ct, string? credential = null)
     {
         var user = new ApplicationUser
         {

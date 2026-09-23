@@ -37,7 +37,7 @@ public class ClaimDenialsController : ControllerBase
             var denials = await query.OrderBy(d => d.Resolution).ThenBy(d => d.DueDate).ToListAsync(HttpContext.RequestAborted);
             return Ok(denials);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -67,7 +67,7 @@ public class ClaimDenialsController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), null, denial);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -92,7 +92,7 @@ public class ClaimDenialsController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return Ok(denial);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 }

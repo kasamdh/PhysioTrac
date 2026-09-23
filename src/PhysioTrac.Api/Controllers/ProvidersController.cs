@@ -37,7 +37,7 @@ public class ProvidersController : ControllerBase
                 .ToListAsync(HttpContext.RequestAborted);
             return Ok(providers.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -69,7 +69,7 @@ public class ProvidersController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), null, ToDto(provider));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     private static ProviderDto ToDto(Provider p) => new(p.Id, p.FirstName, p.LastName, p.FullName, p.Specialty, p.IsActive, p.OnlineBookingEnabled);

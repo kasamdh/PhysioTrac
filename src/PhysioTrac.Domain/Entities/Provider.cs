@@ -16,7 +16,6 @@ public class Provider : BaseEntity
     public string LastName { get; set; } = string.Empty;
     public string? Specialty { get; set; }
     public string? Credentials { get; set; }
-    public string? LicenseNumber { get; set; }
     public string? NpiNumber { get; set; }
     public bool IsActive { get; set; } = true;
     public bool OnlineBookingEnabled { get; set; } = true;
@@ -31,6 +30,7 @@ public class Provider : BaseEntity
     public ICollection<ProviderAppointmentType> AppointmentTypeLinks { get; set; } = new List<ProviderAppointmentType>();
     public ICollection<ProviderAvailability> Availabilities { get; set; } = new List<ProviderAvailability>();
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+    public ICollection<ProviderLicense> Licenses { get; set; } = new List<ProviderLicense>();
 
     public string FullName => $"{FirstName} {LastName}".Trim();
 }

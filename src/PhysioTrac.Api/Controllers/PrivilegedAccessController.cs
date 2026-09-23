@@ -58,7 +58,7 @@ public class PrivilegedAccessController : ControllerBase
             var grants = await _privilegedAccess.ListAsync(client.Id, HttpContext.RequestAborted);
             return Ok(new { grants = await ToDtosAsync(grants, HttpContext.RequestAborted) });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -72,7 +72,7 @@ public class PrivilegedAccessController : ControllerBase
             var grant = await _privilegedAccess.RequestAsync(client.Id, _currentUser, request.Reason, request.DurationHours, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListGrants), new { clientNumber }, new { grant = await ToDtoAsync(grant, HttpContext.RequestAborted) });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -87,7 +87,7 @@ public class PrivilegedAccessController : ControllerBase
             var grant = await _privilegedAccess.RevokeAsync(grantId, _currentUser, HttpContext.RequestAborted);
             return Ok(new { grant = await ToDtoAsync(grant, HttpContext.RequestAborted) });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -131,7 +131,7 @@ public class PrivilegedAccessController : ControllerBase
 
             return Ok(new { patients = patients.Select(ToPatientDto) });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -157,7 +157,7 @@ public class PrivilegedAccessController : ControllerBase
             // only, unlike the original's fuller clinical bundle.
             return Ok(new { patient = ToPatientDto(patient), grant = await ToDtoAsync(grant!, HttpContext.RequestAborted) });
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 

@@ -38,7 +38,7 @@ public class PatientsController : ControllerBase
         }
         catch (ForbiddenException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { detail = ex.Message });
         }
     }
 
@@ -56,7 +56,7 @@ public class PatientsController : ControllerBase
         }
         catch (ForbiddenException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { detail = ex.Message });
         }
     }
 
@@ -84,7 +84,7 @@ public class PatientsController : ControllerBase
         }
         catch (ForbiddenException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { detail = ex.Message });
         }
     }
 
@@ -112,7 +112,7 @@ public class PatientsController : ControllerBase
         }
         catch (ForbiddenException ex)
         {
-            return Forbid(ex.Message);
+            return StatusCode(403, new { detail = ex.Message });
         }
     }
 

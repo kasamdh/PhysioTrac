@@ -29,7 +29,7 @@ public class GoalsController : ControllerBase
             var goals = await _goals.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(goals.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -40,7 +40,7 @@ public class GoalsController : ControllerBase
             var goal = await _goals.CreateAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListForPatient), new { patientId = goal.PatientId }, ToDto(goal));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -52,7 +52,7 @@ public class GoalsController : ControllerBase
             var goal = await _goals.ApproveAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(goal));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -65,7 +65,7 @@ public class GoalsController : ControllerBase
             var goal = await _goals.UpdateProgressAsync(id, request, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(goal));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 

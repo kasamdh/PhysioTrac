@@ -36,7 +36,7 @@ public class PatientInsuranceController : ControllerBase
                 .ToListAsync(HttpContext.RequestAborted);
             return Ok(policies);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -83,7 +83,7 @@ public class PatientInsuranceController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, policy);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 }

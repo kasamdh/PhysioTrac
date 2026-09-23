@@ -30,7 +30,7 @@ public class ConsentsController : ControllerBase
             var consents = await _consents.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(consents.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     /// <summary>Returns the current fixed consent text for every type, so a
@@ -48,7 +48,7 @@ public class ConsentsController : ControllerBase
             var consent = await _consents.RecordAsync(request, _currentUser, HttpContext.Connection.RemoteIpAddress?.ToString(), HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), new { patientId }, ToDto(consent));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -61,7 +61,7 @@ public class ConsentsController : ControllerBase
             var consent = await _consents.RevokeAsync(consentId, request, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(consent));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }

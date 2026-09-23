@@ -27,7 +27,7 @@ public class ClaimTransactionsController : ControllerBase
         {
             return Ok(await _transactions.ListForClaimAsync(claimId, _currentUser, HttpContext.RequestAborted));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -39,7 +39,7 @@ public class ClaimTransactionsController : ControllerBase
             var transaction = await _transactions.RecordAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListForClaim), new { claimId = transaction.ClaimId }, transaction);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }

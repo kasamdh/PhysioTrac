@@ -50,6 +50,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<HomeExerciseItem> HomeExerciseItems => Set<HomeExerciseItem>();
     public DbSet<ReferringProvider> ReferringProviders => Set<ReferringProvider>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<ProviderLicense> ProviderLicenses => Set<ProviderLicense>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -149,6 +150,15 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(p => p.Locations).WithMany(l => l.Providers)
                 .UsingEntity(j => j.ToTable("ProviderLocations"));
+        });
+
+        builder.Entity<ProviderLicense>(e =>
+        {
+            e.HasIndex(l => new { l.ProviderId, l.State, l.LicenseNumber }).IsUnique();
+            e.Property(l => l.State).HasMaxLength(2).IsFixedLength();
+            e.Property(l => l.Status).HasConversion<string>().HasMaxLength(16);
+            e.HasOne(l => l.Provider).WithMany(p => p.Licenses)
+                .HasForeignKey(l => l.ProviderId).OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<AppointmentType>(e =>

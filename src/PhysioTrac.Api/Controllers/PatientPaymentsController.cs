@@ -36,7 +36,7 @@ public class PatientPaymentsController : ControllerBase
                 .OrderByDescending(p => p.AttemptedAt).ToListAsync(HttpContext.RequestAborted);
             return Ok(payments);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     /// <summary>Portal-only: a patient records their own payment attempt,
@@ -65,7 +65,7 @@ public class PatientPaymentsController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, payment);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 }
 

@@ -29,7 +29,7 @@ public class MessagesController : ControllerBase
             var messages = await _messages.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(messages.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -40,7 +40,7 @@ public class MessagesController : ControllerBase
             var message = await _messages.SendAsync(new SendMessageRequest(patientId, body.Body), _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), new { patientId }, ToDto(message));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
@@ -52,7 +52,7 @@ public class MessagesController : ControllerBase
             await _messages.MarkThreadReadAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return NoContent();
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     private static MessageDto ToDto(Message m) => new(

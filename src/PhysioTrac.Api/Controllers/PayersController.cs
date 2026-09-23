@@ -35,7 +35,7 @@ public class PayersController : ControllerBase
                 .OrderBy(p => p.Name).ToListAsync(HttpContext.RequestAborted);
             return Ok(payers);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -62,7 +62,7 @@ public class PayersController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), null, payer);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 }
 

@@ -29,7 +29,7 @@ public class AppointmentsController : ControllerBase
             var appointments = await _appointments.ListForRangeAsync(_currentUser, from, to, HttpContext.RequestAborted);
             return Ok(appointments.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -40,7 +40,7 @@ public class AppointmentsController : ControllerBase
             var appointment = await _appointments.CreateAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), null, ToDto(appointment));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -53,7 +53,7 @@ public class AppointmentsController : ControllerBase
             var appointment = await _appointments.CancelAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(appointment));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }

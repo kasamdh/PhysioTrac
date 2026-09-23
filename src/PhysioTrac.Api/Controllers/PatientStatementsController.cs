@@ -43,7 +43,7 @@ public class PatientStatementsController : ControllerBase
                 .OrderByDescending(s => s.StatementDate).ToListAsync(HttpContext.RequestAborted);
             return Ok(statements);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost("patient/{patientId:guid}/generate")]
@@ -75,7 +75,7 @@ public class PatientStatementsController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, statement);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 }
 

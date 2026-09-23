@@ -34,7 +34,7 @@ public class ClaimsController : ControllerBase
             }
             return Ok(dtos);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpGet("{id:guid}")]
@@ -45,7 +45,7 @@ public class ClaimsController : ControllerBase
             var claim = await _claims.GetAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(await ToDtoAsync(claim));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -57,7 +57,7 @@ public class ClaimsController : ControllerBase
             var claim = await _claims.CreateFromChargesAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(Get), new { id = claim.Id }, await ToDtoAsync(claim));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -70,7 +70,7 @@ public class ClaimsController : ControllerBase
             var claim = await _claims.UpdateStatusAsync(id, request, _currentUser, HttpContext.RequestAborted);
             return Ok(await ToDtoAsync(claim));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 

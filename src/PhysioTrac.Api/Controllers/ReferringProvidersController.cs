@@ -36,7 +36,7 @@ public class ReferringProvidersController : ControllerBase
                 .ToListAsync(HttpContext.RequestAborted);
             return Ok(providers.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -71,7 +71,7 @@ public class ReferringProvidersController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), null, ToDto(provider));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     private static ReferringProviderDto ToDto(ReferringProvider r) => new(

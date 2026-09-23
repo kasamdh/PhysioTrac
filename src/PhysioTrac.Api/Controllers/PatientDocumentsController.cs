@@ -31,7 +31,7 @@ public class PatientDocumentsController : ControllerBase
             var documents = await _documents.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(documents.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -52,7 +52,7 @@ public class PatientDocumentsController : ControllerBase
             var document = await _documents.UploadAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), new { patientId }, ToDto(document));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
@@ -70,7 +70,7 @@ public class PatientDocumentsController : ControllerBase
             }
             return File(content, document.ContentType, document.OriginalFilename);
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -82,7 +82,7 @@ public class PatientDocumentsController : ControllerBase
             await _documents.DeleteAsync(documentId, _currentUser, HttpContext.RequestAborted);
             return NoContent();
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }

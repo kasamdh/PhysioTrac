@@ -36,7 +36,7 @@ public class PortalBookingController : ControllerBase
             var appointment = await _booking.CreateAsync(_currentUser, request, HttpContext.RequestAborted);
             return StatusCode(201, ToDto(appointment));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (BookingException ex) { return BookingError(ex); }
     }
 
@@ -48,7 +48,7 @@ public class PortalBookingController : ControllerBase
             var appointment = await _booking.CancelAsync(_currentUser, id, HttpContext.RequestAborted);
             return Ok(ToDto(appointment));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (BookingException ex) { return BookingError(ex); }
     }
 
@@ -60,7 +60,7 @@ public class PortalBookingController : ControllerBase
             var appointment = await _booking.RescheduleAsync(_currentUser, id, request, HttpContext.RequestAborted);
             return Ok(ToDto(appointment));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (BookingException ex) { return BookingError(ex); }
     }
 
@@ -72,7 +72,7 @@ public class PortalBookingController : ControllerBase
             var appointment = await _booking.ConfirmAsync(_currentUser, id, HttpContext.RequestAborted);
             return Ok(ToDto(appointment));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (BookingException ex) { return BookingError(ex); }
     }
 
@@ -84,7 +84,7 @@ public class PortalBookingController : ControllerBase
             var entries = await _booking.ListWaitlistAsync(_currentUser, HttpContext.RequestAborted);
             return Ok(entries.Select(ToWaitlistDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost("waitlist")]
@@ -95,7 +95,7 @@ public class PortalBookingController : ControllerBase
             var entry = await _booking.JoinWaitlistAsync(_currentUser, request, HttpContext.RequestAborted);
             return StatusCode(201, ToWaitlistDto(entry));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (BookingException ex) { return BookingError(ex); }
     }
 
@@ -107,7 +107,7 @@ public class PortalBookingController : ControllerBase
             var entry = await _booking.LeaveWaitlistAsync(_currentUser, id, HttpContext.RequestAborted);
             return Ok(ToWaitlistDto(entry));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (BookingException ex) { return BookingError(ex); }
     }
 

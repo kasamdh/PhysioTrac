@@ -29,7 +29,7 @@ public class NotesController : ControllerBase
             var notes = await _notes.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
             return Ok(notes.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpGet("{id:guid}")]
@@ -40,7 +40,7 @@ public class NotesController : ControllerBase
             var note = await _notes.GetAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(note));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -52,7 +52,7 @@ public class NotesController : ControllerBase
             var note = await _notes.CreateDraftAsync(request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(Get), new { id = note.Id }, ToDto(note));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -64,7 +64,7 @@ public class NotesController : ControllerBase
             var note = await _notes.UpdateDraftAsync(id, request, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(note));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -76,7 +76,7 @@ public class NotesController : ControllerBase
             var note = await _notes.GetAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(NoteComplianceEvaluator.Evaluate(note));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -88,7 +88,7 @@ public class NotesController : ControllerBase
             var note = await _notes.SignNoteAsync(id, request.AttestationConfirmed, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(note));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -101,7 +101,7 @@ public class NotesController : ControllerBase
             var note = await _notes.CosignNoteAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(note));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -115,7 +115,7 @@ public class NotesController : ControllerBase
             return CreatedAtAction(nameof(Get), new { id }, new NoteAddendumDto(
                 addendum.Id, addendum.NoteId, addendum.AuthorId, addendum.Reason, addendum.Body, addendum.CreatedAt));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
@@ -128,7 +128,7 @@ public class NotesController : ControllerBase
             var items = await _notes.ListInterventionsAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(items.Select(ToInterventionDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
@@ -140,7 +140,7 @@ public class NotesController : ControllerBase
             var item = await _notes.AddInterventionAsync(id, request, _currentUser, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListInterventions), new { id }, ToInterventionDto(item));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }

@@ -36,7 +36,7 @@ public class AppointmentTypesController : ControllerBase
                 .OrderBy(a => a.Name).ToListAsync(HttpContext.RequestAborted);
             return Ok(types.Select(ToDto));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpPost]
@@ -61,7 +61,7 @@ public class AppointmentTypesController : ControllerBase
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             return CreatedAtAction(nameof(List), null, ToDto(type));
         }
-        catch (ForbiddenException ex) { return Forbid(ex.Message); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     private static AppointmentTypeDto ToDto(AppointmentType a) => new(
