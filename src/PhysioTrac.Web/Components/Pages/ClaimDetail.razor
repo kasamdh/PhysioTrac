@@ -17,98 +17,117 @@
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="alert-error">@_error</p>
 }
 else if (_claim is null)
 {
-    <p>Loading…</p>
+    <p class="text-text-muted">Loading…</p>
 }
 else
 {
-    <a href="/patients/@_claim.PatientId">&larr; Back to patient</a>
-    <h1>Claim — @PayerName</h1>
-    <p class="status-line">
-        Status:
-        @if (CanManage)
-        {
-            <select @bind="_statusChange">
-                @foreach (var status in Enum.GetValues<ClaimStatus>())
-                {
-                    <option value="@status">@status</option>
-                }
-            </select>
-            <button @onclick="UpdateStatus">Update</button>
-        }
-        else
-        {
-            <strong>@_claim.Status</strong>
-        }
-        @if (_claim.SubmittedAt is not null)
-        {
-            <span> · Submitted @_claim.SubmittedAt?.ToString("yyyy-MM-dd")</span>
-        }
-        @if (_claim.ClosedAt is not null)
-        {
-            <span> · Closed @_claim.ClosedAt?.ToString("yyyy-MM-dd")</span>
-        }
-    </p>
-    @if (_statusError is not null)
-    {
-        <p class="error">@_statusError</p>
-    }
+    <a href="/patients/@_claim.PatientId" class="text-sm text-text-muted no-underline hover:text-primary">&larr; Back to patient</a>
 
-    <p>Diagnosis codes: @(_claim.DiagnosisCodeList.Count > 0 ? string.Join(", ", _claim.DiagnosisCodeList) : "—")</p>
-
-    @if (_totals is not null)
-    {
-        <div class="totals">
-            <div><span>Total charges</span><strong>@_totals.TotalChargeAmount.ToString("C")</strong></div>
-            <div><span>Total paid</span><strong>@_totals.TotalPaid.ToString("C")</strong></div>
-            <div><span>Total adjusted</span><strong>@_totals.TotalAdjusted.ToString("C")</strong></div>
-            <div><span>Balance</span><strong>@_totals.Balance.ToString("C")</strong></div>
+    <div class="card mt-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <h1 class="text-xl font-semibold text-text">Claim — @PayerName</h1>
+            @if (!CanManage)
+            {
+                <StatusPill Text="@_claim.Status.ToString()" />
+            }
         </div>
-    }
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted">
+            @if (CanManage)
+            {
+                <span>Status:</span>
+                <select @bind="_statusChange" class="field-input mt-0 w-auto">
+                    @foreach (var status in Enum.GetValues<ClaimStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+                <button class="btn-secondary" @onclick="UpdateStatus">Update</button>
+            }
+            @if (_claim.SubmittedAt is not null)
+            {
+                <span> · Submitted @_claim.SubmittedAt?.ToString("yyyy-MM-dd")</span>
+            }
+            @if (_claim.ClosedAt is not null)
+            {
+                <span> · Closed @_claim.ClosedAt?.ToString("yyyy-MM-dd")</span>
+            }
+        </div>
+        @if (_statusError is not null)
+        {
+            <p class="alert-error mt-2">@_statusError</p>
+        }
 
-    <section>
-        <h3>Charges on this claim</h3>
+        <p class="mt-3 text-sm text-text-muted">Diagnosis codes: @(_claim.DiagnosisCodeList.Count > 0 ? string.Join(", ", _claim.DiagnosisCodeList) : "—")</p>
+
+        @if (_totals is not null)
+        {
+            <div class="mt-4 flex flex-wrap gap-3">
+                <div class="rounded-lg border border-border bg-surface-muted px-4 py-2.5">
+                    <span class="block text-xs text-text-subtle">Total charges</span>
+                    <strong class="text-text">@_totals.TotalChargeAmount.ToString("C")</strong>
+                </div>
+                <div class="rounded-lg border border-border bg-surface-muted px-4 py-2.5">
+                    <span class="block text-xs text-text-subtle">Total paid</span>
+                    <strong class="text-text">@_totals.TotalPaid.ToString("C")</strong>
+                </div>
+                <div class="rounded-lg border border-border bg-surface-muted px-4 py-2.5">
+                    <span class="block text-xs text-text-subtle">Total adjusted</span>
+                    <strong class="text-text">@_totals.TotalAdjusted.ToString("C")</strong>
+                </div>
+                <div class="rounded-lg border border-border bg-surface-muted px-4 py-2.5">
+                    <span class="block text-xs text-text-subtle">Balance</span>
+                    <strong class="text-text">@_totals.Balance.ToString("C")</strong>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="card mt-4">
+        <h3 class="section-title">Charges on this claim</h3>
         @if (_charges.Count == 0)
         {
-            <p>No charges attached.</p>
+            <p class="text-text-muted">No charges attached.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Service date</th><th>CPT</th><th>Units</th><th>Amount</th></tr></thead>
-                <tbody>
-                    @foreach (var charge in _charges)
-                    {
-                        <tr>
-                            <td>@charge.ServiceDate.ToString("yyyy-MM-dd")</td>
-                            <td>@charge.CptCode</td>
-                            <td>@charge.Units</td>
-                            <td>@charge.ChargeAmount.ToString("C")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Service date</th><th>CPT</th><th>Units</th><th>Amount</th></tr></thead>
+                    <tbody>
+                        @foreach (var charge in _charges)
+                        {
+                            <tr>
+                                <td>@charge.ServiceDate.ToString("yyyy-MM-dd")</td>
+                                <td>@charge.CptCode</td>
+                                <td>@charge.Units</td>
+                                <td>@charge.ChargeAmount.ToString("C")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 
-    <section>
-        <h3>Transactions</h3>
+    <div class="card mt-4">
+        <h3 class="section-title">Transactions</h3>
         @if (CanManage)
         {
-            <button class="primary" @onclick="() => _showTransactionForm = !_showTransactionForm">@(_showTransactionForm ? "Cancel" : "Record transaction")</button>
+            <button class="btn-primary mb-3" @onclick="() => _showTransactionForm = !_showTransactionForm">@(_showTransactionForm ? "Cancel" : "Record transaction")</button>
             @if (_showTransactionForm)
             {
-                <div class="form-card">
+                <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
                     @if (_transactionError is not null)
                     {
-                        <p class="error">@_transactionError</p>
+                        <p class="alert-error mb-3">@_transactionError</p>
                     }
-                    <label>
+                    <label class="field-label">
                         Kind
-                        <select @bind="_newTransactionKind">
+                        <select @bind="_newTransactionKind" class="field-input">
                             @foreach (var kind in Enum.GetValues<ClaimTransactionKind>())
                             {
                                 <option value="@kind">@kind</option>
@@ -117,9 +136,9 @@ else
                     </label>
                     @if (_newTransactionKind is ClaimTransactionKind.InsurancePayment or ClaimTransactionKind.PatientPayment)
                     {
-                        <label>
+                        <label class="field-label">
                             Method
-                            <select @bind="_newTransactionMethod">
+                            <select @bind="_newTransactionMethod" class="field-input">
                                 <option value="">Unspecified</option>
                                 @foreach (var method in Enum.GetValues<ClaimTransactionMethod>())
                                 {
@@ -128,14 +147,14 @@ else
                             </select>
                         </label>
                     }
-                    <label>Amount <input type="number" min="0.01" step="0.01" @bind="_newTransactionAmount" /></label>
-                    <label>Payment date <input type="date" @bind="_newTransactionDate" /></label>
-                    <label>Reference (optional) <input @bind="_newTransactionReference" /></label>
+                    <label class="field-label">Amount <input type="number" min="0.01" step="0.01" @bind="_newTransactionAmount" class="field-input" /></label>
+                    <label class="field-label">Payment date <input type="date" @bind="_newTransactionDate" class="field-input" /></label>
+                    <label class="field-label">Reference (optional) <input @bind="_newTransactionReference" class="field-input" /></label>
                     @if (_newTransactionKind == ClaimTransactionKind.Transfer)
                     {
-                        <label>
+                        <label class="field-label">
                             Transfer to claim
-                            <select @bind="_newTransactionTransferToClaimId">
+                            <select @bind="_newTransactionTransferToClaimId" class="field-input">
                                 <option value="">Select claim…</option>
                                 @foreach (var claim in _siblingClaims)
                                 {
@@ -144,52 +163,39 @@ else
                             </select>
                         </label>
                     }
-                    <label>Denial code (optional) <input @bind="_newTransactionDenialCode" /></label>
-                    <label>Denial reason (optional) <input @bind="_newTransactionDenialReason" /></label>
-                    <label>Notes (optional) <input @bind="_newTransactionNotes" /></label>
-                    <button class="primary" @onclick="RecordTransaction">Save</button>
+                    <label class="field-label">Denial code (optional) <input @bind="_newTransactionDenialCode" class="field-input" /></label>
+                    <label class="field-label">Denial reason (optional) <input @bind="_newTransactionDenialReason" class="field-input" /></label>
+                    <label class="field-label">Notes (optional) <input @bind="_newTransactionNotes" class="field-input" /></label>
+                    <button class="btn-primary" @onclick="RecordTransaction">Save</button>
                 </div>
             }
         }
         @if (_transactions.Count == 0)
         {
-            <p>No transactions recorded.</p>
+            <p class="text-text-muted">No transactions recorded.</p>
         }
         else
         {
-            <table>
-                <thead><tr><th>Date</th><th>Kind</th><th>Method</th><th>Amount</th><th>Reference</th></tr></thead>
-                <tbody>
-                    @foreach (var transaction in _transactions)
-                    {
-                        <tr>
-                            <td>@transaction.PaymentDate.ToString("yyyy-MM-dd")</td>
-                            <td>@transaction.Kind</td>
-                            <td>@(transaction.Method?.ToString() ?? "—")</td>
-                            <td>@transaction.Amount.ToString("C")</td>
-                            <td>@(transaction.Reference ?? "—")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Date</th><th>Kind</th><th>Method</th><th>Amount</th><th>Reference</th></tr></thead>
+                    <tbody>
+                        @foreach (var transaction in _transactions)
+                        {
+                            <tr>
+                                <td>@transaction.PaymentDate.ToString("yyyy-MM-dd")</td>
+                                <td>@transaction.Kind</td>
+                                <td>@(transaction.Method?.ToString() ?? "—")</td>
+                                <td>@transaction.Amount.ToString("C")</td>
+                                <td>@(transaction.Reference ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </section>
+    </div>
 }
-
-<style>
-    .error { color: #dc2626; }
-    .status-line { color: #475569; }
-    .totals { display: flex; gap: 1.5rem; margin: 1rem 0; }
-    .totals div { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem; }
-    .totals span { display: block; font-size: 0.8rem; color: #64748b; }
-    section { margin-top: 2rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
-    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #e2e8f0; }
-    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
-    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
-    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
-</style>
 
 @code {
     [Parameter]

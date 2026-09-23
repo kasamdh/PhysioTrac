@@ -17,34 +17,34 @@
 
 <PageTitle>Schedule — PhysioTrac</PageTitle>
 
-<h1>Schedule</h1>
+<h1 class="mb-4 text-xl font-semibold text-text">Schedule</h1>
 
 @if (_error is not null)
 {
-    <p class="error">@_error</p>
+    <p class="alert-error">@_error</p>
 }
 else
 {
-    <div class="week-nav">
-        <button @onclick="() => ChangeWeek(-1)">&larr; Previous week</button>
-        <strong>@_weekStart.ToString("MMM d") – @_weekStart.AddDays(6).ToString("MMM d, yyyy")</strong>
-        <button @onclick="() => ChangeWeek(1)">Next week &rarr;</button>
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+        <button class="btn-secondary" @onclick="() => ChangeWeek(-1)">&larr; Previous week</button>
+        <strong class="text-text">@_weekStart.ToString("MMM d") – @_weekStart.AddDays(6).ToString("MMM d, yyyy")</strong>
+        <button class="btn-secondary" @onclick="() => ChangeWeek(1)">Next week &rarr;</button>
         @if (CanSchedule)
         {
-            <button class="primary" @onclick="ToggleForm">@(_showForm ? "Cancel" : "New appointment")</button>
+            <button class="btn-primary ml-auto" @onclick="ToggleForm">@(_showForm ? "Cancel" : "New appointment")</button>
         }
     </div>
 
     @if (_showForm)
     {
-        <div class="form-card">
+        <div class="card mb-6 max-w-md">
             @if (_formError is not null)
             {
-                <p class="error">@_formError</p>
+                <p class="alert-error mb-3">@_formError</p>
             }
-            <label>
+            <label class="field-label">
                 Patient
-                <select @bind="_newPatientId">
+                <select @bind="_newPatientId" class="field-input">
                     <option value="">Select patient…</option>
                     @foreach (var patient in _patientOptions)
                     {
@@ -52,9 +52,9 @@ else
                     }
                 </select>
             </label>
-            <label>
+            <label class="field-label">
                 Therapist
-                <select @bind="_newTherapistId">
+                <select @bind="_newTherapistId" class="field-input">
                     <option value="">Select therapist…</option>
                     @foreach (var therapist in _therapistOptions)
                     {
@@ -62,9 +62,9 @@ else
                     }
                 </select>
             </label>
-            <label>
+            <label class="field-label">
                 Provider (optional)
-                <select @bind="_newProviderId">
+                <select @bind="_newProviderId" class="field-input">
                     <option value="">None</option>
                     @foreach (var provider in _providerOptions)
                     {
@@ -72,9 +72,9 @@ else
                     }
                 </select>
             </label>
-            <label>
+            <label class="field-label">
                 Appointment type (optional)
-                <select @bind="_newAppointmentTypeId" @bind:after="ApplyAppointmentTypeDefaults">
+                <select @bind="_newAppointmentTypeId" @bind:after="ApplyAppointmentTypeDefaults" class="field-input">
                     <option value="">None</option>
                     @foreach (var type in _appointmentTypeOptions)
                     {
@@ -82,102 +82,91 @@ else
                     }
                 </select>
             </label>
-            <label>
+            <label class="field-label">
                 Kind
-                <select @bind="_newKind">
+                <select @bind="_newKind" class="field-input">
                     @foreach (var kind in Enum.GetValues<AppointmentKind>())
                     {
                         <option value="@kind">@kind</option>
                     }
                 </select>
             </label>
-            <label>
+            <label class="field-label">
                 Date
-                <input type="date" @bind="_newDate" />
+                <input type="date" @bind="_newDate" class="field-input" />
             </label>
-            <label>
+            <label class="field-label">
                 Start time
-                <input type="time" @bind="_newStartTime" />
+                <input type="time" @bind="_newStartTime" class="field-input" />
             </label>
-            <label>
+            <label class="field-label">
                 Duration (minutes)
-                <input type="number" min="5" step="5" @bind="_newDurationMinutes" />
+                <input type="number" min="5" step="5" @bind="_newDurationMinutes" class="field-input" />
             </label>
-            <label class="checkbox">
+            <label class="mb-3 flex items-center gap-2 text-sm">
                 <input type="checkbox" @bind="_newIsHomeVisit" />
                 Home visit
             </label>
-            <label>
+            <label class="field-label">
                 Reason for visit
-                <input @bind="_newReason" maxlength="240" />
+                <input @bind="_newReason" maxlength="240" class="field-input" />
             </label>
-            <button class="primary" @onclick="CreateAppointment">Book appointment</button>
+            <button class="btn-primary" @onclick="CreateAppointment">Book appointment</button>
         </div>
     }
 
     @if (_appointments is null)
     {
-        <p>Loading…</p>
+        <p class="text-text-muted">Loading…</p>
     }
     else if (_appointments.Count == 0)
     {
-        <p>No appointments this week.</p>
+        <p class="text-text-muted">No appointments this week.</p>
     }
     else
     {
         @foreach (var day in _appointments.GroupBy(a => a.StartsAt.Date).OrderBy(g => g.Key))
         {
-            <h3>@day.Key.ToString("dddd, MMM d")</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Patient</th>
-                        <th>Therapist</th>
-                        <th>Kind</th>
-                        <th>Status</th>
-                        <th>Home visit</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var appt in day.OrderBy(a => a.StartsAt))
-                    {
-                        <tr>
-                            <td>@appt.StartsAt.ToString("h:mm tt")–@appt.EndsAt.ToString("h:mm tt")</td>
-                            <td>@PatientName(appt.PatientId)</td>
-                            <td>@TherapistName(appt.TherapistId)</td>
-                            <td>@appt.Kind</td>
-                            <td>@appt.Status</td>
-                            <td>@(appt.IsHomeVisit ? "Yes" : "No")</td>
-                            <td>
-                                @if (appt.Status is AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn)
-                                {
-                                    <button class="link-button" @onclick="() => CancelAppointment(appt.Id)">Cancel</button>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="card mb-4">
+                <h3 class="section-title">@day.Key.ToString("dddd, MMM d")</h3>
+                <div class="overflow-hidden rounded-lg border border-border">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Patient</th>
+                                <th>Therapist</th>
+                                <th>Kind</th>
+                                <th>Status</th>
+                                <th>Home visit</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var appt in day.OrderBy(a => a.StartsAt))
+                            {
+                                <tr>
+                                    <td>@appt.StartsAt.ToString("h:mm tt")–@appt.EndsAt.ToString("h:mm tt")</td>
+                                    <td>@PatientName(appt.PatientId)</td>
+                                    <td>@TherapistName(appt.TherapistId)</td>
+                                    <td>@appt.Kind</td>
+                                    <td><StatusPill Text="@appt.Status.ToString()" /></td>
+                                    <td>@(appt.IsHomeVisit ? "Yes" : "No")</td>
+                                    <td>
+                                        @if (appt.Status is AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn)
+                                        {
+                                            <button class="link-danger" @onclick="() => CancelAppointment(appt.Id)">Cancel</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         }
     }
 }
-
-<style>
-    .week-nav { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-    .week-nav button { padding: 0.4rem 0.8rem; border: 1px solid #cbd5e1; background: white; border-radius: 4px; cursor: pointer; }
-    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
-    .error { color: #dc2626; }
-    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; max-width: 420px; }
-    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
-    .form-card label.checkbox { display: flex; align-items: center; gap: 0.5rem; }
-    .form-card label.checkbox input { width: auto; }
-    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
-    .link-button { background: none; border: none; color: #dc2626; cursor: pointer; padding: 0; text-decoration: underline; }
-</style>
 
 @code {
     private DateTime _weekStart = StartOfWeek(DateTime.Today);
