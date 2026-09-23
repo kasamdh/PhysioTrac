@@ -29,6 +29,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: "Server=sqlserver;Database=PhysioTrac;User Id=sa;Password=${SQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True"
       Cors__AllowedOrigins__0: "http://localhost:5073"
+      Seed__DemoPassword: "${SEED_DEMO_PASSWORD:?Set SEED_DEMO_PASSWORD in your .env file -- see README}"
     ports:
       - "5080:8080"
     depends_on:

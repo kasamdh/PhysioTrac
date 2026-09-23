@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using PhysioTrac.Application.Configuration;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
 using PhysioTrac.Infrastructure.Identity;
@@ -24,8 +26,6 @@ namespace PhysioTrac.Infrastructure.Seed;
 /// production database is never auto-seeded with fake credentials.</summary>
 public static class DemoDataSeeder
 {
-    public const string DemoPassword = "DemoPass123!";
-
     private const string SourceMotionSlug = "source-motion-pt";
     private const string TotalMotionSlug = "total-motion-pt";
 
@@ -33,21 +33,30 @@ public static class DemoDataSeeder
     {
         var db = services.GetRequiredService<PhysioTracDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var seedOptions = services.GetRequiredService<IOptions<SeedOptions>>().Value;
+
+        if (string.IsNullOrWhiteSpace(seedOptions.DemoPassword))
+        {
+            throw new InvalidOperationException(
+                "Seed:DemoPassword is not set. Set the Seed__DemoPassword environment variable " +
+                "(or a Development user secret) before starting the Api -- demo login credentials " +
+                "are never hardcoded in source or checked-in appsettings.");
+        }
 
         if (await db.Organizations.AnyAsync(o => o.Slug == SourceMotionSlug, ct))
         {
             return;
         }
 
-        await SeedSourceMotionAsync(db, userManager, ct);
-        await SeedTotalMotionAsync(db, userManager, ct);
+        await SeedSourceMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
+        await SeedTotalMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
     }
 
     /// <summary>Org 1000 -- the first real customer. Two physical locations
     /// (matching Source Motion's actual footprint) so multi-location
     /// scheduling/reporting has something real to show, not just one
     /// headquarters address standing in for everything.</summary>
-    private static async Task SeedSourceMotionAsync(PhysioTracDbContext db, UserManager<ApplicationUser> userManager, CancellationToken ct)
+    private static async Task SeedSourceMotionAsync(PhysioTracDbContext db, UserManager<ApplicationUser> userManager, string demoPassword, CancellationToken ct)
     {
         var organization = new Organization
         {
@@ -90,13 +99,13 @@ public static class DemoDataSeeder
         db.Locations.AddRange(fuquayVarina, raleigh);
 
         var admin = await CreateUserAsync(userManager, organization.Id, "admin", "admin@sourcemotionpt.test",
-            "Alex", "Rivera", UserRole.Admin, ct);
+            "Alex", "Rivera", UserRole.Admin, demoPassword, ct);
         var therapist = await CreateUserAsync(userManager, organization.Id, "therapist", "therapist@sourcemotionpt.test",
-            "Jamie", "Chen", UserRole.Therapist, ct, credential: "PT, DPT");
+            "Jamie", "Chen", UserRole.Therapist, demoPassword, ct, credential: "PT, DPT");
         await CreateUserAsync(userManager, organization.Id, "scheduler", "scheduler@sourcemotionpt.test",
-            "Morgan", "Patel", UserRole.Scheduler, ct);
+            "Morgan", "Patel", UserRole.Scheduler, demoPassword, ct);
         await CreateUserAsync(userManager, organization.Id, "biller", "biller@sourcemotionpt.test",
-            "Casey", "Nguyen", UserRole.Biller, ct);
+            "Casey", "Nguyen", UserRole.Biller, demoPassword, ct);
 
         var provider = new Provider
         {
@@ -188,7 +197,7 @@ public static class DemoDataSeeder
     /// prove isolation: its own admin/therapist logins, its own patient, its
     /// own appointment, and its own clinical note. None of these ids are
     /// derived from or shared with Source Motion's data in any way.</summary>
-    private static async Task SeedTotalMotionAsync(PhysioTracDbContext db, UserManager<ApplicationUser> userManager, CancellationToken ct)
+    private static async Task SeedTotalMotionAsync(PhysioTracDbContext db, UserManager<ApplicationUser> userManager, string demoPassword, CancellationToken ct)
     {
         var organization = new Organization
         {
@@ -220,9 +229,9 @@ public static class DemoDataSeeder
         db.Locations.Add(austin);
 
         var admin = await CreateUserAsync(userManager, organization.Id, "tm.admin", "admin@totalmotionpt.test",
-            "David", "Okafor", UserRole.Admin, ct);
+            "David", "Okafor", UserRole.Admin, demoPassword, ct);
         var therapist = await CreateUserAsync(userManager, organization.Id, "tm.therapist", "therapist@totalmotionpt.test",
-            "Priya", "Sharma", UserRole.Therapist, ct, credential: "PT, DPT");
+            "Priya", "Sharma", UserRole.Therapist, demoPassword, ct, credential: "PT, DPT");
 
         var provider = new Provider
         {
@@ -304,7 +313,7 @@ public static class DemoDataSeeder
 
     private static async Task<ApplicationUser> CreateUserAsync(
         UserManager<ApplicationUser> userManager, Guid organizationId, string userName, string email,
-        string firstName, string lastName, UserRole role, CancellationToken ct, string? credential = null)
+        string firstName, string lastName, UserRole role, string demoPassword, CancellationToken ct, string? credential = null)
     {
         var user = new ApplicationUser
         {
@@ -319,7 +328,7 @@ public static class DemoDataSeeder
             MustUseMfa = false,
         };
 
-        var result = await userManager.CreateAsync(user, DemoPassword);
+        var result = await userManager.CreateAsync(user, demoPassword);
         if (!result.Succeeded)
         {
             throw new InvalidOperationException(

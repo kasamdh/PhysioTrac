@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.Configure<SecurityOptions>(configuration.GetSection(SecurityOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
+        services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
 
         services.AddScoped<ITenantAccessService, TenantAccessService>();
         services.AddScoped<IAuditService, AuditService>();

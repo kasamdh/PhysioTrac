@@ -1,8 +1,11 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Api.Auth;
+using PhysioTrac.Api.Filters;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Configuration;
+using PhysioTrac.Application.Patients;
 using PhysioTrac.Infrastructure;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
@@ -12,9 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 const string FrontendCorsPolicy = "Frontend";
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<FluentValidationActionFilter>());
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddValidatorsFromAssemblyContaining<CreatePatientRequestValidator>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 

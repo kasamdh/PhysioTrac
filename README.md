@@ -79,7 +79,20 @@ client (see `frontend/README.md`).
 4. **Fetch the Tailwind CLI** (one-time, per machine) so `PhysioTrac.Web`
    builds its stylesheet — see `src/PhysioTrac.Web/Styles/README.md`.
 
-5. **Run it.** In Development, `PhysioTrac.Api` also auto-migrates and
+5. **Set the demo seed password.** `appsettings.Development.json` is
+   committed to git, so the seeded users' password is never hardcoded there
+   or in source — it's read from config at startup and the app refuses to
+   start the seeder if it's missing. Set it once via .NET User Secrets:
+
+   ```powershell
+   dotnet user-secrets set "Seed:DemoPassword" "DemoPass123!" --project src/PhysioTrac.Api
+   ```
+
+   (or set the `Seed__DemoPassword` environment variable instead, if you
+   prefer). Use whatever value you like locally — it only ever touches your
+   own dev database.
+
+6. **Run it.** In Development, `PhysioTrac.Api` also auto-migrates and
    seeds demo data on startup (see [Demo data](#demo-data)) — so running the
    API once is enough to get a ready-to-use database.
 
@@ -88,7 +101,7 @@ client (see `frontend/README.md`).
    dotnet run --project src/PhysioTrac.Web    # http://localhost:5073
    ```
 
-6. **Optional: run the React SPA** (a second, separate client of the same
+7. **Optional: run the React SPA** (a second, separate client of the same
    API — see [Architecture](#architecture)):
 
    ```powershell
@@ -118,6 +131,15 @@ healthy. Once it's up:
 Override the SQL `sa` password by setting `SQL_SA_PASSWORD` in your
 environment or a `.env` file before running `docker compose up` — never
 commit a real password to source control.
+
+You must also set `SEED_DEMO_PASSWORD` (same way — environment or `.env`);
+`docker compose up` refuses to start the `api` service without it, since
+the demo users' password is never hardcoded in `docker-compose.yml` or in
+source:
+
+```bash
+echo "SEED_DEMO_PASSWORD=DemoPass123!" >> .env
+```
 
 ## Demo data
 
