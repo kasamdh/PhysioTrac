@@ -122,10 +122,11 @@ docker compose up --build
 ```
 
 This starts SQL Server, then `PhysioTrac.Api` (which applies migrations and
-seeds demo data on first boot), then `PhysioTrac.Web` once the API reports
-healthy. Once it's up:
+seeds demo data on first boot), then `PhysioTrac.Web` and the React
+`frontend/` SPA once the API reports healthy. Once it's up:
 
-- Web UI: http://localhost:5073
+- Web UI (Blazor): http://localhost:5073
+- React SPA: http://localhost:5173
 - API + Swagger: http://localhost:5080/swagger
 
 Override the SQL `sa` password by setting `SQL_SA_PASSWORD` in your

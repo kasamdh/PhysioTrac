@@ -42,22 +42,22 @@ export function DashboardPage() {
         )}
         {patientsQuery.data && patientsQuery.data.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-border">
-            <table className="w-full text-sm">
+            <table className="data-table">
               <thead>
-                <tr className="border-b border-border bg-surface-muted text-left text-xs uppercase tracking-wide text-text-subtle">
-                  <th className="px-4 py-3 font-medium">MRN</th>
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Age</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
+                <tr>
+                  <th>MRN</th>
+                  <th>Name</th>
+                  <th>Age</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {patientsQuery.data.map((patient) => (
-                  <tr key={patient.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3 text-text-muted">{patient.medicalRecordNumber}</td>
-                    <td className="px-4 py-3 font-medium text-text">{patient.fullName}</td>
-                    <td className="px-4 py-3">{patient.age}</td>
-                    <td className="px-4 py-3">{patient.status}</td>
+                  <tr key={patient.id}>
+                    <td className="text-text-muted">{patient.medicalRecordNumber}</td>
+                    <td className="font-medium text-text">{patient.fullName}</td>
+                    <td>{patient.age}</td>
+                    <td>{patient.status}</td>
                   </tr>
                 ))}
               </tbody>

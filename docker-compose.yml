@@ -29,6 +29,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: "Server=sqlserver;Database=PhysioTrac;User Id=sa;Password=${SQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True"
       Cors__AllowedOrigins__0: "http://localhost:5073"
+      Cors__AllowedOrigins__1: "http://localhost:5173"
       Seed__DemoPassword: "${SEED_DEMO_PASSWORD:?Set SEED_DEMO_PASSWORD in your .env file -- see README}"
     ports:
       - "5080:8080"
@@ -57,6 +58,21 @@ services:
       # Waits for the API's own migrate+seed step to finish (its /health
       # endpoint only comes up once that's done) so Web never races the
       # schema. See PhysioTrac.Api/Program.cs.
+      api:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked in at build time (Vite convention) -- must be the URL the
+        # BROWSER reaches, i.e. the api service's host-mapped port above,
+        # not an internal Compose service name.
+        VITE_API_BASE_URL: "http://localhost:5080"
+    ports:
+      - "5173:8080"
+    depends_on:
       api:
         condition: service_healthy
 
