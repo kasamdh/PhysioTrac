@@ -60,4 +60,6 @@ public class Patient : BaseEntity
     public ICollection<ClinicalNote> Notes { get; set; } = new List<ClinicalNote>();
     public ICollection<FunctionalGoal> Goals { get; set; } = new List<FunctionalGoal>();
     public ICollection<OutcomeScore> Outcomes { get; set; } = new List<OutcomeScore>();
+    public ICollection<PatientDocument> Documents { get; set; } = new List<PatientDocument>();
+    public ICollection<Consent> Consents { get; set; } = new List<Consent>();
 }

@@ -27,4 +27,12 @@ public static class RoleSets
     {
         UserRole.Scheduler
     };
+
+    /// <summary>Uploading/managing a patient's documents spans front-desk
+    /// intake scans, clinical uploads, and billing (insurance card/EOB
+    /// scans) -- effectively every staff role except Patient.</summary>
+    public static readonly IReadOnlySet<UserRole> DocumentManagement = new HashSet<UserRole>(Clinical)
+    {
+        UserRole.Scheduler, UserRole.Biller
+    };
 }

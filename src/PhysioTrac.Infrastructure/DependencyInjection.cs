@@ -6,6 +6,8 @@ using PhysioTrac.Application.Billing;
 using PhysioTrac.Application.Booking;
 using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Configuration;
+using PhysioTrac.Application.Consents;
+using PhysioTrac.Application.Documents;
 using PhysioTrac.Application.Scheduling;
 using PhysioTrac.Application.Sessions;
 using PhysioTrac.Application.SuperAdmin;
@@ -28,6 +30,7 @@ public static class DependencyInjection
 
         services.Configure<SecurityOptions>(configuration.GetSection(SecurityOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
 
         services.AddScoped<ITenantAccessService, TenantAccessService>();
         services.AddScoped<IAuditService, AuditService>();
@@ -44,6 +47,9 @@ public static class DependencyInjection
         services.AddScoped<IChargeService, ChargeService>();
         services.AddScoped<IClaimService, ClaimService>();
         services.AddScoped<IClaimTransactionService, ClaimTransactionService>();
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IConsentService, ConsentService>();
 
         return services;
     }

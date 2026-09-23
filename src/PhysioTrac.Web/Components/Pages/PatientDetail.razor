@@ -5,6 +5,8 @@
 @using PhysioTrac.Application.Auth
 @using PhysioTrac.Application.Billing
 @using PhysioTrac.Application.Clinical
+@using PhysioTrac.Application.Consents
+@using PhysioTrac.Application.Documents
 @using PhysioTrac.Application.Tenancy
 @using PhysioTrac.Domain.Entities
 @using PhysioTrac.Domain.Enums
@@ -16,6 +18,8 @@
 @inject IOutcomeScoreService OutcomeService
 @inject IChargeService ChargeService
 @inject IClaimService ClaimServiceApi
+@inject IDocumentService DocumentService
+@inject IConsentService ConsentService
 @inject PhysioTracDbContext Db
 @inject NavigationManager Navigation
 
@@ -642,6 +646,128 @@ else
             </div>
         }
     </div>
+
+    <div class="card mt-4">
+        <h2 class="section-title">Documents</h2>
+        @if (CanManageDocuments)
+        {
+            <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
+                @if (_documentError is not null)
+                {
+                    <p class="alert-error mb-3">@_documentError</p>
+                }
+                <label class="field-label">
+                    Category
+                    <select @bind="_newDocumentCategory" class="field-input">
+                        @foreach (var category in Enum.GetValues<DocumentCategory>())
+                        {
+                            <option value="@category">@category</option>
+                        }
+                    </select>
+                </label>
+                <label class="field-label">Description (optional) <input @bind="_newDocumentDescription" class="field-input" /></label>
+                <label class="field-label">
+                    File
+                    <InputFile OnChange="OnDocumentFileSelected" class="field-input" />
+                </label>
+                <button class="btn-primary" disabled="@(_pendingUploadFile is null || _isUploadingDocument)" @onclick="UploadDocument">
+                    @(_isUploadingDocument ? "Uploading…" : "Upload")
+                </button>
+            </div>
+        }
+        @if (_documents is null)
+        {
+            <p class="text-text-muted">Loading…</p>
+        }
+        else if (_documents.Count == 0)
+        {
+            <p class="text-text-muted">No documents on file.</p>
+        }
+        else
+        {
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Uploaded</th><th>Category</th><th>Filename</th><th>Description</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var document in _documents)
+                        {
+                            <tr>
+                                <td>@document.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                <td>@document.Category</td>
+                                <td>@document.OriginalFilename</td>
+                                <td>@(document.Description ?? "—")</td>
+                                <td>
+                                    <a class="text-primary hover:underline" href="/documents/@document.Id/download" target="_blank">Download</a>
+                                    @if (CanManageDocuments)
+                                    {
+                                        <button class="link-danger ml-3" @onclick="() => DeleteDocument(document.Id)">Delete</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="card mt-4">
+        <h2 class="section-title">Consents</h2>
+        @if (CanManageDocuments)
+        {
+            <div class="mb-4 max-w-md rounded-lg border border-border bg-surface-muted p-4">
+                @if (_consentError is not null)
+                {
+                    <p class="alert-error mb-3">@_consentError</p>
+                }
+                <label class="field-label">
+                    Consent type
+                    <select @bind="_newConsentType" class="field-input">
+                        @foreach (var type in Enum.GetValues<ConsentType>())
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </label>
+                <p class="mb-3 rounded-md bg-surface p-2 text-xs text-text-muted">@ConsentTypeText.For(_newConsentType)</p>
+                <label class="field-label">Signed by (typed signature) <input @bind="_newConsentSignedByName" class="field-input" /></label>
+                <button class="btn-primary" @onclick="RecordConsent">Record signature</button>
+            </div>
+        }
+        @if (_consents is null)
+        {
+            <p class="text-text-muted">Loading…</p>
+        }
+        else if (_consents.Count == 0)
+        {
+            <p class="text-text-muted">No consents on file.</p>
+        }
+        else
+        {
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead><tr><th>Type</th><th>Signed by</th><th>Signed at</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var consent in _consents)
+                        {
+                            <tr>
+                                <td>@consent.ConsentType</td>
+                                <td>@consent.SignedByName</td>
+                                <td>@consent.SignedAt.ToString("yyyy-MM-dd h:mm tt")</td>
+                                <td><StatusPill Text="@(consent.IsActive ? "Active" : "Revoked")" /></td>
+                                <td>
+                                    @if (consent.IsActive && CanManageDocuments)
+                                    {
+                                        <button class="link-danger" @onclick="() => RevokeConsent(consent.Id)">Revoke</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
 }
 
 @code {
@@ -733,7 +859,20 @@ else
     private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
     private bool CanBill => RoleSets.Billing.Contains(CurrentUser.Role);
     private bool CanCollectPayments => RoleSets.PaymentCollection.Contains(CurrentUser.Role);
+    private bool CanManageDocuments => RoleSets.DocumentManagement.Contains(CurrentUser.Role);
     private List<Charge> UnbilledCharges => (_charges ?? new()).Where(c => c.ClaimId is null && c.SuperbillId is null && c.Status != ChargeStatus.Void).ToList();
+
+    private List<PatientDocument>? _documents;
+    private string? _documentError;
+    private DocumentCategory _newDocumentCategory = DocumentCategory.Other;
+    private string? _newDocumentDescription;
+    private IBrowserFile? _pendingUploadFile;
+    private bool _isUploadingDocument;
+
+    private List<Consent>? _consents;
+    private string? _consentError;
+    private ConsentType _newConsentType = ConsentType.ConsentToTreat;
+    private string _newConsentSignedByName = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -756,6 +895,8 @@ else
         await ReloadPaymentsAsync();
         await ReloadSuperbillsAsync();
         await ReloadStatementsAsync();
+        await ReloadDocumentsAsync();
+        await ReloadConsentsAsync();
     }
 
     private async Task ReloadNotesAsync() =>
@@ -1138,5 +1279,104 @@ else
         await Db.SaveChangesAsync();
 
         await ReloadStatementsAsync();
+    }
+
+    private async Task ReloadDocumentsAsync() =>
+        _documents = (await DocumentService.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+
+    private void OnDocumentFileSelected(InputFileChangeEventArgs e) => _pendingUploadFile = e.File;
+
+    private async Task UploadDocument()
+    {
+        _documentError = null;
+        if (_pendingUploadFile is null)
+        {
+            _documentError = "Choose a file first.";
+            return;
+        }
+
+        _isUploadingDocument = true;
+        try
+        {
+            const long maxUploadBytes = 25 * 1024 * 1024;
+            await using var stream = _pendingUploadFile.OpenReadStream(maxUploadBytes);
+            var request = new UploadDocumentRequest(
+                PatientId, _newDocumentCategory, _pendingUploadFile.Name, _pendingUploadFile.ContentType,
+                _pendingUploadFile.Size, string.IsNullOrWhiteSpace(_newDocumentDescription) ? null : _newDocumentDescription.Trim(),
+                stream);
+            await DocumentService.UploadAsync(request, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException
+            or PhysioTrac.Application.Common.NotFoundException or InvalidOperationException)
+        {
+            _documentError = ex.Message;
+            return;
+        }
+        finally
+        {
+            _isUploadingDocument = false;
+        }
+
+        _pendingUploadFile = null;
+        _newDocumentDescription = null;
+        _newDocumentCategory = DocumentCategory.Other;
+        await ReloadDocumentsAsync();
+    }
+
+    private async Task DeleteDocument(Guid documentId)
+    {
+        try
+        {
+            await DocumentService.DeleteAsync(documentId, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException
+            or PhysioTrac.Application.Common.NotFoundException or InvalidOperationException)
+        {
+            _documentError = ex.Message;
+            return;
+        }
+        await ReloadDocumentsAsync();
+    }
+
+    private async Task ReloadConsentsAsync() =>
+        _consents = (await ConsentService.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+
+    private async Task RecordConsent()
+    {
+        _consentError = null;
+        if (string.IsNullOrWhiteSpace(_newConsentSignedByName))
+        {
+            _consentError = "A typed signature name is required.";
+            return;
+        }
+
+        try
+        {
+            var request = new RecordConsentRequest(PatientId, _newConsentType, _newConsentSignedByName.Trim());
+            await ConsentService.RecordAsync(request, CurrentUser, ipAddress: null);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
+        {
+            _consentError = ex.Message;
+            return;
+        }
+
+        _newConsentSignedByName = string.Empty;
+        await ReloadConsentsAsync();
+    }
+
+    private async Task RevokeConsent(Guid consentId)
+    {
+        try
+        {
+            await ConsentService.RevokeAsync(consentId, new RevokeConsentRequest(null), CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException
+            or PhysioTrac.Application.Common.NotFoundException or InvalidOperationException)
+        {
+            _consentError = ex.Message;
+            return;
+        }
+        await ReloadConsentsAsync();
     }
 }

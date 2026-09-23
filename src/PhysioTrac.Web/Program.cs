@@ -74,6 +74,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAccountEndpoints();
+app.MapDocumentEndpoints();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
