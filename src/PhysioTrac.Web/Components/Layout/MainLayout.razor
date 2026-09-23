@@ -3,48 +3,43 @@
 
 <AuthorizeView>
     <Authorized>
-        <div class="app-shell">
-            <header class="app-header">
-                <span class="app-title">PhysioTrac</span>
-                <nav>
-                    <a href="/patients">Patients</a>
-                    <a href="/schedule">Schedule</a>
-                    <a href="/providers">Providers</a>
-                    <a href="/appointment-types">Appointment types</a>
-                    <a href="/service-prices">Service prices</a>
-                    <a href="/payers">Payers</a>
+        <div class="min-h-screen bg-surface-muted">
+            <header class="flex flex-wrap items-center gap-4 border-b border-border bg-surface px-6 py-3 shadow-sm">
+                <a href="/" class="flex items-center gap-2 text-text no-underline">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-white">P</span>
+                    <span class="font-semibold">PhysioTrac</span>
+                </a>
+                <nav class="flex flex-1 flex-wrap gap-1 text-sm">
+                    @{ var navClass = "rounded-md px-3 py-1.5 text-text-muted no-underline transition hover:bg-surface-muted hover:text-text"; }
+                    @{ var navActiveClass = "bg-primary-light text-primary-deep font-medium"; }
+                    <NavLink href="/patients" class="@navClass" ActiveClass="@navActiveClass">Patients</NavLink>
+                    <NavLink href="/schedule" class="@navClass" ActiveClass="@navActiveClass">Schedule</NavLink>
+                    <NavLink href="/providers" class="@navClass" ActiveClass="@navActiveClass">Providers</NavLink>
+                    <NavLink href="/appointment-types" class="@navClass" ActiveClass="@navActiveClass">Appointment types</NavLink>
+                    <NavLink href="/service-prices" class="@navClass" ActiveClass="@navActiveClass">Service prices</NavLink>
+                    <NavLink href="/payers" class="@navClass" ActiveClass="@navActiveClass">Payers</NavLink>
                 </nav>
-                <div class="app-user">
+                <div class="flex items-center gap-3 text-sm text-text-muted">
                     <span>@context.User.Identity?.Name</span>
                     <form method="post" action="/account/logout">
-                        <button type="submit">Sign out</button>
+                        <button type="submit" class="rounded-md border border-border px-3 py-1.5 text-text-muted transition hover:border-primary hover:text-primary">
+                            Sign out
+                        </button>
                     </form>
                 </div>
             </header>
-            <main class="app-body">
+            <main class="mx-auto max-w-6xl px-6 py-6">
                 @Body
             </main>
         </div>
     </Authorized>
 </AuthorizeView>
 
-<div id="blazor-error-ui">
+<div id="blazor-error-ui" class="fixed inset-x-0 bottom-0 bg-danger px-4 py-3 text-sm text-white">
     An unhandled error has occurred.
-    <a href="" class="reload">Reload</a>
-    <a class="dismiss">🗙</a>
+    <a href="" class="reload underline">Reload</a>
+    <a class="dismiss ml-2 cursor-pointer">✕</a>
 </div>
-
-<style>
-    .app-header { display: flex; align-items: center; gap: 1.5rem; padding: 0.75rem 1.5rem; background: #1e293b; color: white; }
-    .app-title { font-weight: 600; }
-    .app-header nav { flex: 1; }
-    .app-header nav a { color: #cbd5e1; text-decoration: none; margin-right: 1rem; }
-    .app-header nav a:hover { color: white; }
-    .app-user { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; }
-    .app-user form { margin: 0; }
-    .app-user button { background: transparent; border: 1px solid #475569; color: #e2e8f0; padding: 0.3rem 0.7rem; border-radius: 4px; cursor: pointer; }
-    .app-body { padding: 1.5rem; }
-</style>
 
 @code {
     [CascadingParameter]

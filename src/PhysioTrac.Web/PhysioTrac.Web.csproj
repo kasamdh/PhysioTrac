@@ -12,4 +12,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- Compiles Styles/app.tailwind.css to wwwroot/css/app.built.css before
+       each build. The CLI binary is a local, gitignored fetch; see
+       Styles/README.md. Skipped (with a warning, not a build failure) when
+       the binary hasn't been fetched yet, so a fresh clone still builds. -->
+  <PropertyGroup>
+    <TailwindCli>$(MSBuildThisFileDirectory)..\..\.tools\tailwindcss.exe</TailwindCli>
+  </PropertyGroup>
+
+  <Target Name="BuildTailwind" BeforeTargets="BeforeBuild">
+    <Exec Command="&quot;$(TailwindCli)&quot; -i &quot;$(MSBuildThisFileDirectory)Styles\app.tailwind.css&quot; -o &quot;$(MSBuildThisFileDirectory)wwwroot\css\app.built.css&quot; --minify"
+          Condition="Exists('$(TailwindCli)')" />
+    <Warning Text="Tailwind CLI not found at $(TailwindCli) -- skipping CSS build. See src/PhysioTrac.Web/Styles/README.md."
+             Condition="!Exists('$(TailwindCli)')" />
+  </Target>
+
 </Project>

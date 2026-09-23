@@ -4,37 +4,40 @@
 
 <PageTitle>Sign in — PhysioTrac</PageTitle>
 
-<div class="login-page">
-    <div class="login-card">
-        <h1>PhysioTrac</h1>
+<div class="flex min-h-screen items-center justify-center bg-surface-muted px-4">
+    <div class="w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-sm">
+        <div class="mb-6 text-center">
+            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-xl font-bold text-white">
+                P
+            </div>
+            <h1 class="text-lg font-semibold text-text">PhysioTrac</h1>
+            <p class="mt-1 text-sm text-text-muted">Source Motion Physical Therapy</p>
+        </div>
+
         @if (HasError)
         {
-            <p class="login-error">Invalid username or password.</p>
+            <p class="mb-4 rounded-md bg-danger-light px-3 py-2 text-sm text-danger">Invalid username or password.</p>
         }
-        <form method="post" action="/account/login">
+
+        <form method="post" action="/account/login" class="space-y-4">
             <input type="hidden" name="returnUrl" value="@ReturnUrl" />
-            <label>
+            <label class="block text-sm font-medium text-text-muted">
                 Username
-                <input type="text" name="username" autocomplete="username" required />
+                <input type="text" name="username" autocomplete="username" required
+                       class="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
             </label>
-            <label>
+            <label class="block text-sm font-medium text-text-muted">
                 Password
-                <input type="password" name="password" autocomplete="current-password" required />
+                <input type="password" name="password" autocomplete="current-password" required
+                       class="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
             </label>
-            <button type="submit">Sign in</button>
+            <button type="submit"
+                    class="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-deep">
+                Sign in
+            </button>
         </form>
     </div>
 </div>
-
-<style>
-    .login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f4f6f8; }
-    .login-card { background: white; padding: 2.5rem; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); width: 320px; }
-    .login-card h1 { margin: 0 0 1.5rem; font-size: 1.5rem; }
-    .login-card label { display: block; margin-bottom: 1rem; font-size: 0.9rem; }
-    .login-card input { width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; }
-    .login-card button { width: 100%; padding: 0.6rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    .login-error { color: #dc2626; font-size: 0.9rem; }
-</style>
 
 @code {
     [SupplyParameterFromQuery]

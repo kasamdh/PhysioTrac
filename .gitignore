@@ -482,3 +482,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Standalone Tailwind CSS CLI binary (large, platform-specific -- fetched by
+# a dev, not committed; see src/PhysioTrac.Web/Styles/README.md)
+/.tools/
+src/PhysioTrac.Web/wwwroot/css/app.built.css
