@@ -374,6 +374,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(s => s.Amount).HasPrecision(10, 2);
             e.HasOne(s => s.Patient).WithMany()
                 .HasForeignKey(s => s.PatientId).OnDelete(DeleteBehavior.Restrict);
+            // Codes is a convenience wrapper over CodesJson (mirrors Claim.DiagnosisCodeList).
+            e.Ignore(s => s.Codes);
         });
 
         builder.Entity<PaymentRecord>(e =>

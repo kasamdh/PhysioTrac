@@ -436,6 +436,186 @@ else
             </table>
         }
     </section>
+
+    <section>
+        <h2>Payments collected</h2>
+        @if (CanCollectPayments)
+        {
+            <button class="primary" @onclick="() => _showPaymentForm = !_showPaymentForm">@(_showPaymentForm ? "Cancel" : "Record payment")</button>
+            @if (_showPaymentForm)
+            {
+                <div class="form-card">
+                    @if (_paymentError is not null)
+                    {
+                        <p class="error">@_paymentError</p>
+                    }
+                    <label>Amount <input type="number" min="0.01" step="0.01" @bind="_newPaymentAmount" /></label>
+                    <label>Received on <input type="date" @bind="_newPaymentReceivedOn" /></label>
+                    <label>Reference <input @bind="_newPaymentReference" placeholder="Check #, receipt #, etc." /></label>
+                    @if (_superbills is { Count: > 0 })
+                    {
+                        <label>
+                            Apply to superbill (optional)
+                            <select @bind="_newPaymentSuperbillId">
+                                <option value="">None</option>
+                                @foreach (var superbill in _superbills)
+                                {
+                                    <option value="@superbill.Id">@superbill.ServiceDate.ToString("yyyy-MM-dd") — @superbill.Amount.ToString("C")</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    <button class="primary" @onclick="CreatePaymentRecord">Save</button>
+                </div>
+            }
+        }
+        @if (_paymentRecords is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_paymentRecords.Count == 0)
+        {
+            <p>No payments recorded yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Received</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var payment in _paymentRecords)
+                    {
+                        <tr>
+                            <td>@payment.ReceivedOn.ToString("yyyy-MM-dd")</td>
+                            <td>@payment.Amount.ToString("C")</td>
+                            <td>@payment.PaymentProcessorReference</td>
+                            <td>@payment.Status</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <h3>Online payment attempts</h3>
+        @if (_patientPayments is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_patientPayments.Count == 0)
+        {
+            <p>No online payment attempts.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Attempted</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var attempt in _patientPayments)
+                    {
+                        <tr>
+                            <td>@attempt.AttemptedAt.ToString("yyyy-MM-dd h:mm tt")</td>
+                            <td>@attempt.Amount.ToString("C")</td>
+                            <td>@attempt.Status</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section>
+        <h2>Superbills (cash-pay)</h2>
+        @if (CanBill)
+        {
+            <button class="primary" @onclick="() => _showSuperbillForm = !_showSuperbillForm">@(_showSuperbillForm ? "Cancel" : "New superbill")</button>
+            @if (_showSuperbillForm)
+            {
+                <div class="form-card">
+                    @if (_superbillError is not null)
+                    {
+                        <p class="error">@_superbillError</p>
+                    }
+                    <label>
+                        Rendering clinician
+                        <select @bind="_newSuperbillClinicianId">
+                            <option value="">Select provider…</option>
+                            @foreach (var provider in _providerOptions)
+                            {
+                                <option value="@provider.Id">@provider.FullName</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Service date <input type="date" @bind="_newSuperbillServiceDate" /></label>
+                    <label>Codes (comma-separated) <input @bind="_newSuperbillCodes" placeholder="97110, 97140" /></label>
+                    <label>Amount <input type="number" min="0" step="0.01" @bind="_newSuperbillAmount" /></label>
+                    <button class="primary" @onclick="CreateSuperbill">Save</button>
+                </div>
+            }
+        }
+        @if (_superbills is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_superbills.Count == 0)
+        {
+            <p>No superbills yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Service date</th><th>Codes</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var superbill in _superbills)
+                    {
+                        <tr>
+                            <td>@superbill.ServiceDate.ToString("yyyy-MM-dd")</td>
+                            <td>@string.Join(", ", superbill.Codes)</td>
+                            <td>@superbill.Amount.ToString("C")</td>
+                            <td>@superbill.Status</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section>
+        <h2>Statements</h2>
+        @if (CanBill)
+        {
+            <div class="inline-form">
+                <input type="date" @bind="_newStatementDueDate" />
+                <button class="primary" @onclick="GenerateStatement">Generate statement</button>
+            </div>
+            @if (_statementError is not null)
+            {
+                <p class="error">@_statementError</p>
+            }
+        }
+        @if (_statements is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_statements.Count == 0)
+        {
+            <p>No statements generated yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Statement date</th><th>Due date</th><th>Balance at generation</th></tr></thead>
+                <tbody>
+                    @foreach (var statement in _statements)
+                    {
+                        <tr>
+                            <td>@statement.StatementDate.ToString("yyyy-MM-dd")</td>
+                            <td>@statement.DueDate.ToString("yyyy-MM-dd")</td>
+                            <td>@statement.BalanceAtGeneration.ToString("C")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
 }
 
 <style>
@@ -516,9 +696,31 @@ else
     private Guid? _newClaimInsuranceId;
     private readonly HashSet<Guid> _selectedChargeIds = new();
 
+    private List<PaymentRecord>? _paymentRecords;
+    private List<PatientPayment>? _patientPayments;
+    private bool _showPaymentForm;
+    private string? _paymentError;
+    private decimal _newPaymentAmount;
+    private DateOnly _newPaymentReceivedOn = DateOnly.FromDateTime(DateTime.Today);
+    private string _newPaymentReference = string.Empty;
+    private Guid? _newPaymentSuperbillId;
+
+    private List<Superbill>? _superbills;
+    private bool _showSuperbillForm;
+    private string? _superbillError;
+    private Guid? _newSuperbillClinicianId;
+    private DateOnly _newSuperbillServiceDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _newSuperbillCodes = string.Empty;
+    private decimal _newSuperbillAmount;
+
+    private List<PatientStatement>? _statements;
+    private string? _statementError;
+    private DateOnly _newStatementDueDate = DateOnly.FromDateTime(DateTime.Today.AddDays(30));
+
     private bool CanDocument => RoleSets.Clinical.Contains(CurrentUser.Role);
     private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
     private bool CanBill => RoleSets.Billing.Contains(CurrentUser.Role);
+    private bool CanCollectPayments => RoleSets.PaymentCollection.Contains(CurrentUser.Role);
     private List<Charge> UnbilledCharges => (_charges ?? new()).Where(c => c.ClaimId is null && c.SuperbillId is null && c.Status != ChargeStatus.Void).ToList();
 
     protected override async Task OnInitializedAsync()
@@ -539,6 +741,9 @@ else
         await ReloadInsuranceAsync();
         await ReloadChargesAsync();
         await ReloadClaimsAsync();
+        await ReloadPaymentsAsync();
+        await ReloadSuperbillsAsync();
+        await ReloadStatementsAsync();
     }
 
     private async Task ReloadNotesAsync() =>
@@ -795,5 +1000,131 @@ else
         _showClaimForm = false;
         await ReloadChargesAsync();
         await ReloadClaimsAsync();
+    }
+
+    private async Task ReloadPaymentsAsync()
+    {
+        _paymentRecords = await Db.PaymentRecords.Where(p => p.PatientId == PatientId)
+            .OrderByDescending(p => p.ReceivedOn).ToListAsync();
+        _patientPayments = await Db.PatientPayments.Where(p => p.PatientId == PatientId)
+            .OrderByDescending(p => p.AttemptedAt).ToListAsync();
+    }
+
+    private async Task CreatePaymentRecord()
+    {
+        _paymentError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.PaymentCollection);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _paymentError = ex.Message; return; }
+
+        if (_newPaymentAmount <= 0)
+        {
+            _paymentError = "Enter an amount greater than zero.";
+            return;
+        }
+        if (_newPaymentSuperbillId is Guid superbillId && !(_superbills ?? new()).Any(s => s.Id == superbillId))
+        {
+            _paymentError = "A payment can only be linked to this patient's superbill.";
+            return;
+        }
+
+        var payment = new PaymentRecord
+        {
+            PatientId = PatientId,
+            SuperbillId = _newPaymentSuperbillId,
+            RecordedById = CurrentUser.UserId,
+            Amount = _newPaymentAmount,
+            ReceivedOn = _newPaymentReceivedOn,
+            PaymentProcessorReference = _newPaymentReference.Trim(),
+        };
+        Db.PaymentRecords.Add(payment);
+        await Db.SaveChangesAsync();
+
+        _newPaymentAmount = 0;
+        _newPaymentReceivedOn = DateOnly.FromDateTime(DateTime.Today);
+        _newPaymentReference = string.Empty;
+        _newPaymentSuperbillId = null;
+        _showPaymentForm = false;
+        await ReloadPaymentsAsync();
+    }
+
+    private async Task ReloadSuperbillsAsync()
+    {
+        _superbills = await Db.Superbills.Where(s => s.PatientId == PatientId)
+            .OrderByDescending(s => s.ServiceDate).ToListAsync();
+    }
+
+    private async Task CreateSuperbill()
+    {
+        _superbillError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Billing);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _superbillError = ex.Message; return; }
+
+        if (_newSuperbillClinicianId is null)
+        {
+            _superbillError = "Select the rendering clinician.";
+            return;
+        }
+
+        var codes = _newSuperbillCodes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var superbill = new Superbill
+        {
+            PatientId = PatientId,
+            ClinicianId = _newSuperbillClinicianId.Value,
+            ServiceDate = _newSuperbillServiceDate,
+            Codes = codes,
+            Amount = _newSuperbillAmount,
+        };
+        Db.Superbills.Add(superbill);
+        await Db.SaveChangesAsync();
+
+        _newSuperbillClinicianId = null;
+        _newSuperbillServiceDate = DateOnly.FromDateTime(DateTime.Today);
+        _newSuperbillCodes = string.Empty;
+        _newSuperbillAmount = 0;
+        _showSuperbillForm = false;
+        await ReloadSuperbillsAsync();
+    }
+
+    private async Task ReloadStatementsAsync()
+    {
+        _statements = await Db.PatientStatements.Where(s => s.PatientId == PatientId)
+            .OrderByDescending(s => s.StatementDate).ToListAsync();
+    }
+
+    private async Task GenerateStatement()
+    {
+        _statementError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Billing);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _statementError = ex.Message; return; }
+
+        var patientClaims = await ClaimServiceApi.ListForPatientAsync(PatientId, CurrentUser);
+        decimal balance = 0;
+        foreach (var claim in patientClaims)
+        {
+            var totals = await ClaimServiceApi.GetTotalsAsync(claim.Id, CurrentUser);
+            balance += totals.Balance;
+        }
+
+        var statement = new PatientStatement
+        {
+            OrganizationId = _patient!.OrganizationId,
+            PatientId = PatientId,
+            DueDate = _newStatementDueDate,
+            BalanceAtGeneration = balance,
+            GeneratedById = CurrentUser.UserId,
+        };
+        Db.PatientStatements.Add(statement);
+        await Db.SaveChangesAsync();
+
+        await ReloadStatementsAsync();
     }
 }
