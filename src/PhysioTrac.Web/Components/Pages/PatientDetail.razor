@@ -15,6 +15,7 @@
 @inject IFunctionalGoalService GoalService
 @inject IOutcomeScoreService OutcomeService
 @inject IChargeService ChargeService
+@inject IClaimService ClaimServiceApi
 @inject PhysioTracDbContext Db
 @inject NavigationManager Navigation
 
@@ -363,6 +364,78 @@ else
             </table>
         }
     </section>
+
+    <section>
+        <h2>Insurance claims</h2>
+        @if (CanBill)
+        {
+            <button class="primary" @onclick="ToggleClaimForm">@(_showClaimForm ? "Cancel" : "New claim")</button>
+            @if (_showClaimForm)
+            {
+                <div class="form-card">
+                    @if (_claimError is not null)
+                    {
+                        <p class="error">@_claimError</p>
+                    }
+                    <label>
+                        Insurance policy
+                        <select @bind="_newClaimInsuranceId">
+                            <option value="">Select policy…</option>
+                            @if (_insurancePolicies is not null)
+                            {
+                                @foreach (var policy in _insurancePolicies)
+                                {
+                                    <option value="@policy.Id">@PayerName(policy.PayerId) - @policy.MemberId (@policy.Rank)</option>
+                                }
+                            }
+                        </select>
+                    </label>
+                    <label>Unbilled charges</label>
+                    @if (UnbilledCharges.Count == 0)
+                    {
+                        <p>No unbilled charges available to attach.</p>
+                    }
+                    else
+                    {
+                        @foreach (var charge in UnbilledCharges)
+                        {
+                            <label class="checkbox">
+                                <input type="checkbox" checked="@_selectedChargeIds.Contains(charge.Id)"
+                                       @onchange="e => ToggleChargeSelection(charge.Id, (bool)e.Value!)" />
+                                @charge.ServiceDate.ToString("yyyy-MM-dd") — @charge.CptCode — @charge.ChargeAmount.ToString("C")
+                            </label>
+                        }
+                    }
+                    <button class="primary" @onclick="CreateClaim">Create claim</button>
+                </div>
+            }
+        }
+        @if (_claims is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_claims.Count == 0)
+        {
+            <p>No insurance claims yet.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Payer</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var claim in _claims)
+                    {
+                        <tr>
+                            <td>@PayerName(claim.PayerId)</td>
+                            <td>@claim.Status</td>
+                            <td>@(claim.SubmittedAt?.ToString("yyyy-MM-dd") ?? "—")</td>
+                            <td><a href="/claims/@claim.Id">Open</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
 }
 
 <style>
@@ -437,9 +510,16 @@ else
     private string? _newChargeOverrideReason;
     private decimal _newChargeAmount;
 
+    private List<Claim>? _claims;
+    private bool _showClaimForm;
+    private string? _claimError;
+    private Guid? _newClaimInsuranceId;
+    private readonly HashSet<Guid> _selectedChargeIds = new();
+
     private bool CanDocument => RoleSets.Clinical.Contains(CurrentUser.Role);
     private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
     private bool CanBill => RoleSets.Billing.Contains(CurrentUser.Role);
+    private List<Charge> UnbilledCharges => (_charges ?? new()).Where(c => c.ClaimId is null && c.SuperbillId is null && c.Status != ChargeStatus.Void).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -458,6 +538,7 @@ else
         await ReloadOutcomesAsync();
         await ReloadInsuranceAsync();
         await ReloadChargesAsync();
+        await ReloadClaimsAsync();
     }
 
     private async Task ReloadNotesAsync() =>
@@ -670,5 +751,49 @@ else
         _newChargeAmount = 0;
         _showChargeForm = false;
         await ReloadChargesAsync();
+    }
+
+    private async Task ReloadClaimsAsync() =>
+        _claims = (await ClaimServiceApi.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+
+    private void ToggleClaimForm() => _showClaimForm = !_showClaimForm;
+
+    private void ToggleChargeSelection(Guid chargeId, bool selected)
+    {
+        if (selected) _selectedChargeIds.Add(chargeId);
+        else _selectedChargeIds.Remove(chargeId);
+    }
+
+    private async Task CreateClaim()
+    {
+        _claimError = null;
+        if (_newClaimInsuranceId is null)
+        {
+            _claimError = "Select an insurance policy.";
+            return;
+        }
+        if (_selectedChargeIds.Count == 0)
+        {
+            _claimError = "Select at least one unbilled charge.";
+            return;
+        }
+
+        var request = new CreateClaimRequest(PatientId, _newClaimInsuranceId.Value, _selectedChargeIds.ToList());
+        try
+        {
+            await ClaimServiceApi.CreateFromChargesAsync(request, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException
+            or PhysioTrac.Application.Common.NotFoundException or InvalidOperationException)
+        {
+            _claimError = ex.Message;
+            return;
+        }
+
+        _newClaimInsuranceId = null;
+        _selectedChargeIds.Clear();
+        _showClaimForm = false;
+        await ReloadChargesAsync();
+        await ReloadClaimsAsync();
     }
 }

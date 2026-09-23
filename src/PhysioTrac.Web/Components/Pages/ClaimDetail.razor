@@ -1,0 +1,301 @@
+@page "/claims/{ClaimId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Auth
+@using PhysioTrac.Application.Billing
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Domain.Enums
+@using PhysioTrac.Infrastructure.Persistence
+@inject ICurrentUser CurrentUser
+@inject IClaimService ClaimService
+@inject IClaimTransactionService TransactionService
+@inject PhysioTracDbContext Db
+
+<PageTitle>Claim — PhysioTrac</PageTitle>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+else if (_claim is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <a href="/patients/@_claim.PatientId">&larr; Back to patient</a>
+    <h1>Claim — @PayerName</h1>
+    <p class="status-line">
+        Status:
+        @if (CanManage)
+        {
+            <select @bind="_statusChange">
+                @foreach (var status in Enum.GetValues<ClaimStatus>())
+                {
+                    <option value="@status">@status</option>
+                }
+            </select>
+            <button @onclick="UpdateStatus">Update</button>
+        }
+        else
+        {
+            <strong>@_claim.Status</strong>
+        }
+        @if (_claim.SubmittedAt is not null)
+        {
+            <span> · Submitted @_claim.SubmittedAt?.ToString("yyyy-MM-dd")</span>
+        }
+        @if (_claim.ClosedAt is not null)
+        {
+            <span> · Closed @_claim.ClosedAt?.ToString("yyyy-MM-dd")</span>
+        }
+    </p>
+    @if (_statusError is not null)
+    {
+        <p class="error">@_statusError</p>
+    }
+
+    <p>Diagnosis codes: @(_claim.DiagnosisCodeList.Count > 0 ? string.Join(", ", _claim.DiagnosisCodeList) : "—")</p>
+
+    @if (_totals is not null)
+    {
+        <div class="totals">
+            <div><span>Total charges</span><strong>@_totals.TotalChargeAmount.ToString("C")</strong></div>
+            <div><span>Total paid</span><strong>@_totals.TotalPaid.ToString("C")</strong></div>
+            <div><span>Total adjusted</span><strong>@_totals.TotalAdjusted.ToString("C")</strong></div>
+            <div><span>Balance</span><strong>@_totals.Balance.ToString("C")</strong></div>
+        </div>
+    }
+
+    <section>
+        <h3>Charges on this claim</h3>
+        @if (_charges.Count == 0)
+        {
+            <p>No charges attached.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Service date</th><th>CPT</th><th>Units</th><th>Amount</th></tr></thead>
+                <tbody>
+                    @foreach (var charge in _charges)
+                    {
+                        <tr>
+                            <td>@charge.ServiceDate.ToString("yyyy-MM-dd")</td>
+                            <td>@charge.CptCode</td>
+                            <td>@charge.Units</td>
+                            <td>@charge.ChargeAmount.ToString("C")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section>
+        <h3>Transactions</h3>
+        @if (CanManage)
+        {
+            <button class="primary" @onclick="() => _showTransactionForm = !_showTransactionForm">@(_showTransactionForm ? "Cancel" : "Record transaction")</button>
+            @if (_showTransactionForm)
+            {
+                <div class="form-card">
+                    @if (_transactionError is not null)
+                    {
+                        <p class="error">@_transactionError</p>
+                    }
+                    <label>
+                        Kind
+                        <select @bind="_newTransactionKind">
+                            @foreach (var kind in Enum.GetValues<ClaimTransactionKind>())
+                            {
+                                <option value="@kind">@kind</option>
+                            }
+                        </select>
+                    </label>
+                    @if (_newTransactionKind is ClaimTransactionKind.InsurancePayment or ClaimTransactionKind.PatientPayment)
+                    {
+                        <label>
+                            Method
+                            <select @bind="_newTransactionMethod">
+                                <option value="">Unspecified</option>
+                                @foreach (var method in Enum.GetValues<ClaimTransactionMethod>())
+                                {
+                                    <option value="@method">@method</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    <label>Amount <input type="number" min="0.01" step="0.01" @bind="_newTransactionAmount" /></label>
+                    <label>Payment date <input type="date" @bind="_newTransactionDate" /></label>
+                    <label>Reference (optional) <input @bind="_newTransactionReference" /></label>
+                    @if (_newTransactionKind == ClaimTransactionKind.Transfer)
+                    {
+                        <label>
+                            Transfer to claim
+                            <select @bind="_newTransactionTransferToClaimId">
+                                <option value="">Select claim…</option>
+                                @foreach (var claim in _siblingClaims)
+                                {
+                                    <option value="@claim.Id">@claim.Id (@claim.Status)</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    <label>Denial code (optional) <input @bind="_newTransactionDenialCode" /></label>
+                    <label>Denial reason (optional) <input @bind="_newTransactionDenialReason" /></label>
+                    <label>Notes (optional) <input @bind="_newTransactionNotes" /></label>
+                    <button class="primary" @onclick="RecordTransaction">Save</button>
+                </div>
+            }
+        }
+        @if (_transactions.Count == 0)
+        {
+            <p>No transactions recorded.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Date</th><th>Kind</th><th>Method</th><th>Amount</th><th>Reference</th></tr></thead>
+                <tbody>
+                    @foreach (var transaction in _transactions)
+                    {
+                        <tr>
+                            <td>@transaction.PaymentDate.ToString("yyyy-MM-dd")</td>
+                            <td>@transaction.Kind</td>
+                            <td>@(transaction.Method?.ToString() ?? "—")</td>
+                            <td>@transaction.Amount.ToString("C")</td>
+                            <td>@(transaction.Reference ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+}
+
+<style>
+    .error { color: #dc2626; }
+    .status-line { color: #475569; }
+    .totals { display: flex; gap: 1.5rem; margin: 1rem 0; }
+    .totals div { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem; }
+    .totals span { display: block; font-size: 0.8rem; color: #64748b; }
+    section { margin-top: 2rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #e2e8f0; }
+    button.primary { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; margin-bottom: 1rem; }
+    .form-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; max-width: 420px; }
+    .form-card label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .form-card input, .form-card select { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+</style>
+
+@code {
+    [Parameter]
+    public Guid ClaimId { get; set; }
+
+    private Claim? _claim;
+    private string? _error;
+    private ClaimTotalsDto? _totals;
+    private List<Charge> _charges = new();
+    private List<ClaimTransaction> _transactions = new();
+    private List<Claim> _siblingClaims = new();
+    private string PayerName => _payerName ?? "Unknown payer";
+    private string? _payerName;
+
+    private ClaimStatus _statusChange;
+    private string? _statusError;
+
+    private bool _showTransactionForm;
+    private string? _transactionError;
+    private ClaimTransactionKind _newTransactionKind = ClaimTransactionKind.InsurancePayment;
+    private ClaimTransactionMethod? _newTransactionMethod;
+    private decimal _newTransactionAmount;
+    private DateOnly _newTransactionDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _newTransactionReference;
+    private Guid? _newTransactionTransferToClaimId;
+    private string? _newTransactionDenialCode;
+    private string? _newTransactionDenialReason;
+    private string? _newTransactionNotes;
+
+    private bool CanManage => RoleSets.Billing.Contains(CurrentUser.Role);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _claim = await ClaimService.GetAsync(ClaimId, CurrentUser);
+            _totals = await ClaimService.GetTotalsAsync(ClaimId, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or PhysioTrac.Application.Common.NotFoundException)
+        {
+            _error = ex.Message;
+            return;
+        }
+
+        _statusChange = _claim.Status;
+        var payer = await Db.Payers.FirstOrDefaultAsync(p => p.Id == _claim.PayerId);
+        _payerName = payer?.Name;
+
+        _charges = await Db.Charges.Where(c => c.ClaimId == _claim.Id).OrderBy(c => c.ServiceDate).ToListAsync();
+        _transactions = (await TransactionService.ListForClaimAsync(ClaimId, CurrentUser)).ToList();
+        _siblingClaims = await Db.Claims.Where(c => c.PatientId == _claim.PatientId && c.Id != _claim.Id).ToListAsync();
+    }
+
+    private async Task UpdateStatus()
+    {
+        _statusError = null;
+        try
+        {
+            await ClaimService.UpdateStatusAsync(ClaimId, new UpdateClaimStatusRequest(_statusChange), CurrentUser);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex) { _statusError = ex.Message; return; }
+        await LoadAsync();
+    }
+
+    private async Task RecordTransaction()
+    {
+        _transactionError = null;
+        if (_newTransactionAmount <= 0)
+        {
+            _transactionError = "Amount must be greater than zero.";
+            return;
+        }
+        if (_newTransactionKind == ClaimTransactionKind.Transfer && _newTransactionTransferToClaimId is null)
+        {
+            _transactionError = "Select a destination claim for the transfer.";
+            return;
+        }
+
+        var request = new RecordClaimTransactionRequest(
+            _claim!.PatientId, ClaimId, _newTransactionTransferToClaimId, _newTransactionKind, _newTransactionMethod,
+            _newTransactionAmount, _newTransactionDate,
+            string.IsNullOrWhiteSpace(_newTransactionReference) ? null : _newTransactionReference.Trim(),
+            string.IsNullOrWhiteSpace(_newTransactionDenialCode) ? null : _newTransactionDenialCode.Trim(),
+            string.IsNullOrWhiteSpace(_newTransactionDenialReason) ? null : _newTransactionDenialReason.Trim(),
+            string.IsNullOrWhiteSpace(_newTransactionNotes) ? null : _newTransactionNotes.Trim());
+
+        try
+        {
+            await TransactionService.RecordAsync(request, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException
+            or PhysioTrac.Application.Common.NotFoundException or InvalidOperationException)
+        {
+            _transactionError = ex.Message;
+            return;
+        }
+
+        _newTransactionAmount = 0;
+        _newTransactionReference = null;
+        _newTransactionTransferToClaimId = null;
+        _newTransactionDenialCode = null;
+        _newTransactionDenialReason = null;
+        _newTransactionNotes = null;
+        _showTransactionForm = false;
+        await LoadAsync();
+    }
+}
