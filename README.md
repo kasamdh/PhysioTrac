@@ -17,6 +17,7 @@ src/
   PhysioTrac.Web             Blazor Server app (the staff-facing UI)
 tests/
   PhysioTrac.Tests           xUnit tests against an EF Core in-memory provider
+frontend/                    React + TypeScript + Vite SPA, talks to PhysioTrac.Api (see frontend/README.md)
 ```
 
 Multi-tenancy is scoped by `Organization.Id` (referred to as the "client" in
@@ -31,8 +32,8 @@ plus a CSRF double-submit token (`GET /api/v1/auth/csrf` →
 `X-CSRF-TOKEN` header) for any JSON client. `PhysioTrac.Web` never calls
 `PhysioTrac.Api` over HTTP — it talks to the Application-layer services
 directly via dependency injection in the same process; `PhysioTrac.Api`
-exists for a separate JSON client (mobile app, SPA, etc.) that doesn't exist
-in this repo yet.
+exists for a separate JSON client — `frontend/`, a React SPA, is that
+client (see `frontend/README.md`).
 
 ## Prerequisites
 
@@ -86,6 +87,17 @@ in this repo yet.
    dotnet run --project src/PhysioTrac.Api    # http://localhost:5080, Swagger at /swagger
    dotnet run --project src/PhysioTrac.Web    # http://localhost:5073
    ```
+
+6. **Optional: run the React SPA** (a second, separate client of the same
+   API — see [Architecture](#architecture)):
+
+   ```powershell
+   cd frontend
+   npm install
+   npm run dev    # http://localhost:5173
+   ```
+
+   See `frontend/README.md` for details.
 
 ## Run with Docker
 
