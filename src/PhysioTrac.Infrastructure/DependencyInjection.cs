@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConsentService, ConsentService>();
+        services.AddScoped<IHomeExerciseProgramService, HomeExerciseProgramService>();
 
         return services;
     }

@@ -20,6 +20,7 @@
 @inject IClaimService ClaimServiceApi
 @inject IDocumentService DocumentService
 @inject IConsentService ConsentService
+@inject IHomeExerciseProgramService HomeExerciseService
 @inject PhysioTracDbContext Db
 @inject NavigationManager Navigation
 
@@ -768,6 +769,92 @@ else
             </div>
         }
     </div>
+
+    <div class="card mt-4">
+        <h2 class="section-title">Home exercise programs</h2>
+        @if (CanDocument)
+        {
+            <button class="btn-primary mb-3" @onclick="() => _showHepForm = !_showHepForm">@(_showHepForm ? "Cancel" : "New program")</button>
+            @if (_showHepForm)
+            {
+                <div class="mb-4 max-w-lg rounded-lg border border-border bg-surface-muted p-4">
+                    @if (_hepError is not null)
+                    {
+                        <p class="alert-error mb-3">@_hepError</p>
+                    }
+                    <label class="field-label">Title <input @bind="_newHepTitle" placeholder="e.g. Phase 1 - Post-op Knee" class="field-input" /></label>
+                    <label class="field-label">General instructions (optional) <textarea @bind="_newHepInstructions" rows="2" class="field-input"></textarea></label>
+
+                    <p class="field-label mb-2">Exercises</p>
+                    @if (_stagedHepItems.Count > 0)
+                    {
+                        <ul class="mb-2 space-y-1 text-sm">
+                            @foreach (var staged in _stagedHepItems)
+                            {
+                                <li class="flex items-center justify-between rounded bg-surface px-2 py-1">
+                                    <span>@staged.Name @(staged.Sets is { } s && staged.Reps is { } r ? $"({s}x{r})" : "")</span>
+                                    <button class="link-danger" @onclick="() => _stagedHepItems.Remove(staged)">Remove</button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    <div class="mb-3 flex flex-wrap items-center gap-2">
+                        <input placeholder="Exercise name" @bind="_stagedItemName" class="field-input mt-0 flex-[2]" />
+                        <input type="number" min="0" placeholder="Sets" @bind="_stagedItemSets" class="field-input mt-0 w-16" />
+                        <input type="number" min="0" placeholder="Reps" @bind="_stagedItemReps" class="field-input mt-0 w-16" />
+                        <button class="btn-secondary" @onclick="StageExerciseItem">Add</button>
+                    </div>
+
+                    <button class="btn-primary" @onclick="CreateHomeExerciseProgram">Save program</button>
+                </div>
+            }
+        }
+        @if (_homeExercisePrograms is null)
+        {
+            <p class="text-text-muted">Loading…</p>
+        }
+        else if (_homeExercisePrograms.Count == 0)
+        {
+            <p class="text-text-muted">No home exercise programs on file.</p>
+        }
+        else
+        {
+            @foreach (var program in _homeExercisePrograms)
+            {
+                <div class="mb-3 rounded-lg border border-border p-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <span class="font-medium text-text">@program.Title</span>
+                            <span class="ml-2 text-xs text-text-muted">@program.CreatedAt.ToString("yyyy-MM-dd")</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <StatusPill Text="@program.Status.ToString()" />
+                            @if (CanDocument && program.IsActive)
+                            {
+                                <button class="link-danger" @onclick="() => DiscontinueHomeExerciseProgram(program.Id)">Discontinue</button>
+                            }
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(program.GeneralInstructions))
+                    {
+                        <p class="mt-1 text-sm text-text-muted">@program.GeneralInstructions</p>
+                    }
+                    <ul class="mt-2 space-y-1 text-sm">
+                        @foreach (var item in program.Items.OrderBy(i => i.Order))
+                        {
+                            <li>
+                                @item.Name
+                                @if (item.Sets is not null || item.Reps is not null)
+                                {
+                                    <span class="text-text-muted">(@item.Sets sets x @item.Reps reps@(item.HoldSeconds is { } h ? $", hold {h}s" : ""))</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+    </div>
 }
 
 @code {
@@ -874,6 +961,16 @@ else
     private ConsentType _newConsentType = ConsentType.ConsentToTreat;
     private string _newConsentSignedByName = string.Empty;
 
+    private List<HomeExerciseProgram>? _homeExercisePrograms;
+    private bool _showHepForm;
+    private string? _hepError;
+    private string _newHepTitle = string.Empty;
+    private string? _newHepInstructions;
+    private readonly List<CreateHomeExerciseItemRequest> _stagedHepItems = new();
+    private string _stagedItemName = string.Empty;
+    private int? _stagedItemSets;
+    private int? _stagedItemReps;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -897,6 +994,7 @@ else
         await ReloadStatementsAsync();
         await ReloadDocumentsAsync();
         await ReloadConsentsAsync();
+        await ReloadHomeExerciseProgramsAsync();
     }
 
     private async Task ReloadNotesAsync() =>
@@ -1378,5 +1476,60 @@ else
             return;
         }
         await ReloadConsentsAsync();
+    }
+
+    private async Task ReloadHomeExerciseProgramsAsync() =>
+        _homeExercisePrograms = (await HomeExerciseService.ListForPatientAsync(PatientId, CurrentUser)).ToList();
+
+    private void StageExerciseItem()
+    {
+        if (string.IsNullOrWhiteSpace(_stagedItemName)) return;
+
+        _stagedHepItems.Add(new CreateHomeExerciseItemRequest(_stagedItemName.Trim(), null, _stagedItemSets, _stagedItemReps, null, null, null));
+        _stagedItemName = string.Empty;
+        _stagedItemSets = null;
+        _stagedItemReps = null;
+    }
+
+    private async Task CreateHomeExerciseProgram()
+    {
+        _hepError = null;
+        if (string.IsNullOrWhiteSpace(_newHepTitle))
+        {
+            _hepError = "A title is required.";
+            return;
+        }
+
+        try
+        {
+            var request = new CreateHomeExerciseProgramRequest(PatientId, _newHepTitle.Trim(), _newHepInstructions, _stagedHepItems.ToList());
+            await HomeExerciseService.CreateAsync(request, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
+        {
+            _hepError = ex.Message;
+            return;
+        }
+
+        _newHepTitle = string.Empty;
+        _newHepInstructions = null;
+        _stagedHepItems.Clear();
+        _showHepForm = false;
+        await ReloadHomeExerciseProgramsAsync();
+    }
+
+    private async Task DiscontinueHomeExerciseProgram(Guid programId)
+    {
+        try
+        {
+            await HomeExerciseService.DiscontinueAsync(programId, CurrentUser);
+        }
+        catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException
+            or PhysioTrac.Application.Common.NotFoundException or InvalidOperationException)
+        {
+            _hepError = ex.Message;
+            return;
+        }
+        await ReloadHomeExerciseProgramsAsync();
     }
 }

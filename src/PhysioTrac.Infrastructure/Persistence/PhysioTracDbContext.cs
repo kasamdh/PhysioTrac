@@ -46,6 +46,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<PatientStatement> PatientStatements => Set<PatientStatement>();
     public DbSet<PatientDocument> PatientDocuments => Set<PatientDocument>();
     public DbSet<Consent> Consents => Set<Consent>();
+    public DbSet<HomeExerciseProgram> HomeExercisePrograms => Set<HomeExerciseProgram>();
+    public DbSet<HomeExerciseItem> HomeExerciseItems => Set<HomeExerciseItem>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -441,6 +443,21 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(c => c.Patient).WithMany(p => p.Consents)
                 .HasForeignKey(c => c.PatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<HomeExerciseProgram>(e =>
+        {
+            e.HasIndex(p => new { p.PatientId, p.Status });
+            e.HasOne(p => p.Organization).WithMany()
+                .HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.Patient).WithMany(pt => pt.HomeExercisePrograms)
+                .HasForeignKey(p => p.PatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<HomeExerciseItem>(e =>
+        {
+            e.HasOne(i => i.Program).WithMany(p => p.Items)
+                .HasForeignKey(i => i.ProgramId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 

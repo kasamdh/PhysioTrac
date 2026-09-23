@@ -62,4 +62,5 @@ public class Patient : BaseEntity
     public ICollection<OutcomeScore> Outcomes { get; set; } = new List<OutcomeScore>();
     public ICollection<PatientDocument> Documents { get; set; } = new List<PatientDocument>();
     public ICollection<Consent> Consents { get; set; } = new List<Consent>();
+    public ICollection<HomeExerciseProgram> HomeExercisePrograms { get; set; } = new List<HomeExerciseProgram>();
 }
