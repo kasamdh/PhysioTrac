@@ -1,13 +1,16 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Api.Auth;
+using PhysioTrac.Api.Authorization;
 using PhysioTrac.Api.Filters;
 using PhysioTrac.Api.Logging;
 using PhysioTrac.Api.Middleware;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Configuration;
 using PhysioTrac.Application.Patients;
+using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Infrastructure;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
@@ -99,7 +102,15 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Lax;
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IAuthorizationHandler, RoleSetAuthorizationHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(PermissionPolicies.Clinical, policy => policy.Requirements.Add(new RoleSetPolicyRequirement(RoleSets.Clinical)));
+    options.AddPolicy(PermissionPolicies.Scheduling, policy => policy.Requirements.Add(new RoleSetPolicyRequirement(RoleSets.Scheduling)));
+    options.AddPolicy(PermissionPolicies.Billing, policy => policy.Requirements.Add(new RoleSetPolicyRequirement(RoleSets.Billing)));
+    options.AddPolicy(PermissionPolicies.PaymentCollection, policy => policy.Requirements.Add(new RoleSetPolicyRequirement(RoleSets.PaymentCollection)));
+    options.AddPolicy(PermissionPolicies.DocumentManagement, policy => policy.Requirements.Add(new RoleSetPolicyRequirement(RoleSets.DocumentManagement)));
+});
 
 builder.Services.AddCors(options =>
 {

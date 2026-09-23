@@ -143,23 +143,66 @@ echo "SEED_DEMO_PASSWORD=DemoPass123!" >> .env
 
 ## Demo data
 
-`PhysioTrac.Infrastructure.Seed.DemoDataSeeder` seeds one clinic
-("Source Motion Physical Therapy") the first time the API starts in
-Development, if it isn't already present. It's idempotent — safe to
-restart the app as many times as you like. It never runs when
-`ASPNETCORE_ENVIRONMENT` isn't `Development`, so a production database is
-never auto-seeded with known credentials.
+`PhysioTrac.Infrastructure.Seed.DemoDataSeeder` seeds two independent
+tenants — Source Motion Physical Therapy (org 1000) and Total Motion PT
+(org 1001) — the first time the API starts in Development, if they aren't
+already present. It's idempotent — safe to restart the app as many times as
+you like. It never runs when `ASPNETCORE_ENVIRONMENT` isn't `Development`,
+so a production database is never auto-seeded with known credentials.
 
-| Username     | Password        | Role       |
-|--------------|-----------------|------------|
-| `admin`      | `DemoPass123!`  | Admin      |
-| `therapist`  | `DemoPass123!`  | Therapist  |
-| `scheduler`  | `DemoPass123!`  | Scheduler  |
-| `biller`     | `DemoPass123!`  | Biller     |
+Every role except SuperAdmin is seeded in **both** organizations (`tm.`-
+prefixed usernames for Total Motion); SuperAdmin is a platform-level account
+seeded once, with no organization at all, since a real `SuperAdmin` account
+can never have a standing `OrganizationId`.
 
-Also seeded: 2 patients, 2 appointment types, 2 service prices, and 1
-insurance payer — enough that every page in the app has real data to show
-immediately.
+| Username        | Org           | Password        | Role       |
+|-----------------|---------------|-----------------|------------|
+| `superadmin`    | *(platform)*  | `DemoPass123!`  | SuperAdmin |
+| `admin`         | Source Motion | `DemoPass123!`  | Admin      |
+| `director`      | Source Motion | `DemoPass123!`  | Director   |
+| `therapist`     | Source Motion | `DemoPass123!`  | Therapist  |
+| `assistant`     | Source Motion | `DemoPass123!`  | Assistant  |
+| `scheduler`     | Source Motion | `DemoPass123!`  | Scheduler  |
+| `biller`        | Source Motion | `DemoPass123!`  | Biller     |
+| `compliance`    | Source Motion | `DemoPass123!`  | Compliance |
+| `patient`       | Source Motion | `DemoPass123!`  | Patient (portal login linked to Taylor Brooks' chart) |
+| `tm.admin`      | Total Motion  | `DemoPass123!`  | Admin      |
+| `tm.director`   | Total Motion  | `DemoPass123!`  | Director   |
+| `tm.therapist`  | Total Motion  | `DemoPass123!`  | Therapist  |
+| `tm.assistant`  | Total Motion  | `DemoPass123!`  | Assistant  |
+| `tm.scheduler`  | Total Motion  | `DemoPass123!`  | Scheduler  |
+| `tm.biller`     | Total Motion  | `DemoPass123!`  | Biller     |
+| `tm.compliance` | Total Motion  | `DemoPass123!`  | Compliance |
+| `tm.patient`    | Total Motion  | `DemoPass123!`  | Patient (portal login linked to Jordan Ellis' chart) |
+
+Also seeded per organization: patients, appointment types, service prices,
+and (Source Motion only) an insurance payer — enough that every page in the
+app has real data to show immediately.
+
+## Authorization, and audit
+
+Role checks happen at two layers that deliberately read the same "role"
+claim, so they can never disagree: `ITenantAccessService.RequireRole` inside
+an action body (the original, still-primary mechanism across all
+controllers), and a small ASP.NET Core policy layer
+(`PhysioTrac.Api.Authorization.RoleSetAuthorizationHandler` +
+`PermissionPolicies`) usable via `[Authorize(Policy = ...)]` for a
+declarative, request-never-reaches-the-action check. See
+`ReferringProvidersController.Create` for the two used together.
+
+Two audit mechanisms write to the same append-only `AuditEvents` table:
+- `ITenantAccessService`/services call `IAuditService` directly for
+  specific security-relevant events (e.g. `access.denied` on a cross-tenant
+  access attempt; `auth.login.success`/`auth.login.failed`/`auth.logout` in
+  `AuthController`).
+- `EntityChangeAuditInterceptor` (an EF Core `SaveChangesInterceptor`)
+  automatically writes `entity.created`/`entity.updated`/`entity.deleted`
+  events for any entity with its own `OrganizationId` property, with no
+  per-service opt-in call. Metadata never includes field values — only the
+  names of changed properties — to keep PHI out of the audit log itself.
+  Entities scoped only indirectly through a relation (e.g. `Appointment`,
+  `ClinicalNote` via `PatientId`) aren't covered by this automatic
+  mechanism yet.
 
 ## Running tests
 

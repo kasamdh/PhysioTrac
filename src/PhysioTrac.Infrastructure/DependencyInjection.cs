@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PhysioTrac.Application.Audit;
+using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Billing;
 using PhysioTrac.Application.Booking;
 using PhysioTrac.Application.Clinical;
@@ -13,6 +14,7 @@ using PhysioTrac.Application.Scheduling;
 using PhysioTrac.Application.Sessions;
 using PhysioTrac.Application.SuperAdmin;
 using PhysioTrac.Application.Tenancy;
+using PhysioTrac.Infrastructure.Auditing;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
 using PhysioTrac.Infrastructure.Services;
@@ -23,8 +25,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<PhysioTracDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("Default")));
+        services.AddScoped<EntityChangeAuditInterceptor>();
+        services.AddDbContext<PhysioTracDbContext>((serviceProvider, options) =>
+            options.UseSqlServer(configuration.GetConnectionString("Default"))
+                .AddInterceptors(serviceProvider.GetRequiredService<EntityChangeAuditInterceptor>()));
         services.AddMemoryCache();
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUserAccessor>();

@@ -48,8 +48,19 @@ public static class DemoDataSeeder
             return;
         }
 
+        await SeedPlatformSuperAdminAsync(userManager, seedOptions.DemoPassword, ct);
         await SeedSourceMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
         await SeedTotalMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
+    }
+
+    /// <summary>The one account with no standing organization at all --
+    /// IsPlatformSuperAdmin requires Role == SuperAdmin AND OrganizationId
+    /// == null, so unlike every other role this is seeded once, globally,
+    /// not per-org.</summary>
+    private static async Task SeedPlatformSuperAdminAsync(UserManager<ApplicationUser> userManager, string demoPassword, CancellationToken ct)
+    {
+        await CreateUserAsync(userManager, organizationId: null, "superadmin", "superadmin@physiotrac.test",
+            "Platform", "Admin", UserRole.SuperAdmin, demoPassword, ct);
     }
 
     /// <summary>Org 1000 -- the first real customer. Two physical locations
@@ -100,12 +111,18 @@ public static class DemoDataSeeder
 
         var admin = await CreateUserAsync(userManager, organization.Id, "admin", "admin@sourcemotionpt.test",
             "Alex", "Rivera", UserRole.Admin, demoPassword, ct);
+        await CreateUserAsync(userManager, organization.Id, "director", "director@sourcemotionpt.test",
+            "Devon", "Reyes", UserRole.Director, demoPassword, ct, credential: "PT, DPT");
         var therapist = await CreateUserAsync(userManager, organization.Id, "therapist", "therapist@sourcemotionpt.test",
             "Jamie", "Chen", UserRole.Therapist, demoPassword, ct, credential: "PT, DPT");
+        await CreateUserAsync(userManager, organization.Id, "assistant", "assistant@sourcemotionpt.test",
+            "Avery", "Kim", UserRole.Assistant, demoPassword, ct, credential: "PTA");
         await CreateUserAsync(userManager, organization.Id, "scheduler", "scheduler@sourcemotionpt.test",
             "Morgan", "Patel", UserRole.Scheduler, demoPassword, ct);
         await CreateUserAsync(userManager, organization.Id, "biller", "biller@sourcemotionpt.test",
             "Casey", "Nguyen", UserRole.Biller, demoPassword, ct);
+        await CreateUserAsync(userManager, organization.Id, "compliance", "compliance@sourcemotionpt.test",
+            "Corey", "Diaz", UserRole.Compliance, demoPassword, ct);
 
         var provider = new Provider
         {
@@ -132,6 +149,13 @@ public static class DemoDataSeeder
             IsCompactPrivilege = false,
         });
 
+        // Taylor's portal login -- the only seeded Patient-role account for
+        // this org, so the portal path (PatientsFor's PortalUserId match) has
+        // a real, working login to test against instead of only ever being
+        // exercised by staff-role logins.
+        var taylorPortalUser = await CreateUserAsync(userManager, organization.Id, "patient", "taylor.brooks@example.test",
+            "Taylor", "Brooks", UserRole.Patient, demoPassword, ct);
+
         db.Patients.AddRange(
             new Patient
             {
@@ -143,6 +167,7 @@ public static class DemoDataSeeder
                 Email = "taylor.brooks@example.test",
                 Diagnoses = "Right knee ACL reconstruction, post-op",
                 AssignedTherapistId = therapist.Id,
+                PortalUserId = taylorPortalUser.Id,
             },
             new Patient
             {
@@ -230,8 +255,18 @@ public static class DemoDataSeeder
 
         var admin = await CreateUserAsync(userManager, organization.Id, "tm.admin", "admin@totalmotionpt.test",
             "David", "Okafor", UserRole.Admin, demoPassword, ct);
+        await CreateUserAsync(userManager, organization.Id, "tm.director", "director@totalmotionpt.test",
+            "Dana", "Fitzgerald", UserRole.Director, demoPassword, ct, credential: "PT, DPT");
         var therapist = await CreateUserAsync(userManager, organization.Id, "tm.therapist", "therapist@totalmotionpt.test",
             "Priya", "Sharma", UserRole.Therapist, demoPassword, ct, credential: "PT, DPT");
+        await CreateUserAsync(userManager, organization.Id, "tm.assistant", "assistant@totalmotionpt.test",
+            "Ashley", "Nguyen", UserRole.Assistant, demoPassword, ct, credential: "PTA");
+        await CreateUserAsync(userManager, organization.Id, "tm.scheduler", "scheduler@totalmotionpt.test",
+            "Sam", "Torres", UserRole.Scheduler, demoPassword, ct);
+        await CreateUserAsync(userManager, organization.Id, "tm.biller", "biller@totalmotionpt.test",
+            "Bailey", "Wong", UserRole.Biller, demoPassword, ct);
+        await CreateUserAsync(userManager, organization.Id, "tm.compliance", "compliance@totalmotionpt.test",
+            "Charlie", "Osei", UserRole.Compliance, demoPassword, ct);
 
         var provider = new Provider
         {
@@ -257,6 +292,9 @@ public static class DemoDataSeeder
             IsCompactPrivilege = false,
         });
 
+        var jordanPortalUser = await CreateUserAsync(userManager, organization.Id, "tm.patient", "jordan.ellis@example.test",
+            "Jordan", "Ellis", UserRole.Patient, demoPassword, ct);
+
         var patient = new Patient
         {
             OrganizationId = organization.Id,
@@ -267,6 +305,7 @@ public static class DemoDataSeeder
             Email = "jordan.ellis@example.test",
             Diagnoses = "Rotator cuff tendinopathy",
             AssignedTherapistId = therapist.Id,
+            PortalUserId = jordanPortalUser.Id,
         };
         db.Patients.Add(patient);
 
@@ -312,7 +351,7 @@ public static class DemoDataSeeder
     }
 
     private static async Task<ApplicationUser> CreateUserAsync(
-        UserManager<ApplicationUser> userManager, Guid organizationId, string userName, string email,
+        UserManager<ApplicationUser> userManager, Guid? organizationId, string userName, string email,
         string firstName, string lastName, UserRole role, string demoPassword, CancellationToken ct, string? credential = null)
     {
         var user = new ApplicationUser

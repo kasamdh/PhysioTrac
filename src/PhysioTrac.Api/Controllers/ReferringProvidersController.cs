@@ -39,7 +39,13 @@ public class ReferringProvidersController : ControllerBase
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
+    // The policy attribute is the declarative counterpart of the
+    // RequireRole(RoleSets.Scheduling) call inside this action -- both
+    // enforce the same role set, read from the same claim (see
+    // RoleSetAuthorizationHandler). Belt and suspenders: the request never
+    // reaches this method at all if the policy fails.
     [HttpPost]
+    [Authorize(Policy = PermissionPolicies.Scheduling)]
     public async Task<IActionResult> Create([FromBody] CreateReferringProviderRequest request)
     {
         try

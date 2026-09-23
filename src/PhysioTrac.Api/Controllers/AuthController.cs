@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Api.Contracts;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Sessions;
 using PhysioTrac.Domain.Enums;
 using PhysioTrac.Infrastructure.Identity;
@@ -20,17 +21,20 @@ public class AuthController : ControllerBase
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ISessionService _sessions;
+    private readonly IAuditService _audit;
     private readonly PhysioTracDbContext _db;
 
     public AuthController(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
         ISessionService sessions,
+        IAuditService audit,
         PhysioTracDbContext db)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _sessions = sessions;
+        _audit = audit;
         _db = db;
     }
 
@@ -44,25 +48,31 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+
         var user = await _userManager.FindByNameAsync(request.Username)
             ?? await _userManager.FindByEmailAsync(request.Username);
         if (user is null)
         {
+            // No audit event here -- there's no user/org to attribute it to,
+            // and writing one keyed by the attempted username would let an
+            // attacker use audit-log side effects to enumerate accounts.
             return InvalidCredentials();
         }
 
         var checkResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (!checkResult.Succeeded)
         {
+            await AuditAuthEventAsync(user, "auth.login.failed", ip, HttpContext.RequestAborted);
             return InvalidCredentials();
         }
 
         if (user.EffectiveStatus(DateTimeOffset.UtcNow) != UserStatus.Active)
         {
+            await AuditAuthEventAsync(user, "auth.login.failed", ip, HttpContext.RequestAborted);
             return InvalidCredentials();
         }
 
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = Request.Headers.UserAgent.ToString();
         var session = await _sessions.CreateSessionAsync(user.Id, user.OrganizationId, user.Role, ip, userAgent, HttpContext.RequestAborted);
 
@@ -70,6 +80,8 @@ public class AuthController : ControllerBase
         {
             new Claim(AppClaimTypes.SessionKey, session.SessionKey),
         });
+
+        await AuditAuthEventAsync(user, "auth.login.success", ip, HttpContext.RequestAborted);
 
         return Ok(ToMeResponse(user));
     }
@@ -83,9 +95,26 @@ public class AuthController : ControllerBase
         {
             await _sessions.RevokeAsync(sessionKey, SessionRevokedReason.UserLogout, HttpContext.RequestAborted);
         }
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user is not null)
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            await AuditAuthEventAsync(user, "auth.logout", ip, HttpContext.RequestAborted);
+        }
+
         await _signInManager.SignOutAsync();
         return NoContent();
     }
+
+    /// <summary>Platform accounts (SuperAdmin, OrganizationId null) have no
+    /// tenant to attribute a login/logout event to, so they go through
+    /// RecordPlatformAuditEventAsync instead -- everyone else's auth events
+    /// are tenant-scoped like any other audit entry.</summary>
+    private Task AuditAuthEventAsync(ApplicationUser user, string action, string? ipAddress, CancellationToken ct) =>
+        user.OrganizationId is Guid organizationId
+            ? _audit.RecordAuditEventAsync(user.Id, action, nameof(ApplicationUser), user.Id, organizationId, ipAddress: ipAddress, ct: ct)
+            : _audit.RecordPlatformAuditEventAsync(user.Id, action, nameof(ApplicationUser), user.Id, ipAddress: ipAddress, ct: ct);
 
     [HttpGet("me")]
     [Authorize]
