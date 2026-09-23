@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Api.Auth;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Configuration;
 using PhysioTrac.Infrastructure;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
+using PhysioTrac.Infrastructure.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,6 +92,20 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Applies pending migrations and seeds the demo dataset on startup.
+// Development-only, deliberately: a production database is never
+// auto-migrated or auto-seeded with known demo credentials as a side
+// effect of the app starting. Kestrel doesn't start listening until this
+// finishes, so /health only reports healthy once it's done -- Docker
+// Compose's web service depends on that to know the schema is ready.
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<PhysioTracDbContext>();
+    await db.Database.MigrateAsync();
+    await DemoDataSeeder.SeedAsync(scope.ServiceProvider);
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -104,6 +120,7 @@ app.UseAuthentication();
 app.UseMiddleware<SessionValidationMiddleware>();
 app.UseAuthorization();
 
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapControllers();
 
 app.Run();

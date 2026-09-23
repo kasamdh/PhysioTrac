@@ -1,0 +1,63 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD:-YourStrong!Passw0rd}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      # mssql-tools18 matches recent server:2022-latest images; if your pull
+      # ships the older toolset, this path is /opt/mssql-tools/bin/sqlcmd.
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/PhysioTrac.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Server=sqlserver;Database=PhysioTrac;User Id=sa;Password=${SQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True"
+      Cors__AllowedOrigins__0: "http://localhost:5073"
+    ports:
+      - "5080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: src/PhysioTrac.Web/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Server=sqlserver;Database=PhysioTrac;User Id=sa;Password=${SQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True"
+    ports:
+      - "5073:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      # Waits for the API's own migrate+seed step to finish (its /health
+      # endpoint only comes up once that's done) so Web never races the
+      # schema. See PhysioTrac.Api/Program.cs.
+      api:
+        condition: service_healthy
+
+volumes:
+  sqlserver-data:

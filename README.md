@@ -1,1 +1,151 @@
 # PhysioTrac
+
+PhysioTrac is a clinical EMR for **Source Motion Physical Therapy** — a .NET
+8 / Clean Architecture rewrite of the same product family as
+[PhysioTrac360](../PhysioTrac360) (Django + React). This project targets
+Blazor Server for the UI and ASP.NET Core Web API for a separate JSON
+surface, both backed by one SQL Server database.
+
+## Architecture
+
+```
+src/
+  PhysioTrac.Domain          Entities, enums — no framework dependencies
+  PhysioTrac.Application     Interfaces, DTOs, business rules (services live in Infrastructure)
+  PhysioTrac.Infrastructure  EF Core DbContext, migrations, service implementations, Identity, seed data
+  PhysioTrac.Api             ASP.NET Core Web API (cookie + CSRF auth, Swagger)
+  PhysioTrac.Web             Blazor Server app (the staff-facing UI)
+tests/
+  PhysioTrac.Tests           xUnit tests against an EF Core in-memory provider
+```
+
+Multi-tenancy is scoped by `Organization.Id` (referred to as the "client" in
+the platform-admin surfaces) — every patient, appointment, note, and billing
+record carries an `OrganizationId`, and `ITenantAccessService` is the single
+choke point that scopes every query to the caller's organization and role.
+
+Authentication is ASP.NET Core Identity with cookies (not JWT) — a
+deliberate choice, not an oversight: `PhysioTrac.Web` is server-rendered
+(cookies are the natural fit), and `PhysioTrac.Api` uses the same cookie
+plus a CSRF double-submit token (`GET /api/v1/auth/csrf` →
+`X-CSRF-TOKEN` header) for any JSON client. `PhysioTrac.Web` never calls
+`PhysioTrac.Api` over HTTP — it talks to the Application-layer services
+directly via dependency injection in the same process; `PhysioTrac.Api`
+exists for a separate JSON client (mobile app, SPA, etc.) that doesn't exist
+in this repo yet.
+
+## Prerequisites
+
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- SQL Server (2019+), or Docker (see [Run with Docker](#run-with-docker) below)
+- The [standalone Tailwind CSS CLI](https://github.com/tailwindlabs/tailwindcss/releases/latest)
+  (only needed to build `PhysioTrac.Web`'s stylesheet locally — Docker fetches
+  it automatically). See `src/PhysioTrac.Web/Styles/README.md`.
+
+## Local setup (bare metal)
+
+1. **Restore and build**
+
+   ```powershell
+   dotnet restore
+   dotnet build
+   ```
+
+2. **Point the app at a SQL Server instance.** The default connection
+   string in `appsettings.json` targets LocalDB
+   (`(localdb)\MSSQLLocalDB`). If you're using a named instance instead
+   (e.g. SQL Server Express), override it in
+   `src/PhysioTrac.Api/appsettings.Development.json` and
+   `src/PhysioTrac.Web/appsettings.Development.json` (gitignored-friendly —
+   edit your local copies):
+
+   ```json
+   {
+     "ConnectionStrings": {
+       "Default": "Server=.\\SQLEXPRESS;Database=PhysioTrac;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
+     }
+   }
+   ```
+
+3. **Apply migrations.** `PhysioTrac.Api` carries the EF Core design-time
+   package, so it's the startup project for tooling:
+
+   ```powershell
+   dotnet tool restore
+   dotnet ef database update --project src/PhysioTrac.Infrastructure --startup-project src/PhysioTrac.Api
+   ```
+
+4. **Fetch the Tailwind CLI** (one-time, per machine) so `PhysioTrac.Web`
+   builds its stylesheet — see `src/PhysioTrac.Web/Styles/README.md`.
+
+5. **Run it.** In Development, `PhysioTrac.Api` also auto-migrates and
+   seeds demo data on startup (see [Demo data](#demo-data)) — so running the
+   API once is enough to get a ready-to-use database.
+
+   ```powershell
+   dotnet run --project src/PhysioTrac.Api    # http://localhost:5080, Swagger at /swagger
+   dotnet run --project src/PhysioTrac.Web    # http://localhost:5073
+   ```
+
+## Run with Docker
+
+No local .NET SDK, SQL Server, or Tailwind CLI needed — everything is built
+inside the containers.
+
+```bash
+docker compose up --build
+```
+
+This starts SQL Server, then `PhysioTrac.Api` (which applies migrations and
+seeds demo data on first boot), then `PhysioTrac.Web` once the API reports
+healthy. Once it's up:
+
+- Web UI: http://localhost:5073
+- API + Swagger: http://localhost:5080/swagger
+
+Override the SQL `sa` password by setting `SQL_SA_PASSWORD` in your
+environment or a `.env` file before running `docker compose up` — never
+commit a real password to source control.
+
+## Demo data
+
+`PhysioTrac.Infrastructure.Seed.DemoDataSeeder` seeds one clinic
+("Source Motion Physical Therapy") the first time the API starts in
+Development, if it isn't already present. It's idempotent — safe to
+restart the app as many times as you like. It never runs when
+`ASPNETCORE_ENVIRONMENT` isn't `Development`, so a production database is
+never auto-seeded with known credentials.
+
+| Username     | Password        | Role       |
+|--------------|-----------------|------------|
+| `admin`      | `DemoPass123!`  | Admin      |
+| `therapist`  | `DemoPass123!`  | Therapist  |
+| `scheduler`  | `DemoPass123!`  | Scheduler  |
+| `biller`     | `DemoPass123!`  | Biller     |
+
+Also seeded: 2 patients, 2 appointment types, 2 service prices, and 1
+insurance payer — enough that every page in the app has real data to show
+immediately.
+
+## Running tests
+
+```powershell
+dotnet test tests/PhysioTrac.Tests/PhysioTrac.Tests.csproj
+```
+
+Tests run against EF Core's in-memory provider, not a real database — fast,
+but this means schema-level issues (constraint violations, cascade-path
+conflicts, missing migrations) only surface against a real SQL Server
+instance. If you're changing the data model, apply the migration and
+exercise it against a real database before considering the change verified.
+
+## Production considerations
+
+This is a HIPAA-oriented application **foundation**, not a certified-
+compliant product as shipped. Before any real patient data goes into a
+production deployment of this app, you still need: a signed BAA with your
+hosting provider, database encryption at rest and in transit, MFA/SSO for
+staff accounts, audit-log retention policy, PHI-safe logging (verify no
+identifiers leak into application logs or error trackers), and a real
+secrets-management story for connection strings and the SQL `sa`/app
+credentials (never the defaults in this README or in `docker-compose.yml`).
