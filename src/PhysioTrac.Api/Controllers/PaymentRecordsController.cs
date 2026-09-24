@@ -62,6 +62,7 @@ public class PaymentRecordsController : ControllerBase
                 RecordedById = _currentUser.UserId,
                 Amount = request.Amount,
                 ReceivedOn = request.ReceivedOn ?? DateOnly.FromDateTime(DateTime.UtcNow),
+                Method = request.Method,
                 PaymentProcessorReference = request.PaymentProcessorReference,
             };
             _db.PaymentRecords.Add(payment);
@@ -72,4 +73,6 @@ public class PaymentRecordsController : ControllerBase
     }
 }
 
-public record CreatePaymentRecordRequest(Guid PatientId, Guid? SuperbillId, decimal Amount, DateOnly? ReceivedOn, string PaymentProcessorReference);
+public record CreatePaymentRecordRequest(
+    Guid PatientId, Guid? SuperbillId, decimal Amount, DateOnly? ReceivedOn,
+    PhysioTrac.Domain.Enums.ClaimTransactionMethod? Method, string PaymentProcessorReference);

@@ -18,4 +18,11 @@ public class PaymentRecord : BaseEntity
     public DateOnly ReceivedOn { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
     public PaymentRecordStatus Status { get; set; } = PaymentRecordStatus.Pending;
     public string PaymentProcessorReference { get; set; } = string.Empty;
+
+    /// <summary>How this cash-pay payment was actually collected -- recorded
+    /// only, matching this app's "no live payment processing" posture even
+    /// for a card/payment-plan entry (see ClaimTransactionMethod, reused
+    /// here rather than a duplicate enum since the same method vocabulary
+    /// applies to both insurance-side and cash-pay collections).</summary>
+    public ClaimTransactionMethod? Method { get; set; }
 }

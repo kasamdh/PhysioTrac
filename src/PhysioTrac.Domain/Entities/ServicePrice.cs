@@ -19,6 +19,16 @@ public class ServicePrice : BaseEntity
     public Guid OrganizationId { get; set; }
     public Organization? Organization { get; set; }
 
+    /// <summary>Null means an organization-wide default price for this CPT
+    /// code; set means a location-specific override. ChargeService's fee-
+    /// schedule resolution prefers a location-specific row over the
+    /// organization-wide one for the same CptCode -- the only "most-specific-
+    /// wins" scoping this row needs, since there's just the one override
+    /// level (no state/regional tier the clinical/consent/intake template
+    /// engines have).</summary>
+    public Guid? LocationId { get; set; }
+    public Location? LocationDetail { get; set; }
+
     public string CptCode { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
     public decimal Price { get; set; }

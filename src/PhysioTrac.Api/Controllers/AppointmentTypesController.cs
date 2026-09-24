@@ -57,6 +57,7 @@ public class AppointmentTypesController : ControllerBase
                 OnlineBookingEnabled = request.OnlineBookingEnabled,
                 RequiresNewPatient = request.RequiresNewPatient,
                 DefaultKind = request.DefaultKind,
+                DefaultCptCode = request.DefaultCptCode,
             };
             _db.AppointmentTypes.Add(type);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
@@ -65,6 +66,27 @@ public class AppointmentTypesController : ControllerBase
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
+    [HttpPatch("{id:guid}/billing")]
+    public async Task<IActionResult> UpdateBilling(Guid id, [FromBody] UpdateAppointmentTypeBillingRequest request)
+    {
+        try
+        {
+            _tenantAccess.RequireRole(_currentUser, RoleSets.Billing);
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            var type = await _db.AppointmentTypes.FirstOrDefaultAsync(a => a.Id == id && a.OrganizationId == organization.Id, HttpContext.RequestAborted);
+            if (type is null) return NotFound(new { detail = "Appointment type was not found." });
+
+            type.DefaultCptCode = request.DefaultCptCode;
+            type.Price = request.Price;
+            type.UpdatedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
+            return Ok(ToDto(type));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+    }
+
     private static AppointmentTypeDto ToDto(AppointmentType a) => new(
-        a.Id, a.Name, a.Description, a.DefaultDurationMinutes, a.Price, a.IsActive, a.OnlineBookingEnabled, a.DefaultKind);
+        a.Id, a.Name, a.Description, a.DefaultDurationMinutes, a.Price, a.IsActive, a.OnlineBookingEnabled, a.DefaultKind, a.DefaultCptCode);
 }
+
+public record UpdateAppointmentTypeBillingRequest(string? DefaultCptCode, decimal? Price);

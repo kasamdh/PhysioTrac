@@ -111,4 +111,192 @@ public class ChargeServiceTests
 
         await Assert.ThrowsAsync<PhysioTrac.Application.Common.NotFoundException>(() => service.CreateAsync(ValidRequest(otherPatientId), biller));
     }
+
+    private static async Task<(ClinicalNote Note, Provider Provider)> SeedSignedNoteAsync(
+        PhysioTracDbContext db, Organization org, Patient patient, params (InterventionCategory? Category, int Minutes, bool IsTimed)[] items)
+    {
+        var therapistUserId = Guid.NewGuid();
+        var provider = new Provider { OrganizationId = org.Id, UserId = therapistUserId, FirstName = "Jamie", LastName = "Chen" };
+        db.Providers.Add(provider);
+
+        var note = new ClinicalNote
+        {
+            PatientId = patient.Id,
+            TherapistId = therapistUserId,
+            Status = NoteStatus.Signed,
+            ServiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
+        };
+        var order = 0;
+        foreach (var (category, minutes, isTimed) in items)
+        {
+            note.InterventionItems.Add(new NoteIntervention
+            {
+                Description = "Intervention", Category = category, Minutes = minutes, IsTimed = isTimed, Order = order++,
+            });
+        }
+        db.ClinicalNotes.Add(note);
+        await db.SaveChangesAsync();
+        return (note, provider);
+    }
+
+    [Fact]
+    public async Task GenerateFromNote_MappedTimedIntervention_CreatesChargeWithComputedUnitsAndFeeSchedulePrice()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var (note, provider) = await SeedSignedNoteAsync(db, org, patient, (InterventionCategory.TherapeuticExercise, 15, true), (InterventionCategory.TherapeuticExercise, 10, true));
+
+        db.CptCodeMappings.Add(new CptCodeMapping { OrganizationId = org.Id, InterventionCategory = InterventionCategory.TherapeuticExercise, CptCode = "97110", CreatedById = biller.UserId });
+        db.ServicePrices.Add(new ServicePrice { OrganizationId = org.Id, CptCode = "97110", Label = "Therapeutic Exercise", Price = 65m });
+        await db.SaveChangesAsync();
+
+        var charges = await service.GenerateFromNoteAsync(note.Id, biller);
+
+        var charge = Assert.Single(charges);
+        Assert.Equal("97110", charge.CptCode);
+        Assert.Equal(25, charge.Minutes); // 15 + 10 summed before applying the 8-minute rule
+        Assert.Equal(2, charge.Units); // 25 minutes -> 2 units under the Medicare table
+        Assert.Equal(65m, charge.ChargeAmount);
+        Assert.Equal(provider.Id, charge.ProviderId);
+        Assert.Equal(note.Id, charge.ClinicalNoteId);
+    }
+
+    [Fact]
+    public async Task GenerateFromNote_LocationSpecificPrice_PreferredOverOrganizationWideDefault()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var location = new Location { OrganizationId = org.Id, Name = "Downtown" };
+        db.Locations.Add(location);
+        patient.PrimaryLocationId = location.Id;
+        await db.SaveChangesAsync();
+        var (note, _) = await SeedSignedNoteAsync(db, org, patient, (InterventionCategory.ManualTherapy, 20, true));
+
+        db.CptCodeMappings.Add(new CptCodeMapping { OrganizationId = org.Id, InterventionCategory = InterventionCategory.ManualTherapy, CptCode = "97140", CreatedById = biller.UserId });
+        db.ServicePrices.AddRange(
+            new ServicePrice { OrganizationId = org.Id, CptCode = "97140", Label = "Manual Therapy", Price = 55m },
+            new ServicePrice { OrganizationId = org.Id, LocationId = location.Id, CptCode = "97140", Label = "Manual Therapy (Downtown)", Price = 70m });
+        await db.SaveChangesAsync();
+
+        var charges = await service.GenerateFromNoteAsync(note.Id, biller);
+
+        Assert.Equal(70m, Assert.Single(charges).ChargeAmount);
+    }
+
+    [Fact]
+    public async Task GenerateFromNote_UnmappedCategory_Throws()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var (note, _) = await SeedSignedNoteAsync(db, org, patient, (InterventionCategory.GaitTraining, 20, true));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GenerateFromNoteAsync(note.Id, biller));
+    }
+
+    [Fact]
+    public async Task GenerateFromNote_DraftNote_Throws()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var note = new ClinicalNote
+        {
+            PatientId = patient.Id, TherapistId = Guid.NewGuid(), Status = NoteStatus.Draft, ServiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
+        };
+        db.ClinicalNotes.Add(note);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GenerateFromNoteAsync(note.Id, biller));
+    }
+
+    [Fact]
+    public async Task GenerateFromNote_CalledTwice_ThrowsOnTheSecondCall()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var (note, _) = await SeedSignedNoteAsync(db, org, patient, (InterventionCategory.TherapeuticExercise, 20, true));
+        db.CptCodeMappings.Add(new CptCodeMapping { OrganizationId = org.Id, InterventionCategory = InterventionCategory.TherapeuticExercise, CptCode = "97110", CreatedById = biller.UserId });
+        db.ServicePrices.Add(new ServicePrice { OrganizationId = org.Id, CptCode = "97110", Label = "Therapeutic Exercise", Price = 65m });
+        await db.SaveChangesAsync();
+
+        await service.GenerateFromNoteAsync(note.Id, biller);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GenerateFromNoteAsync(note.Id, biller));
+    }
+
+    [Fact]
+    public async Task GenerateFromNote_UntimedIntervention_BillsOneUnitPerLine_WithNoMinutesRecorded()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var (note, _) = await SeedSignedNoteAsync(db, org, patient, (InterventionCategory.PatientEducation, 0, false), (InterventionCategory.PatientEducation, 0, false));
+        db.CptCodeMappings.Add(new CptCodeMapping { OrganizationId = org.Id, InterventionCategory = InterventionCategory.PatientEducation, CptCode = "97535", CreatedById = biller.UserId });
+        db.ServicePrices.Add(new ServicePrice { OrganizationId = org.Id, CptCode = "97535", Label = "Self-Care/Home Mgmt Training", Price = 50m });
+        await db.SaveChangesAsync();
+
+        var charges = await service.GenerateFromNoteAsync(note.Id, biller);
+
+        var charge = Assert.Single(charges);
+        Assert.Equal(2, charge.Units);
+        Assert.Null(charge.Minutes);
+    }
+
+    [Fact]
+    public async Task GenerateFromAppointment_CompletedWithDefaultCptCode_CreatesFlatCharge()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var provider = new Provider { OrganizationId = org.Id, FirstName = "Jamie", LastName = "Chen" };
+        var appointmentType = new AppointmentType { OrganizationId = org.Id, Name = "Follow-up", DefaultCptCode = "97110", Price = 95m };
+        db.Providers.Add(provider);
+        db.AppointmentTypes.Add(appointmentType);
+        await db.SaveChangesAsync();
+
+        var appointment = new Appointment
+        {
+            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id,
+            Status = AppointmentStatus.Completed, StartsAt = DateTimeOffset.UtcNow, EndsAt = DateTimeOffset.UtcNow.AddMinutes(30), CreatedById = biller.UserId,
+        };
+        db.Appointments.Add(appointment);
+        await db.SaveChangesAsync();
+
+        var charge = await service.GenerateFromAppointmentAsync(appointment.Id, biller);
+
+        Assert.Equal("97110", charge.CptCode);
+        Assert.Equal(95m, charge.ChargeAmount);
+        Assert.Equal(1, charge.Units);
+        Assert.Equal(appointment.Id, charge.AppointmentId);
+    }
+
+    [Fact]
+    public async Task GenerateFromAppointment_NoDefaultCptCodeConfigured_Throws()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var provider = new Provider { OrganizationId = org.Id, FirstName = "Jamie", LastName = "Chen" };
+        var appointmentType = new AppointmentType { OrganizationId = org.Id, Name = "Follow-up" };
+        db.Providers.Add(provider);
+        db.AppointmentTypes.Add(appointmentType);
+        await db.SaveChangesAsync();
+        var appointment = new Appointment
+        {
+            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id,
+            Status = AppointmentStatus.Completed, StartsAt = DateTimeOffset.UtcNow, EndsAt = DateTimeOffset.UtcNow.AddMinutes(30), CreatedById = biller.UserId,
+        };
+        db.Appointments.Add(appointment);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GenerateFromAppointmentAsync(appointment.Id, biller));
+    }
+
+    [Fact]
+    public async Task GenerateFromAppointment_NotCompleted_Throws()
+    {
+        var (db, service, org, patient, biller) = NewService();
+        var provider = new Provider { OrganizationId = org.Id, FirstName = "Jamie", LastName = "Chen" };
+        var appointmentType = new AppointmentType { OrganizationId = org.Id, Name = "Follow-up", DefaultCptCode = "97110", Price = 95m };
+        db.Providers.Add(provider);
+        db.AppointmentTypes.Add(appointmentType);
+        await db.SaveChangesAsync();
+        var appointment = new Appointment
+        {
+            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id,
+            Status = AppointmentStatus.Scheduled, StartsAt = DateTimeOffset.UtcNow, EndsAt = DateTimeOffset.UtcNow.AddMinutes(30), CreatedById = biller.UserId,
+        };
+        db.Appointments.Add(appointment);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GenerateFromAppointmentAsync(appointment.Id, biller));
+    }
 }

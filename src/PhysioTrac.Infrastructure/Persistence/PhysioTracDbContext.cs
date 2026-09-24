@@ -48,6 +48,9 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<PaymentRecord> PaymentRecords => Set<PaymentRecord>();
     public DbSet<PatientPayment> PatientPayments => Set<PatientPayment>();
     public DbSet<ServicePrice> ServicePrices => Set<ServicePrice>();
+    public DbSet<CptCode> CptCodes => Set<CptCode>();
+    public DbSet<CptCodeMapping> CptCodeMappings => Set<CptCodeMapping>();
+    public DbSet<PayerFeeScheduleItem> PayerFeeScheduleItems => Set<PayerFeeScheduleItem>();
     public DbSet<PatientStatement> PatientStatements => Set<PatientStatement>();
     public DbSet<PatientDocument> PatientDocuments => Set<PatientDocument>();
     public DbSet<Consent> Consents => Set<Consent>();
@@ -75,6 +78,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(o => o.Name).HasMaxLength(160).IsRequired();
             e.Property(o => o.Status).HasConversion<string>().HasMaxLength(16);
             e.Property(o => o.SubscriptionTier).HasConversion<string>().HasMaxLength(20);
+            e.Property(o => o.EightMinuteRuleVariant).HasConversion<string>().HasMaxLength(24);
         });
 
         builder.Entity<Location>(e =>
@@ -449,6 +453,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(c => c.PatientId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(c => c.ClinicalNote).WithMany()
                 .HasForeignKey(c => c.ClinicalNoteId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(c => c.Appointment).WithMany()
+                .HasForeignKey(c => c.AppointmentId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(c => c.Location).WithMany()
                 .HasForeignKey(c => c.LocationId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(c => c.Claim).WithMany(cl => cl.Charges)
@@ -526,11 +532,33 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         {
             e.HasIndex(p => new { p.PatientId, p.ReceivedOn });
             e.Property(p => p.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(p => p.Method).HasConversion<string>().HasMaxLength(16);
             e.Property(p => p.Amount).HasPrecision(10, 2);
             e.HasOne(p => p.Patient).WithMany()
                 .HasForeignKey(p => p.PatientId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(p => p.Superbill).WithMany(s => s.Payments)
                 .HasForeignKey(p => p.SuperbillId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<CptCode>(e =>
+        {
+            e.HasIndex(c => c.Code).IsUnique();
+        });
+
+        builder.Entity<CptCodeMapping>(e =>
+        {
+            e.HasIndex(m => new { m.OrganizationId, m.InterventionCategory, m.IsActive });
+            e.Property(m => m.InterventionCategory).HasConversion<string>().HasMaxLength(32);
+            e.HasOne(m => m.Organization).WithMany()
+                .HasForeignKey(m => m.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<PayerFeeScheduleItem>(e =>
+        {
+            e.Property(f => f.AllowedAmount).HasPrecision(10, 2);
+            e.HasIndex(f => new { f.PayerId, f.CptCode }).IsUnique();
+            e.HasOne(f => f.Payer).WithMany()
+                .HasForeignKey(f => f.PayerId).OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<PatientPayment>(e =>
@@ -547,13 +575,28 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(s => s.HomeVisitKind).HasConversion<string>().HasMaxLength(20);
             e.Property(s => s.Price).HasPrecision(10, 2);
             e.Property(s => s.DepositAmount).HasPrecision(8, 2);
-            e.HasIndex(s => new { s.OrganizationId, s.CptCode }).IsUnique();
+            // Split in two, rather than one (OrganizationId, LocationId,
+            // CptCode) unique index, because EF Core's SQL Server provider
+            // auto-adds a "WHERE LocationId IS NOT NULL" filter to any
+            // unique index containing a nullable column (to match C#/LINQ
+            // null-never-equals-null semantics) -- a single combined index
+            // would then only constrain the location-specific rows, letting
+            // multiple org-wide (LocationId NULL) rows for the same CPT code
+            // back in. Each filtered index enforces its own scope exactly:
+            // at most one org-wide default row per code, and at most one
+            // row per (location, code) pair.
+            e.HasIndex(s => new { s.OrganizationId, s.CptCode })
+                .IsUnique().HasFilter("[LocationId] IS NULL");
+            e.HasIndex(s => new { s.OrganizationId, s.LocationId, s.CptCode })
+                .IsUnique().HasFilter("[LocationId] IS NOT NULL");
             e.HasIndex(s => new { s.OrganizationId, s.HomeVisitKind })
                 .IsUnique().HasFilter("[HomeVisitKind] IS NOT NULL");
             e.HasIndex(s => new { s.OrganizationId, s.IsHomeVisitTravelFee })
                 .IsUnique().HasFilter("[IsHomeVisitTravelFee] = 1");
             e.HasOne(s => s.Organization).WithMany()
                 .HasForeignKey(s => s.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(s => s.LocationDetail).WithMany()
+                .HasForeignKey(s => s.LocationId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<PatientStatement>(e =>

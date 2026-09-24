@@ -1,3 +1,5 @@
+using PhysioTrac.Domain.Enums;
+
 namespace PhysioTrac.Application.Billing;
 
 /// <summary>Direct port of `services._medicare_eight_minute_units` —
@@ -7,9 +9,20 @@ namespace PhysioTrac.Application.Billing;
 /// suggestion, never submit it directly.</summary>
 public static class EightMinuteRuleCalculator
 {
-    public static int ComputeUnits(int totalTimedMinutes)
+    /// <summary>Original single-table overload, kept for every existing
+    /// caller that only ever meant the Medicare table -- equivalent to
+    /// calling <see cref="ComputeUnits(int, EightMinuteRuleVariant)"/> with
+    /// <see cref="EightMinuteRuleVariant.Medicare"/>.</summary>
+    public static int ComputeUnits(int totalTimedMinutes) => ComputeUnits(totalTimedMinutes, EightMinuteRuleVariant.Medicare);
+
+    public static int ComputeUnits(int totalTimedMinutes, EightMinuteRuleVariant variant)
     {
         if (totalTimedMinutes < 8) return 0;
-        return 1 + (totalTimedMinutes - 8) / 15;
+
+        return variant switch
+        {
+            EightMinuteRuleVariant.RoundedFifteenMinute => (int)Math.Round(totalTimedMinutes / 15.0, MidpointRounding.AwayFromZero),
+            _ => 1 + (totalTimedMinutes - 8) / 15,
+        };
     }
 }

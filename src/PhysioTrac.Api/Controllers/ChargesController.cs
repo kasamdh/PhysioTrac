@@ -70,8 +70,45 @@ public class ChargesController : ControllerBase
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
+    [HttpPost("generate-from-note/{noteId:guid}")]
+    public async Task<IActionResult> GenerateFromNote(Guid noteId)
+    {
+        try
+        {
+            var charges = await _charges.GenerateFromNoteAsync(noteId, _currentUser, HttpContext.RequestAborted);
+            return StatusCode(201, charges.Select(ToDto));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    [HttpPost("generate-from-appointment/{appointmentId:guid}")]
+    public async Task<IActionResult> GenerateFromAppointment(Guid appointmentId)
+    {
+        try
+        {
+            var charge = await _charges.GenerateFromAppointmentAsync(appointmentId, _currentUser, HttpContext.RequestAborted);
+            return CreatedAtAction(nameof(Get), new { id = charge.Id }, ToDto(charge));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    [HttpGet("fee-schedule/resolve")]
+    public async Task<IActionResult> ResolveFeeSchedule([FromQuery] string cptCode, [FromQuery] Guid? locationId = null)
+    {
+        try
+        {
+            var amount = await _charges.ResolveFeeScheduleAmountAsync(cptCode, locationId, _currentUser, HttpContext.RequestAborted);
+            return amount is null ? NoContent() : Ok(new { cptCode, locationId, amount });
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+    }
+
     private static ChargeDto ToDto(Charge c) => new(
-        c.Id, c.PatientId, c.ClinicalNoteId, c.ProviderId, c.LocationId, c.ServiceDate, c.CptCode,
+        c.Id, c.PatientId, c.ClinicalNoteId, c.AppointmentId, c.ProviderId, c.LocationId, c.ServiceDate, c.CptCode,
         JsonSerializer.Deserialize<List<string>>(c.ModifiersJson) ?? new(), c.Units, c.Minutes,
         c.RecommendedUnits, c.UnitsDifference, c.UnitsOverrideReason, c.ChargeAmount, c.Status);
 }

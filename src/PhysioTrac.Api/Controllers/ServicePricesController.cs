@@ -26,13 +26,20 @@ public class ServicePricesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> List()
+    public async Task<IActionResult> List([FromQuery] Guid? locationId = null)
     {
         try
         {
             var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
-            var prices = await _db.ServicePrices.Where(s => s.OrganizationId == organization.Id)
-                .OrderBy(s => s.CptCode).ToListAsync(HttpContext.RequestAborted);
+            var query = _db.ServicePrices.Where(s => s.OrganizationId == organization.Id);
+            if (locationId is Guid loc)
+            {
+                // Both an organization-wide default and a location-specific
+                // override can exist for the same CPT code -- return both so
+                // a client can show which one currently wins for this location.
+                query = query.Where(s => s.LocationId == loc || s.LocationId == null);
+            }
+            var prices = await query.OrderBy(s => s.CptCode).ThenBy(s => s.LocationId).ToListAsync(HttpContext.RequestAborted);
             return Ok(prices);
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -64,10 +71,20 @@ public class ServicePricesController : ControllerBase
                     return UnprocessableEntity(new { detail = "Enter a deposit amount greater than zero." });
                 }
             }
+            if (request.LocationId is Guid locationId)
+            {
+                var locationExists = await _db.Locations.AnyAsync(
+                    l => l.Id == locationId && l.OrganizationId == organization.Id, HttpContext.RequestAborted);
+                if (!locationExists)
+                {
+                    return NotFound(new { detail = "Location was not found." });
+                }
+            }
 
             var price = new ServicePrice
             {
                 OrganizationId = organization.Id,
+                LocationId = request.LocationId,
                 CptCode = request.CptCode,
                 Label = request.Label,
                 Price = request.Price,
@@ -85,5 +102,5 @@ public class ServicePricesController : ControllerBase
 }
 
 public record CreateServicePriceRequest(
-    string CptCode, string Label, decimal Price,
+    string CptCode, string Label, decimal Price, Guid? LocationId,
     PhysioTrac.Domain.Enums.AppointmentKind? HomeVisitKind, bool IsHomeVisitTravelFee, decimal? DepositAmount);

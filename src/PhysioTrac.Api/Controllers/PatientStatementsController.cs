@@ -23,13 +23,16 @@ public class PatientStatementsController : ControllerBase
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
     private readonly IClaimService _claims;
+    private readonly IBillingReportService _reports;
     private readonly PhysioTracDbContext _db;
 
-    public PatientStatementsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, IClaimService claims, PhysioTracDbContext db)
+    public PatientStatementsController(
+        ITenantAccessService tenantAccess, ICurrentUser currentUser, IClaimService claims, IBillingReportService reports, PhysioTracDbContext db)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
         _claims = claims;
+        _reports = reports;
         _db = db;
     }
 
@@ -76,6 +79,18 @@ public class PatientStatementsController : ControllerBase
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, statement);
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+    }
+
+    [HttpGet("{id:guid}/line-items")]
+    public async Task<IActionResult> LineItems(Guid id)
+    {
+        try
+        {
+            var items = await _reports.GetStatementLineItemsAsync(id, _currentUser, HttpContext.RequestAborted);
+            return Ok(items);
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 }
 

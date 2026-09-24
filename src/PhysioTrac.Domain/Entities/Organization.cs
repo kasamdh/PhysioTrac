@@ -41,6 +41,11 @@ public class Organization : BaseEntity
     public int? ProgressNoteDueDays { get; set; }
     public int? ProgressNoteDueVisitCount { get; set; }
 
+    /// <summary>Which timed-minutes-to-units table ChargeService.GenerateFromNoteAsync
+    /// uses when computing a generated charge's recommended units -- see
+    /// EightMinuteRuleVariant's own doc comment.</summary>
+    public EightMinuteRuleVariant EightMinuteRuleVariant { get; set; } = EightMinuteRuleVariant.Medicare;
+
     public DateTimeOffset? OnboardingCompletedAt { get; set; }
     public bool IsActive { get; set; } = true;
 

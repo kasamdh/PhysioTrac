@@ -379,6 +379,120 @@ a real form-builder UI for staff to author `IntakeFormTemplate`/
 `ConsentTemplate` `SchemaJson`/`BodyText` — both currently authored via the
 API directly.
 
+## Billing and revenue cycle
+
+Backend for "Phase 7." Another gap analysis before writing code, and another
+large surprise: this codebase already had a strikingly mature billing/
+revenue-cycle model committed well before this session's numbered phases --
+`Charge`, `Claim` (with CMS-1500-shaped `DiagnosisCodeListJson`/
+`DiagnosisPointersFor` box 21/24E logic and a full `ClaimStatus` workflow:
+Draft → Ready → Submitted → Accepted/Rejected → Processing →
+Paid/Denied/Appealed → Closed), `ClaimTransaction` (payments, adjustments,
+write-offs, refunds, balance transfers between claims), `ClaimDenial` (a
+denial work queue with appeal status and overdue tracking), `Superbill` +
+`PaymentRecord` (the cash-pay path), `PatientPayment` (patient-initiated
+online payments), and `PatientStatement` (a generated balance snapshot) --
+plus an existing Medicare 8-minute-rule calculator and CPT/modifier capture
+validation on `Charge`. All of it already patient-portal-safe: every list/
+read method on these was already gated only by `RequirePatientAccessAsync`,
+no staff-only role check, so "patient balances" and "payments" needed no new
+access-control work, only confirming it (see the new tests below).
+
+What genuinely didn't exist, and is what this phase builds:
+
+- **CPT code reference catalog** (`CptCode`, `/api/v1/cpt-codes`) -- the
+  CPT-side twin of the existing ICD-10 `DiagnosisCode` catalog, same
+  treatment (shared, read-only, seed-maintained). CPT codes existed
+  everywhere only as unvalidated strings before this.
+- **Organization/location fee schedules** -- `ServicePrice` gained a
+  nullable `LocationId`: a location-specific row overrides the
+  organization-wide default for the same CPT code. This needed two
+  *separate* filtered unique indexes, not one combined index, after
+  discovering that EF Core's SQL Server provider auto-filters a unique
+  index on any nullable column (`WHERE LocationId IS NOT NULL`) -- a single
+  combined index would have silently stopped enforcing "at most one
+  org-wide default per CPT code," letting duplicates back in. Caught by
+  reading the generated migration before applying it, not by a test.
+- **Payer fee schedules** (`PayerFeeScheduleItem`,
+  `/api/v1/payers/{id}/fee-schedule`) -- a payer's contracted/allowed
+  amount per CPT code, informational/reporting data alongside (not
+  enforced against) what the clinic actually bills.
+- **Configurable 8-minute rule** (`Organization.EightMinuteRuleVariant`,
+  `EightMinuteRuleCalculator`'s new variant-aware overload) -- the existing
+  calculator was hard-coded to the Medicare table; added a second,
+  explicitly-labeled-as-a-simplification `RoundedFifteenMinute` variant
+  for organizations that use a simpler quarter-hour rounding scheme, kept
+  the original single-argument overload so every existing caller is
+  unaffected.
+- **Charges generated from completed appointments and signed notes**
+  (`IChargeService.GenerateFromNoteAsync`/`GenerateFromAppointmentAsync`) --
+  previously `Charge` creation was entirely manual. The note-based path
+  groups a signed note's `NoteIntervention` items by their (deliberately
+  clinical-only) `InterventionCategory`, resolves each group's CPT code via
+  a new org-configurable `CptCodeMapping`, sums each code's own timed
+  minutes independently through the configured 8-minute-rule variant (not
+  implementing cross-code remainder pooling -- a documented, further
+  wrinkle real multi-code 8-minute-rule billing sometimes applies), and
+  prices from the fee schedule. The appointment-based path is the simpler
+  cash-pay alternative: one flat charge from `AppointmentType
+  .DefaultCptCode`, a new field -- discovered mid-verification that it
+  had no way to actually be set through the API at all (`AppointmentTypesController`
+  only ever exposed `Create`, never an update), so added
+  `PATCH /appointment-types/{id}/billing` to close that gap before calling
+  the feature done. Both paths refuse to duplicate charges for the same
+  note/appointment.
+- **Aging report** (0-30/31-60/61-90/90+, `GET /billing-reports/aging`) and
+  **revenue reports by provider, location, or service**
+  (`GET /billing-reports/revenue`) -- both fully new, computed live from
+  the existing `Charge`/`Claim`/`ClaimTransaction`/`Superbill`/
+  `PaymentRecord` ledger, no new persisted state. Aging buckets by days
+  since the earliest date of service on a claim's/superbill's own charges
+  (not submission date, which can be null for a still-Draft claim).
+  Revenue draws a deliberate accrual-vs-cash split: billed amount is
+  grouped by the requested dimension and filtered to the date range;
+  collected amount is total cash actually received in that range,
+  independent of which visit's charge it happens to pay down.
+- **Patient balance** (`GET /billing-reports/patient-balance/{id}`) and
+  **statement line items** (`GET /patient-statements/{id}/line-items`) --
+  the latter is the exact "rebuilt live... not ported yet" gap
+  `PatientStatement`'s own pre-existing doc comment flagged, now filled in:
+  reconstructs a previously generated statement's charges and payment/
+  adjustment activity dated on or before its own `StatementDate`, so a
+  statement stays reproducible after later activity accrues.
+- **`PaymentPlan`** added to `ClaimTransactionMethod` (reused for
+  `PaymentRecord.Method`, new, rather than a duplicate enum) -- completing
+  the phase's cash/card/check/insurance/payment-plan method list. No
+  payment processing of any kind is implemented, per the phase's explicit
+  "recorded only" instruction -- exactly like the pre-existing
+  `PatientPayment`/`PaymentRecord` already worked.
+
+Tests added: `EightMinuteRuleCalculatorTests` (both variants against known
+minute/unit tables), new `ChargeServiceTests` cases for both generation
+paths (mapped/unmapped categories, minute summing, location-price
+precedence, untimed-intervention unit counting, duplicate-generation
+guards), and a new `BillingReportServiceTests` covering aging bucketing,
+patient balance aggregation, revenue filtering/grouping, and statement
+line-item reconstruction (including that a refund correctly *increases* the
+shown balance while payments/adjustments reduce it -- caught and fixed a
+real sign-flip bug in that logic before it shipped, via a test that
+constructed the exact refund scenario).
+
+Verified: dotnet build clean, full xUnit suite green (311/311, 39 new),
+migration applied to local SQL Server with no cascade-path conflicts, and
+live-verified end-to-end against the running API + real SQL Server: fee
+schedule resolution (org-wide vs. location override), charge generation
+from a two-intervention signed note (25 summed minutes -> 2 units -> priced
+at the location override), charge generation from a completed appointment
+(flat rate from `AppointmentType.Price`), duplicate-generation rejected on
+both paths, the aging/revenue/patient-balance reports, and CPT code search
+-- then cleaned up all test data.
+
+Deferred: real payer-specific claim edits/837P file generation (the data
+model is aligned for it; an actual clearinghouse integration is explicitly
+out of scope per the phase spec), and the billing screens themselves
+(charge review queue, claims worklist, aging dashboard) -- same as every
+prior phase's frontend deferral.
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -553,6 +667,17 @@ Also seeded: one Platform-scope `ConsentTemplate` per `ConsentType` (so
 falling back to the static `ConsentTypeText` constant, even on a freshly
 created database) and one starter Platform-scope `IntakeFormTemplate`
 (`new-patient-intake`) every organization can build on.
+
+Also seeded: a shared `CptCode` reference catalog (mirroring the ICD-10
+catalog above); per-organization `CptCodeMapping`s (therapeutic exercise →
+97110, manual therapy → 97140, and more for Source Motion) so
+`GenerateFromNoteAsync` has something to resolve immediately; `ServicePrice`
+fee-schedule rows for those same codes, including one location-specific
+override at Source Motion's Fuquay-Varina clinic (97110 priced higher there
+than the organization-wide default) to demonstrate the override actually
+taking precedence; and `AppointmentType.DefaultCptCode` set on both orgs'
+Initial Evaluation types, so `GenerateFromAppointmentAsync` has a default to
+bill against too.
 
 ## Authorization, and audit
 

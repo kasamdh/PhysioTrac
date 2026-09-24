@@ -10,9 +10,13 @@ public record CreateProviderRequest(string FirstName, string LastName, string? S
 
 public record UpdateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, bool IsActive, IReadOnlyList<Guid>? LocationIds);
 
-public record AppointmentTypeDto(Guid Id, string Name, string? Description, int DefaultDurationMinutes, decimal? Price, bool IsActive, bool OnlineBookingEnabled, AppointmentKind? DefaultKind);
+public record AppointmentTypeDto(
+    Guid Id, string Name, string? Description, int DefaultDurationMinutes, decimal? Price,
+    bool IsActive, bool OnlineBookingEnabled, AppointmentKind? DefaultKind, string? DefaultCptCode);
 
-public record CreateAppointmentTypeRequest(string Name, string? Description, int DefaultDurationMinutes, decimal? Price, bool OnlineBookingEnabled, bool RequiresNewPatient, AppointmentKind? DefaultKind);
+public record CreateAppointmentTypeRequest(
+    string Name, string? Description, int DefaultDurationMinutes, decimal? Price,
+    bool OnlineBookingEnabled, bool RequiresNewPatient, AppointmentKind? DefaultKind, string? DefaultCptCode);
 
 public record Slot(DateTimeOffset Start, DateTimeOffset End);
 

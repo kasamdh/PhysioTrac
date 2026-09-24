@@ -50,6 +50,7 @@ public static class DemoDataSeeder
         }
 
         await SeedDiagnosisCodesAsync(db, ct);
+        await SeedCptCodesAsync(db, ct);
         var superAdmin = await SeedPlatformSuperAdminAsync(userManager, seedOptions.DemoPassword, ct);
         await SeedClinicalNoteTemplatesAsync(db, superAdmin.Id, ct);
         await SeedConsentAndIntakeTemplatesAsync(db, superAdmin.Id, ct);
@@ -82,6 +83,30 @@ public static class DemoDataSeeder
             new DiagnosisCode { Code = "R26.2", Description = "Difficulty in walking, not elsewhere classified" },
             new DiagnosisCode { Code = "E11.9", Description = "Type 2 diabetes mellitus without complications" },
             new DiagnosisCode { Code = "I10", Description = "Essential (primary) hypertension" });
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Shared, org-independent CPT/HCPCS reference data -- the
+    /// CPT-side twin of SeedDiagnosisCodesAsync, same treatment (a small
+    /// PT-relevant slice, not the full code set). IsTimeBased distinguishes
+    /// the timed treatment codes (subject to the 8-minute rule) from the
+    /// fixed evaluation/re-evaluation codes billed as one unit regardless of
+    /// time.</summary>
+    private static async Task SeedCptCodesAsync(PhysioTracDbContext db, CancellationToken ct)
+    {
+        db.CptCodes.AddRange(
+            new CptCode { Code = "97161", Description = "PT evaluation, low complexity", IsTimeBased = false },
+            new CptCode { Code = "97162", Description = "PT evaluation, moderate complexity", IsTimeBased = false },
+            new CptCode { Code = "97163", Description = "PT evaluation, high complexity", IsTimeBased = false },
+            new CptCode { Code = "97164", Description = "PT re-evaluation", IsTimeBased = false },
+            new CptCode { Code = "97110", Description = "Therapeutic exercise", IsTimeBased = true },
+            new CptCode { Code = "97112", Description = "Neuromuscular re-education", IsTimeBased = true },
+            new CptCode { Code = "97116", Description = "Gait training", IsTimeBased = true },
+            new CptCode { Code = "97140", Description = "Manual therapy techniques", IsTimeBased = true },
+            new CptCode { Code = "97530", Description = "Therapeutic activities", IsTimeBased = true },
+            new CptCode { Code = "97535", Description = "Self-care/home management training", IsTimeBased = true },
+            new CptCode { Code = "97010", Description = "Hot/cold pack application", IsTimeBased = false },
+            new CptCode { Code = "20560", Description = "Dry needling, 1-2 muscles", IsTimeBased = false });
         await db.SaveChangesAsync(ct);
     }
 
@@ -376,6 +401,7 @@ public static class DemoDataSeeder
             Price = 175.00m,
             RequiresNewPatient = true,
             DefaultKind = AppointmentKind.Evaluation,
+            DefaultCptCode = "97161",
         };
         var followUpType = new AppointmentType
         {
@@ -385,12 +411,29 @@ public static class DemoDataSeeder
             DefaultDurationMinutes = 30,
             Price = 95.00m,
             DefaultKind = AppointmentKind.FollowUp,
+            DefaultCptCode = "97110",
         };
         db.AppointmentTypes.AddRange(evalType, followUpType);
 
         db.ServicePrices.AddRange(
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97161", Label = "PT Evaluation, Low Complexity", Price = 150.00m, CreatedById = admin.Id },
             new ServicePrice { OrganizationId = organization.Id, CptCode = "97110", Label = "Therapeutic Exercise", Price = 65.00m, CreatedById = admin.Id },
-            new ServicePrice { OrganizationId = organization.Id, CptCode = "97140", Label = "Manual Therapy", Price = 55.00m, CreatedById = admin.Id });
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97140", Label = "Manual Therapy", Price = 55.00m, CreatedById = admin.Id },
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97112", Label = "Neuromuscular Re-education", Price = 60.00m, CreatedById = admin.Id },
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97116", Label = "Gait Training", Price = 58.00m, CreatedById = admin.Id },
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97535", Label = "Self-Care/Home Mgmt Training", Price = 62.00m, CreatedById = admin.Id },
+            // A location-specific override for the Fuquay-Varina clinic --
+            // demonstrates ServicePrice.LocationId resolution actually
+            // taking priority over the organization-wide row above.
+            new ServicePrice { OrganizationId = organization.Id, LocationId = fuquayVarina.Id, CptCode = "97110", Label = "Therapeutic Exercise (Fuquay-Varina)", Price = 68.00m, CreatedById = admin.Id });
+
+        db.CptCodeMappings.AddRange(
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.TherapeuticExercise, CptCode = "97110", CreatedById = admin.Id },
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.ManualTherapy, CptCode = "97140", CreatedById = admin.Id },
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.NeuromuscularReeducation, CptCode = "97112", CreatedById = admin.Id },
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.GaitTraining, CptCode = "97116", CreatedById = admin.Id },
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.PatientEducation, CptCode = "97535", CreatedById = admin.Id },
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.TherapeuticActivity, CptCode = "97530", CreatedById = admin.Id });
 
         var bcbs = new Payer
         {
@@ -788,8 +831,17 @@ public static class DemoDataSeeder
             Price = 165.00m,
             RequiresNewPatient = true,
             DefaultKind = AppointmentKind.Evaluation,
+            DefaultCptCode = "97161",
         };
         db.AppointmentTypes.Add(appointmentType);
+
+        db.ServicePrices.AddRange(
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97161", Label = "PT Evaluation, Low Complexity", Price = 140.00m, CreatedById = admin.Id },
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97110", Label = "Therapeutic Exercise", Price = 60.00m, CreatedById = admin.Id },
+            new ServicePrice { OrganizationId = organization.Id, CptCode = "97140", Label = "Manual Therapy", Price = 52.00m, CreatedById = admin.Id });
+        db.CptCodeMappings.AddRange(
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.TherapeuticExercise, CptCode = "97110", CreatedById = admin.Id },
+            new CptCodeMapping { OrganizationId = organization.Id, InterventionCategory = InterventionCategory.ManualTherapy, CptCode = "97140", CreatedById = admin.Id });
         await db.SaveChangesAsync(ct);
 
         var appointmentStart = DateTimeOffset.UtcNow.Date.AddDays(1).AddHours(9);

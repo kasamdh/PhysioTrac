@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IChargeService, ChargeService>();
         services.AddScoped<IClaimService, ClaimService>();
         services.AddScoped<IClaimTransactionService, ClaimTransactionService>();
+        services.AddScoped<IBillingReportService, BillingReportService>();
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConsentService, ConsentService>();

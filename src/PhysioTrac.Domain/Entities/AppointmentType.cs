@@ -28,4 +28,14 @@ public class AppointmentType : BaseEntity
 
     /// <summary>Optional clinical-workflow default this maps to.</summary>
     public AppointmentKind? DefaultKind { get; set; }
+
+    /// <summary>The flat CPT code ChargeService.GenerateFromAppointmentAsync
+    /// bills a completed appointment of this type under (paired with
+    /// <see cref="Price"/>, or the fee schedule if Price is unset) -- the
+    /// simple per-visit billing path for a cash-pay clinic that doesn't
+    /// itemize by treatment, as opposed to GenerateFromNoteAsync's per-
+    /// intervention itemization. Null means this appointment type can't be
+    /// billed this way; a biller must generate its charges from the note
+    /// instead (or enter one manually).</summary>
+    public string? DefaultCptCode { get; set; }
 }
