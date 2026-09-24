@@ -2,9 +2,13 @@ using PhysioTrac.Domain.Enums;
 
 namespace PhysioTrac.Application.Scheduling;
 
-public record ProviderDto(Guid Id, string FirstName, string LastName, string FullName, string? Specialty, bool IsActive, bool OnlineBookingEnabled);
+public record ProviderDto(
+    Guid Id, string FirstName, string LastName, string FullName, string? Specialty, string? Credentials,
+    string? NpiNumber, bool IsActive, bool OnlineBookingEnabled, IReadOnlyList<Guid> LocationIds);
 
-public record CreateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, Guid? UserId, IReadOnlyList<Guid>? LocationIds);
+public record CreateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, Guid? UserId, IReadOnlyList<Guid>? LocationIds);
+
+public record UpdateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, bool IsActive, IReadOnlyList<Guid>? LocationIds);
 
 public record AppointmentTypeDto(Guid Id, string Name, string? Description, int DefaultDurationMinutes, decimal? Price, bool IsActive, bool OnlineBookingEnabled);
 

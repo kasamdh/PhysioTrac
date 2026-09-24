@@ -35,4 +35,14 @@ public static class RoleSets
     {
         UserRole.Scheduler, UserRole.Biller
     };
+
+    /// <summary>Organization-level administration: clinic locations, the
+    /// organization profile itself, and staff accounts/roles. Deliberately
+    /// narrower than <see cref="Clinical"/> -- a Therapist or Compliance
+    /// officer has clinical access but no business managing which locations
+    /// exist or who else has a login.</summary>
+    public static readonly IReadOnlySet<UserRole> OrganizationAdministration = new HashSet<UserRole>
+    {
+        UserRole.Admin, UserRole.Director
+    };
 }

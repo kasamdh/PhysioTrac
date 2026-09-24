@@ -45,4 +45,22 @@ public class ProviderLicense : BaseEntity
     /// configurable policy (the spec's "configurable templates and policies
     /// per organization/location/state" is a later module).</summary>
     public bool IsExpiringSoon => Status == ProviderLicenseStatus.Active && !IsExpired && DaysUntilExpiration <= 90;
+
+    /// <summary>Tiered version of <see cref="IsExpiringSoon"/> for a report/
+    /// alert list -- fixed 90/60/30-day thresholds today, same caveat as
+    /// above about per-organization configurability being a later module.
+    /// An inactive (Suspended/Revoked/Pending) license never alerts: there's
+    /// nothing actionable about a license that isn't currently relied on.</summary>
+    public LicenseExpirationAlertLevel ExpirationAlertLevel
+    {
+        get
+        {
+            if (Status != ProviderLicenseStatus.Active) return LicenseExpirationAlertLevel.None;
+            if (IsExpired) return LicenseExpirationAlertLevel.Expired;
+            if (DaysUntilExpiration <= 30) return LicenseExpirationAlertLevel.Notice30;
+            if (DaysUntilExpiration <= 60) return LicenseExpirationAlertLevel.Notice60;
+            if (DaysUntilExpiration <= 90) return LicenseExpirationAlertLevel.Notice90;
+            return LicenseExpirationAlertLevel.None;
+        }
+    }
 }

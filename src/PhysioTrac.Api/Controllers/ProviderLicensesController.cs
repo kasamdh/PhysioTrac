@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -14,7 +15,13 @@ namespace PhysioTrac.Api.Controllers;
 /// nested under a providerId so tenant scoping is unavoidable: the provider
 /// itself is always re-loaded and org-checked server-side before any of its
 /// licenses are touched -- a license id alone is never trusted to imply
-/// which organization it belongs to.</summary>
+/// which organization it belongs to.
+///
+/// ProviderLicense has no OrganizationId of its own (scoped via
+/// ProviderId -> Provider.OrganizationId), so unlike Location/Provider it
+/// is NOT covered by EntityChangeAuditInterceptor's automatic entity-change
+/// audit -- Create/Update below write explicit audit events for that
+/// reason.</summary>
 [ApiController]
 [Route("api/v1/providers/{providerId:guid}/licenses")]
 [Authorize]
@@ -22,12 +29,14 @@ public class ProviderLicensesController : ControllerBase
 {
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
+    private readonly IAuditService _audit;
     private readonly PhysioTracDbContext _db;
 
-    public ProviderLicensesController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    public ProviderLicensesController(ITenantAccessService tenantAccess, ICurrentUser currentUser, IAuditService audit, PhysioTracDbContext db)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
+        _audit = audit;
         _db = db;
     }
 
@@ -75,6 +84,11 @@ public class ProviderLicensesController : ControllerBase
             };
             _db.ProviderLicenses.Add(license);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            await _audit.RecordAuditEventAsync(
+                _currentUser.UserId, "entity.created", nameof(ProviderLicense), license.Id, provider.OrganizationId,
+                metadata: new { providerId = provider.Id, state = license.State }, ct: HttpContext.RequestAborted);
+
             return CreatedAtAction(nameof(List), new { providerId }, ToDto(license));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -97,6 +111,11 @@ public class ProviderLicensesController : ControllerBase
             license.Notes = request.Notes;
             license.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            await _audit.RecordAuditEventAsync(
+                _currentUser.UserId, "entity.updated", nameof(ProviderLicense), license.Id, provider.OrganizationId,
+                metadata: new { providerId = provider.Id, state = license.State }, ct: HttpContext.RequestAborted);
+
             return Ok(ToDto(license));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -117,12 +136,61 @@ public class ProviderLicensesController : ControllerBase
 
     private static ProviderLicenseDto ToDto(ProviderLicense l) => new(
         l.Id, l.ProviderId, l.State, l.LicenseNumber, l.IssueDate, l.ExpirationDate,
-        l.Status, l.IsCompactPrivilege, l.Notes, l.IsExpired, l.IsExpiringSoon);
+        l.Status, l.IsCompactPrivilege, l.Notes, l.IsExpired, l.IsExpiringSoon, l.ExpirationAlertLevel);
 }
+
+/// <summary>Org-wide expiration-alert report, deliberately not nested under
+/// a providerId -- a Compliance/Admin user needs "everything expiring soon
+/// across the whole organization", not one provider at a time.</summary>
+[ApiController]
+[Route("api/v1/providers/licenses/expiring")]
+[Authorize]
+public class ExpiringLicensesController : ControllerBase
+{
+    private readonly ITenantAccessService _tenantAccess;
+    private readonly ICurrentUser _currentUser;
+    private readonly PhysioTracDbContext _db;
+
+    public ExpiringLicensesController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    {
+        _tenantAccess = tenantAccess;
+        _currentUser = currentUser;
+        _db = db;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> List()
+    {
+        try
+        {
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            var licenses = await _db.ProviderLicenses
+                .Include(l => l.Provider)
+                .Where(l => l.Provider!.OrganizationId == organization.Id && l.Status == ProviderLicenseStatus.Active)
+                .ToListAsync(HttpContext.RequestAborted);
+
+            var alerts = licenses
+                .Select(l => new ExpiringLicenseDto(
+                    l.Id, l.ProviderId, l.Provider!.FullName, l.State, l.LicenseNumber,
+                    l.ExpirationDate, l.DaysUntilExpiration, l.ExpirationAlertLevel))
+                .Where(a => a.AlertLevel != LicenseExpirationAlertLevel.None)
+                .OrderBy(a => a.DaysUntilExpiration)
+                .ToList();
+
+            return Ok(alerts);
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+    }
+}
+
+public record ExpiringLicenseDto(
+    Guid LicenseId, Guid ProviderId, string ProviderName, string State, string LicenseNumber,
+    DateOnly ExpirationDate, int DaysUntilExpiration, LicenseExpirationAlertLevel AlertLevel);
 
 public record ProviderLicenseDto(
     Guid Id, Guid ProviderId, string State, string LicenseNumber, DateOnly? IssueDate, DateOnly ExpirationDate,
-    ProviderLicenseStatus Status, bool IsCompactPrivilege, string? Notes, bool IsExpired, bool IsExpiringSoon);
+    ProviderLicenseStatus Status, bool IsCompactPrivilege, string? Notes, bool IsExpired, bool IsExpiringSoon,
+    LicenseExpirationAlertLevel AlertLevel);
 
 public record CreateProviderLicenseRequest(
     string State, string LicenseNumber, DateOnly? IssueDate, DateOnly ExpirationDate,

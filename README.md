@@ -35,6 +35,52 @@ directly via dependency injection in the same process; `PhysioTrac.Api`
 exists for a separate JSON client — `frontend/`, a React SPA, is that
 client (see `frontend/README.md`).
 
+## Organization administration
+
+Two separate controllers manage organizations, matching a strict rule: a
+**Platform Super Admin** manages any organization (provisioning, suspend/
+activate/archive) via `SuperAdminClientsController`
+(`/api/v1/super-admin/clients`, `RequirePlatformSuperAdmin`-gated); an
+**Organization Admin** (or Director) manages only their own via:
+
+- `OrganizationsController` — `GET/PUT /api/v1/organizations/profile` (name,
+  timezone, NPI, Tax ID, address, support contact, PTA cosign policy).
+- `LocationsController` — full CRUD for clinic locations
+  (`/api/v1/locations`), including each location's own NPI/Tax ID (a
+  location can bill under its own Type 2 NPI distinct from the
+  organization's). Reads are open to any staff role; writes require
+  `RoleSets.OrganizationAdministration` (Admin/Director). No hard delete —
+  `PATCH /{id}/deactivate` sets `IsActive = false`.
+- `UsersController` — staff list/invite/role-change/activate/deactivate
+  (`/api/v1/users`), org-scoped and `OrganizationAdministration`-gated.
+  Invite reuses the same hashed-token scheme `SuperAdminClientsController`
+  uses for a new organization's first admin (`InvitationTokenGenerator`);
+  deactivating a user immediately revokes their active sessions (not just a
+  status flag) via `ISessionService.RevokeAllForUserAsync`.
+- `ProvidersController` — provider profiles (specialty, credentials, NPI)
+  and their location assignments now support full update, not just create.
+- `ProviderLicensesController` + `ExpiringLicensesController` — PT/PTA
+  state licenses with PT Compact privilege tracking; `ProviderLicense.
+  ExpirationAlertLevel` buckets a license into `Notice90`/`Notice60`/
+  `Notice30`/`Expired`, and `GET /api/v1/providers/licenses/expiring`
+  reports every alertable license across the organization, most urgent
+  first.
+
+Every mutation here is audited: `Location`/`Provider` changes are picked up
+automatically by `EntityChangeAuditInterceptor` (they carry their own
+`OrganizationId`); `Organization`/`ProviderLicense`/`ApplicationUser`
+changes don't (scoped indirectly, or not `BaseEntity`), so their
+controllers/services write an explicit `IAuditService` event instead.
+
+**Not built in this pass**: documentation/consent template assignment by
+organization, state, or location. There's currently no reusable "consent
+template" concept at all — `Consent.ConsentText` is a free-text snapshot
+typed in at signing time, not read from a stored template. State-specific
+consent language is a real compliance feature (which template applies —
+location-specific, then state-specific, then an org-wide default) that
+deserves its own design rather than being bolted onto an already-large
+phase; flagging it here as the one item from this phase not attempted yet.
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)

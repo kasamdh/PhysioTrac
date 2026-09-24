@@ -14,6 +14,7 @@ using PhysioTrac.Application.Scheduling;
 using PhysioTrac.Application.Sessions;
 using PhysioTrac.Application.SuperAdmin;
 using PhysioTrac.Application.Tenancy;
+using PhysioTrac.Application.Users;
 using PhysioTrac.Infrastructure.Auditing;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
@@ -42,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IClientProvisioningService, ClientProvisioningService>();
+        services.AddScoped<IUserManagementService, UserManagementService>();
         services.AddScoped<IPrivilegedAccessService, PrivilegedAccessService>();
         services.AddScoped<IAvailabilityService, AvailabilityService>();
         services.AddScoped<IAppointmentService, AppointmentService>();
