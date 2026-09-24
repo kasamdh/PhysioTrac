@@ -305,7 +305,11 @@ else
         _signError = null;
         try
         {
-            await NoteService.SignNoteAsync(NoteId, _attestationConfirmed, CurrentUser);
+            // Blazor Server has no per-request IP the same way an HTTP
+            // controller does (it's a persistent circuit, not one request);
+            // null here is an honest gap, not a workaround -- the React/API
+            // sign path (NotesController) does capture the real IP.
+            await NoteService.SignNoteAsync(NoteId, _attestationConfirmed, ipAddress: null, CurrentUser);
         }
         catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
         {

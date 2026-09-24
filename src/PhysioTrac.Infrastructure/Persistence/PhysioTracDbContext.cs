@@ -31,6 +31,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
     public DbSet<NoteAddendum> NoteAddenda => Set<NoteAddendum>();
+    public DbSet<ClinicalNoteVersion> ClinicalNoteVersions => Set<ClinicalNoteVersion>();
+    public DbSet<ClinicalNoteTemplate> ClinicalNoteTemplates => Set<ClinicalNoteTemplate>();
     public DbSet<NoteIntervention> NoteInterventions => Set<NoteIntervention>();
     public DbSet<FunctionalGoal> FunctionalGoals => Set<FunctionalGoal>();
     public DbSet<OutcomeScore> OutcomeScores => Set<OutcomeScore>();
@@ -336,6 +338,25 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(a => a.NoteId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        builder.Entity<ClinicalNoteVersion>(e =>
+        {
+            e.HasIndex(v => new { v.NoteId, v.VersionNumber }).IsUnique();
+            e.HasOne(v => v.Note).WithMany(n => n.Versions)
+                .HasForeignKey(v => v.NoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ClinicalNoteTemplate>(e =>
+        {
+            e.HasIndex(t => new { t.OrganizationId, t.NoteType, t.Scope, t.State, t.LocationId, t.IsActive });
+            e.Property(t => t.NoteType).HasConversion<string>().HasMaxLength(20);
+            e.Property(t => t.Scope).HasConversion<string>().HasMaxLength(16);
+            e.Property(t => t.State).HasMaxLength(2).IsFixedLength();
+            e.HasOne(t => t.Organization).WithMany()
+                .HasForeignKey(t => t.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(t => t.LocationDetail).WithMany()
+                .HasForeignKey(t => t.LocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         builder.Entity<NoteIntervention>(e =>
         {
             e.Property(i => i.Category).HasConversion<string>().HasMaxLength(32);
@@ -347,6 +368,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         {
             e.HasIndex(g => new { g.PatientId, g.Status, g.TargetDate });
             e.Property(g => g.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(g => g.Term).HasConversion<string>().HasMaxLength(16);
             e.Property(g => g.BaselineValue).HasPrecision(8, 2);
             e.Property(g => g.TargetValue).HasPrecision(8, 2);
             e.Property(g => g.CurrentValue).HasPrecision(8, 2);
@@ -613,7 +635,21 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         {
             if (entry.State != EntityState.Modified) continue;
             var originalStatus = (Domain.Enums.NoteStatus)entry.OriginalValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
-            if (originalStatus == Domain.Enums.NoteStatus.Signed)
+            if (originalStatus is not (Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked)) continue;
+
+            // The one legitimate write to an already-Signed row: locking it
+            // (ClinicalNoteService.LockNoteAsync), which touches only Status
+            // and UpdatedAt and only moves Signed -> Locked. Anything else --
+            // any other field touched, or Status moving anywhere else --
+            // is exactly the "signed notes are immutable" violation this
+            // guards against.
+            var newStatus = (Domain.Enums.NoteStatus)entry.CurrentValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
+            var isLockTransition = originalStatus == Domain.Enums.NoteStatus.Signed && newStatus == Domain.Enums.NoteStatus.Locked;
+            var onlyStatusAndTimestampChanged = entry.Properties
+                .Where(p => p.IsModified)
+                .All(p => p.Metadata.Name is nameof(Domain.Entities.ClinicalNote.Status) or nameof(Domain.Entities.ClinicalNote.UpdatedAt));
+
+            if (!(isLockTransition && onlyStatusAndTimestampChanged))
             {
                 throw new InvalidOperationException("Signed notes are immutable. Create an addendum instead.");
             }

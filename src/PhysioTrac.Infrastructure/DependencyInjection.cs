@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<IReminderService, NoOpReminderService>();
         services.AddScoped<IClinicalNoteService, ClinicalNoteService>();
+        services.AddScoped<IClinicalTemplateService, ClinicalTemplateService>();
         services.AddScoped<IFunctionalGoalService, FunctionalGoalService>();
         services.AddScoped<IOutcomeScoreService, OutcomeScoreService>();
         services.AddScoped<IPublicBookingService, PublicBookingService>();

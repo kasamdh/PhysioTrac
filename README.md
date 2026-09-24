@@ -181,6 +181,59 @@ therapist-only double-booking check. Built the rest:
   loosening that to a hard requirement would be a real, separate schema
   decision, not something to fold into this phase silently.
 
+## Clinical documentation engine
+
+Backend for "Phase 5A"; the note-taking UI itself (rendering a template's
+schema into an actual form, a printable/PDF-ready layout) is the natural
+next phase, same sequencing as the last four. The Draft -> Signed lifecycle,
+PTA cosign workflow, per-note interventions, structured functional goals,
+and outcome measures already existed and were already thoroughly tested
+(`ClinicalNoteServiceTests`: signed-note immutability, addendum-only-after-
+signing, cross-org isolation). Built the rest:
+
+- **Configurable template engine** (`ClinicalTemplatesController`,
+  `/api/v1/clinical-templates`) — didn't exist at all before this. A
+  `ClinicalNoteTemplate` is a JSON schema of sections/fields per `NoteType`,
+  with real versioning: creating a new one for the same scope deactivates
+  the previous version rather than overwriting it, so the full history
+  stays queryable. Resolution is most-specific-wins: Location -> State ->
+  Organization -> Platform default (`GET .../resolve`). The backend
+  validates SchemaJson is well-formed JSON and owns resolution/versioning;
+  it doesn't interpret section contents -- see `ClinicalNoteTemplate`'s own
+  doc comment for the documented (not enforced field-by-field) schema shape
+  naming the reusable components this phase asks for (pain scale, ROM/MMT
+  tables, goals, outcome measures, functional limitations, ICD-10/CPT
+  pickers) -- each of which already has a real structured backend
+  counterpart (`PatientDiagnosis`, `NoteIntervention`/`ServicePrice`,
+  `OutcomeScore`, `FunctionalGoal`) rather than the template being the only
+  place that data lives.
+- **`NoteStatus.Locked`** — a further, manual step past `Signed`
+  (Admin/Director-only, via `POST /notes/{id}/lock`). `Signed` already
+  blocked direct edits and still allowed an addendum; `Locked` additionally
+  blocks new addenda too. `EnforceSignedNoteImmutability` (the DB-level
+  guard) now recognizes exactly one legitimate write to an already-signed
+  row — the Signed -> Locked transition itself, touching only `Status`/
+  `UpdatedAt` — and still rejects everything else.
+- **E-signature detail**: `SignatureCredentials` (the signer's own
+  Credential field, snapshotted — never re-read live later),
+  `SignatureIpAddress`, and `SignatureHash` (a SHA-256 digest over the
+  note's clinical content, computed the moment every other signature field
+  is set) were all missing before; only `SignatureName`/`SignedAt` existed.
+  The hash is a best-effort integrity check alongside the DB-level
+  immutability enforcement, not a cryptographic signature meant to resist a
+  determined attacker with DB access.
+- **Immutable version history** (`ClinicalNoteVersion`,
+  `GET /notes/{id}/versions`) — an append-only snapshot written on every
+  draft save (autosave is just calling the existing `PUT` as often as the
+  frontend likes; each call gets its own version row) and once more at
+  signing (`IsSignedVersion = true`, the final snapshot). This is what
+  "immutable version history" means here, distinct from
+  `EnforceSignedNoteImmutability`: not a second enforcement of "can't edit
+  a signed note," but a real, queryable record of what the note looked like
+  at each save, including every draft revision before it was ever signed.
+- **Goals gained a Term** (`GoalTerm.ShortTerm`/`LongTerm`) — the short/
+  long-term distinction this phase asks for didn't exist as a field before.
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)

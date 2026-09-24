@@ -85,12 +85,37 @@ public class NotesController : ControllerBase
     {
         try
         {
-            var note = await _notes.SignNoteAsync(id, request.AttestationConfirmed, _currentUser, HttpContext.RequestAborted);
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var note = await _notes.SignNoteAsync(id, request.AttestationConfirmed, ipAddress, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(note));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
+    [HttpPost("{id:guid}/lock")]
+    public async Task<IActionResult> Lock(Guid id)
+    {
+        try
+        {
+            var note = await _notes.LockNoteAsync(id, _currentUser, HttpContext.RequestAborted);
+            return Ok(ToDto(note));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    [HttpGet("{id:guid}/versions")]
+    public async Task<IActionResult> Versions(Guid id)
+    {
+        try
+        {
+            var versions = await _notes.GetVersionHistoryAsync(id, _currentUser, HttpContext.RequestAborted);
+            return Ok(versions.Select(v => new ClinicalNoteVersionDto(v.Id, v.NoteId, v.VersionNumber, v.ContentJson, v.SavedById, v.IsSignedVersion, v.CreatedAt)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/cosign")]
@@ -149,7 +174,8 @@ public class NotesController : ControllerBase
         n.Id, n.PatientId, n.TherapistId, n.AppointmentId, n.NoteType, n.Status, n.ServiceDate,
         n.Subjective, n.Objective, n.Interventions, n.Assessment, n.Plan,
         n.PlanOfCareStart, n.PlanOfCareEnd, n.FrequencyPerWeek, n.DurationWeeks, n.ReassessmentDue,
-        n.SignatureName, n.SignedAt, n.CosignRequired, n.CosignedById, n.CosignedAt);
+        n.SignatureName, n.SignatureCredentials, n.SignedAt, n.SignatureIpAddress, n.SignatureHash,
+        n.CosignRequired, n.CosignedById, n.CosignedAt);
 
     private static InterventionDto ToInterventionDto(NoteIntervention i) => new(
         i.Id, i.NoteId, i.Description, i.BodyRegion, i.Category, i.Minutes, i.Units, i.IsTimed, i.Order);

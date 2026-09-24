@@ -13,6 +13,7 @@ public class FunctionalGoal : BaseEntity
 
     public string FunctionalLimitation { get; set; } = string.Empty;
     public string FunctionalTask { get; set; } = string.Empty;
+    public GoalTerm Term { get; set; } = GoalTerm.ShortTerm;
     public decimal BaselineValue { get; set; }
     public decimal TargetValue { get; set; }
     public decimal? CurrentValue { get; set; }

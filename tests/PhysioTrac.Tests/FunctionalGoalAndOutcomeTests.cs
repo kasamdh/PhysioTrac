@@ -40,7 +40,7 @@ public class FunctionalGoalAndOutcomeTests
         var (_, goals, _, _, patient, therapist) = NewServices();
 
         var goal = await goals.CreateAsync(new CreateGoalRequest(
-            patient.Id, "Difficulty climbing stairs", "Climb 12 stairs without rail", 3, 12, "stairs", "Direct observation",
+            patient.Id, "Difficulty climbing stairs", "Climb 12 stairs without rail", GoalTerm.ShortTerm, 3, 12, "stairs", "Direct observation",
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)), "Patient will climb 12 stairs independently."), therapist);
 
         Assert.Equal(GoalStatus.Draft, goal.Status);
@@ -55,7 +55,7 @@ public class FunctionalGoalAndOutcomeTests
     {
         var (_, goals, _, _, patient, therapist) = NewServices();
         var goal = await goals.CreateAsync(new CreateGoalRequest(
-            patient.Id, "Limited reach", "Reach overhead shelf", 0, 10, "reps", "Direct observation",
+            patient.Id, "Limited reach", "Reach overhead shelf", GoalTerm.LongTerm, 0, 10, "reps", "Direct observation",
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)), "wording"), therapist);
 
         var updated = await goals.UpdateProgressAsync(goal.Id, new UpdateGoalProgressRequest(5), therapist);

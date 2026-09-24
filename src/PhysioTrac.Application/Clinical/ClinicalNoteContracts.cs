@@ -7,7 +7,10 @@ public record ClinicalNoteDto(
     NoteType NoteType, NoteStatus Status, DateOnly ServiceDate,
     string? Subjective, string? Objective, string? Interventions, string? Assessment, string? Plan,
     DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue,
-    string? SignatureName, DateTimeOffset? SignedAt, bool CosignRequired, Guid? CosignedById, DateTimeOffset? CosignedAt);
+    string? SignatureName, string? SignatureCredentials, DateTimeOffset? SignedAt, string? SignatureIpAddress, string? SignatureHash,
+    bool CosignRequired, Guid? CosignedById, DateTimeOffset? CosignedAt);
+
+public record ClinicalNoteVersionDto(Guid Id, Guid NoteId, int VersionNumber, string ContentJson, Guid SavedById, bool IsSignedVersion, DateTimeOffset CreatedAt);
 
 public record CreateNoteRequest(
     Guid PatientId, NoteType NoteType, DateOnly ServiceDate, Guid? AppointmentId,

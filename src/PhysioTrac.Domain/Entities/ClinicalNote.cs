@@ -36,7 +36,24 @@ public class ClinicalNote : BaseEntity
     public DateOnly? ReassessmentDue { get; set; }
 
     public string? SignatureName { get; set; }
+
+    /// <summary>Snapshot of the signer's own Credential field (e.g. "PT, DPT")
+    /// at the moment of signing -- never re-read live from ApplicationUser
+    /// later, the same reasoning CosignRequired already snapshots the org
+    /// policy at note-creation time.</summary>
+    public string? SignatureCredentials { get; set; }
     public DateTimeOffset? SignedAt { get; set; }
+    public string? SignatureIpAddress { get; set; }
+
+    /// <summary>SHA-256 hex digest of the note's clinical content at the
+    /// moment of signing (see ClinicalNoteService.ComputeContentHash) --
+    /// belt-and-suspenders integrity proof alongside the DB-level immutability
+    /// enforcement (EnforceSignedNoteImmutability): recomputing this hash
+    /// against the current row later and comparing detects any tampering
+    /// that somehow bypassed that enforcement (e.g. a direct DB edit outside
+    /// the app).</summary>
+    public string? SignatureHash { get; set; }
+
     public bool FinalizationAttestation { get; set; }
 
     /// <summary>Structured section blobs (ROM/MMT/special tests, discharge
@@ -57,5 +74,10 @@ public class ClinicalNote : BaseEntity
     public ICollection<NoteAddendum> Addenda { get; set; } = new List<NoteAddendum>();
     public ICollection<NoteIntervention> InterventionItems { get; set; } = new List<NoteIntervention>();
 
-    public bool IsSigned => Status == NoteStatus.Signed;
+    public bool IsSigned => Status is NoteStatus.Signed or NoteStatus.Locked;
+
+    /// <summary>Locked additionally blocks new addenda -- see NoteStatus.Locked's own doc comment.</summary>
+    public bool IsLocked => Status == NoteStatus.Locked;
+
+    public ICollection<ClinicalNoteVersion> Versions { get; set; } = new List<ClinicalNoteVersion>();
 }

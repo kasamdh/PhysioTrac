@@ -70,7 +70,7 @@ public class GoalsController : ControllerBase
     }
 
     private static FunctionalGoalDto ToDto(FunctionalGoal g) => new(
-        g.Id, g.PatientId, g.AuthorId, g.FunctionalLimitation, g.FunctionalTask,
+        g.Id, g.PatientId, g.AuthorId, g.FunctionalLimitation, g.FunctionalTask, g.Term,
         g.BaselineValue, g.TargetValue, g.CurrentValue, g.Unit, g.MeasurementMethod,
         g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt);
 }

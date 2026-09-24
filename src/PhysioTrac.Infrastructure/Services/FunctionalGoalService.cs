@@ -35,6 +35,7 @@ public class FunctionalGoalService : IFunctionalGoalService
             AuthorId = actor.UserId,
             FunctionalLimitation = request.FunctionalLimitation,
             FunctionalTask = request.FunctionalTask,
+            Term = request.Term,
             BaselineValue = request.BaselineValue,
             TargetValue = request.TargetValue,
             Unit = request.Unit,

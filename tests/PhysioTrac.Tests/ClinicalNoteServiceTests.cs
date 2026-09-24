@@ -55,7 +55,7 @@ public class ClinicalNoteServiceTests
         var therapist = Therapist(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), therapist);
 
-        var signed = await service.SignNoteAsync(note.Id, true, therapist);
+        var signed = await service.SignNoteAsync(note.Id, true, null, therapist);
 
         Assert.Equal(NoteStatus.Signed, signed.Status);
         Assert.NotNull(signed.SignedAt);
@@ -69,7 +69,7 @@ public class ClinicalNoteServiceTests
         var request = CompleteDailyNote(patient.Id) with { Objective = "" };
         var note = await service.CreateDraftAsync(request, therapist);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SignNoteAsync(note.Id, true, therapist));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SignNoteAsync(note.Id, true, null, therapist));
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class ClinicalNoteServiceTests
         var therapist = Therapist(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), therapist);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SignNoteAsync(note.Id, false, therapist));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SignNoteAsync(note.Id, false, null, therapist));
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class ClinicalNoteServiceTests
         var (db, service, org, patient) = NewService();
         var therapist = Therapist(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), therapist);
-        await service.SignNoteAsync(note.Id, true, therapist);
+        await service.SignNoteAsync(note.Id, true, null, therapist);
 
         await Assert.ThrowsAsync<PhysioTrac.Application.Common.ForbiddenException>(() =>
             service.UpdateDraftAsync(note.Id, new UpdateNoteRequest("tampered", null, null, null, null, null, null, null, null, null), therapist));
@@ -105,7 +105,7 @@ public class ClinicalNoteServiceTests
         var (db, service, org, patient) = NewService();
         var therapist = Therapist(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), therapist);
-        await service.SignNoteAsync(note.Id, true, therapist);
+        await service.SignNoteAsync(note.Id, true, null, therapist);
 
         var tracked = await db.ClinicalNotes.FirstAsync(n => n.Id == note.Id);
         tracked.Subjective = "tampered";
@@ -127,7 +127,7 @@ public class ClinicalNoteServiceTests
         await Assert.ThrowsAsync<PhysioTrac.Application.Common.ForbiddenException>(() =>
             service.CreateAddendumAsync(note.Id, new CreateAddendumRequest("correction", "body"), therapist));
 
-        await service.SignNoteAsync(note.Id, true, therapist);
+        await service.SignNoteAsync(note.Id, true, null, therapist);
         var addendum = await service.CreateAddendumAsync(note.Id, new CreateAddendumRequest("correction", "body"), therapist);
         Assert.Equal(note.Id, addendum.NoteId);
     }
@@ -142,7 +142,7 @@ public class ClinicalNoteServiceTests
         var (_, service, org, patient) = NewService();
         var therapist = Therapist(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), therapist);
-        await service.SignNoteAsync(note.Id, true, therapist);
+        await service.SignNoteAsync(note.Id, true, null, therapist);
 
         await Assert.ThrowsAsync<PhysioTrac.Application.Common.ForbiddenException>(() =>
             service.AddInterventionAsync(note.Id, new CreateInterventionRequest("Gait training", null, null, 15, null, true, 0), therapist));
@@ -155,7 +155,7 @@ public class ClinicalNoteServiceTests
         var assistant = Assistant(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), assistant);
 
-        var signed = await service.SignNoteAsync(note.Id, true, assistant);
+        var signed = await service.SignNoteAsync(note.Id, true, null, assistant);
 
         Assert.Equal(NoteStatus.ReviewRequired, signed.Status);
         Assert.True(note.CosignRequired);
@@ -168,7 +168,7 @@ public class ClinicalNoteServiceTests
         var assistant = Assistant(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), assistant);
 
-        var signed = await service.SignNoteAsync(note.Id, true, assistant);
+        var signed = await service.SignNoteAsync(note.Id, true, null, assistant);
 
         Assert.Equal(NoteStatus.Signed, signed.Status);
     }
@@ -179,7 +179,7 @@ public class ClinicalNoteServiceTests
         var (_, service, org, patient) = NewService(ptaCosignRequired: true);
         var assistant = Assistant(org.Id);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), assistant);
-        await service.SignNoteAsync(note.Id, true, assistant);
+        await service.SignNoteAsync(note.Id, true, null, assistant);
 
         var supervisor = Therapist(org.Id);
         var cosigned = await service.CosignNoteAsync(note.Id, supervisor);
@@ -195,7 +195,7 @@ public class ClinicalNoteServiceTests
         var assistantId = Guid.NewGuid();
         var assistant = Assistant(org.Id, assistantId);
         var note = await service.CreateDraftAsync(CompleteDailyNote(patient.Id), assistant);
-        await service.SignNoteAsync(note.Id, true, assistant);
+        await service.SignNoteAsync(note.Id, true, null, assistant);
 
         // Re-fetch as the same user attempting to cosign their own note.
         Assert.False(service.CanCosignNote(assistant, note));

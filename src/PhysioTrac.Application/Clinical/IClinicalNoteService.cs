@@ -27,6 +27,9 @@ public interface IClinicalNoteService
 
     bool CanCreateAddendum(ICurrentUser user, ClinicalNote note);
 
+    /// <summary>Locking is a further step past Signed -- see NoteStatus.Locked's own doc comment.</summary>
+    bool CanLockNote(ICurrentUser user, ClinicalNote note);
+
     Task<ClinicalNote> CreateDraftAsync(CreateNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>Throws <see cref="Common.ForbiddenException"/> if the note
@@ -41,8 +44,20 @@ public interface IClinicalNoteService
 
     /// <summary>Finalizes a note. Caller must have already checked
     /// <see cref="CanFinalizeNote"/>. Throws if the compliance-finding
-    /// blockers aren't resolved, or attestation isn't confirmed.</summary>
-    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, ICurrentUser actor, CancellationToken ct = default);
+    /// blockers aren't resolved, or attestation isn't confirmed. Captures
+    /// the signer's credentials-at-signing-time, ipAddress, and a content
+    /// hash on the note itself, and writes the final immutable
+    /// ClinicalNoteVersion snapshot.</summary>
+    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>A further, manual step past Signed that additionally blocks
+    /// new addenda -- see NoteStatus.Locked's own doc comment.</summary>
+    Task<ClinicalNote> LockNoteAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Every saved snapshot of the note's content, oldest first --
+    /// every draft save plus the final signed version. Append-only; see
+    /// ClinicalNoteVersion's own doc comment.</summary>
+    Task<IReadOnlyList<ClinicalNoteVersion>> GetVersionHistoryAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>Completes a PTA-authored note awaiting cosign. Caller must
     /// have already checked <see cref="CanCosignNote"/>.</summary>

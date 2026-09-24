@@ -118,6 +118,12 @@ else
                     }
                     <label class="field-label">Functional limitation <input @bind="_newGoalLimitation" class="field-input" /></label>
                     <label class="field-label">Functional task <input @bind="_newGoalTask" class="field-input" /></label>
+                    <label class="field-label">Term
+                        <select @bind="_newGoalTerm" class="field-input">
+                            <option value="@GoalTerm.ShortTerm">Short-term</option>
+                            <option value="@GoalTerm.LongTerm">Long-term</option>
+                        </select>
+                    </label>
                     <label class="field-label">Baseline value <input type="number" step="0.01" @bind="_newGoalBaseline" class="field-input" /></label>
                     <label class="field-label">Target value <input type="number" step="0.01" @bind="_newGoalTarget" class="field-input" /></label>
                     <label class="field-label">Unit <input @bind="_newGoalUnit" placeholder="e.g. degrees, reps" class="field-input" /></label>
@@ -873,6 +879,7 @@ else
     private bool _showGoalForm;
     private string? _goalError;
     private string _newGoalLimitation = string.Empty;
+    private GoalTerm _newGoalTerm = GoalTerm.ShortTerm;
     private string _newGoalTask = string.Empty;
     private decimal _newGoalBaseline;
     private decimal _newGoalTarget;
@@ -1032,7 +1039,7 @@ else
 
         try
         {
-            var request = new CreateGoalRequest(PatientId, _newGoalLimitation.Trim(), _newGoalTask.Trim(),
+            var request = new CreateGoalRequest(PatientId, _newGoalLimitation.Trim(), _newGoalTask.Trim(), _newGoalTerm,
                 _newGoalBaseline, _newGoalTarget, _newGoalUnit.Trim(), _newGoalMethod.Trim(), _newGoalTargetDate, null);
             await GoalService.CreateAsync(request, CurrentUser);
         }
@@ -1040,6 +1047,7 @@ else
 
         _newGoalLimitation = string.Empty;
         _newGoalTask = string.Empty;
+        _newGoalTerm = GoalTerm.ShortTerm;
         _newGoalBaseline = 0;
         _newGoalTarget = 0;
         _newGoalUnit = string.Empty;
