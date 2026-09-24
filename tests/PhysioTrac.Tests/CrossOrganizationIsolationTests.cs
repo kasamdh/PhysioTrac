@@ -37,7 +37,7 @@ public class CrossOrganizationIsolationTests
     {
         var audit = new AuditService(db);
         var tenantAccess = new TenantAccessService(db, audit);
-        var controller = new PatientsController(tenantAccess, user, db);
+        var controller = new PatientsController(tenantAccess, user, audit, db);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         return controller;
     }
@@ -62,8 +62,8 @@ public class CrossOrganizationIsolationTests
         var controller = NewController(db, org1000Admin);
 
         var result = Assert.IsType<OkObjectResult>(await controller.List());
-        var patients = Assert.IsAssignableFrom<IEnumerable<PatientDto>>(result.Value);
-        Assert.DoesNotContain(patients, p => p.Id == patientIn1001.Id);
+        var page = Assert.IsType<PagedPatientsDto>(result.Value);
+        Assert.DoesNotContain(page.Items, p => p.Id == patientIn1001.Id);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class CrossOrganizationIsolationTests
         var controller = NewController(db, org1000Admin);
 
         var result = Assert.IsType<ObjectResult>(await controller.Update(
-            patientIn1001.Id, new UpdatePatientRequest("Hacked", "Name", null, null, null, PatientStatus.Active)));
+            patientIn1001.Id, new UpdatePatientRequest("Hacked", "Name", null, null, null, null, null, null, null, null, null, PatientStatus.Active)));
         Assert.Equal(403, result.StatusCode);
 
         var unchanged = await db.Patients.FindAsync(patientIn1001.Id);
@@ -108,7 +108,7 @@ public class CrossOrganizationIsolationTests
         var controller = NewController(db, org1000Scheduler);
 
         var created = Assert.IsType<CreatedAtActionResult>(await controller.Create(
-            new CreatePatientRequest("New", "Patient", new DateOnly(1995, 1, 1), null, null, null)));
+            new CreatePatientRequest("New", "Patient", new DateOnly(1995, 1, 1), null, null, null, null, null, null, null, null, null)));
         var dto = Assert.IsType<PatientDto>(created.Value);
 
         var persisted = await db.Patients.FindAsync(dto.Id);
@@ -126,7 +126,7 @@ public class CrossOrganizationIsolationTests
         var controller = NewController(db, biller);
 
         var result = Assert.IsType<ObjectResult>(await controller.Create(
-            new CreatePatientRequest("Should", "Fail", new DateOnly(1995, 1, 1), null, null, null)));
+            new CreatePatientRequest("Should", "Fail", new DateOnly(1995, 1, 1), null, null, null, null, null, null, null, null, null)));
         Assert.Equal(403, result.StatusCode);
     }
 }

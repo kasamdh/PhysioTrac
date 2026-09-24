@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Domain.Entities;
 using PhysioTrac.Infrastructure.Persistence;
 
 namespace PhysioTrac.Api.Controllers;
 
-/// <summary>Read-only ICD-10-CM reference lookup — the same catalog for
-/// every tenant. Maintained only via a seed process, never edited here.</summary>
+/// <summary>Read-only ICD-10-CM catalog browse/search -- shared reference
+/// data across every tenant (see DiagnosisCode's own doc comment), so this
+/// deliberately has no tenant scoping at all, unlike almost every other
+/// controller in this Api.</summary>
 [ApiController]
 [Route("api/v1/diagnosis-codes")]
 [Authorize]
@@ -20,15 +23,23 @@ public class DiagnosisCodesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Search([FromQuery(Name = "q")] string? query, [FromQuery] int limit = 25)
+    public async Task<IActionResult> Search([FromQuery] string? q, [FromQuery] int limit = 25)
     {
-        var q = _db.DiagnosisCodes.Where(d => d.IsBillable);
-        if (!string.IsNullOrWhiteSpace(query))
+        var query = _db.DiagnosisCodes.Where(c => c.IsBillable);
+        if (!string.IsNullOrWhiteSpace(q))
         {
-            var text = query.Trim();
-            q = q.Where(d => d.Code.Contains(text) || d.Description.Contains(text));
+            var term = q.Trim();
+            query = query.Where(c => c.Code.Contains(term) || c.Description.Contains(term));
         }
-        var results = await q.OrderBy(d => d.Code).Take(Math.Clamp(limit, 1, 100)).ToListAsync(HttpContext.RequestAborted);
+
+        var results = await query
+            .OrderBy(c => c.Code)
+            .Take(Math.Clamp(limit, 1, 100))
+            .Select(c => new DiagnosisCodeDto(c.Id, c.Code, c.Description, c.IsBillable))
+            .ToListAsync(HttpContext.RequestAborted);
+
         return Ok(results);
     }
 }
+
+public record DiagnosisCodeDto(Guid Id, string Code, string Description, bool IsBillable);

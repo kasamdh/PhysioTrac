@@ -81,6 +81,56 @@ location-specific, then state-specific, then an org-wide default) that
 deserves its own design rather than being bolted onto an already-large
 phase; flagging it here as the one item from this phase not attempted yet.
 
+## Patient management
+
+`PatientsController` (`/api/v1/patients`) now supports, beyond the original
+CRUD:
+
+- **Search/filter/sort/pagination**: `?search=&status=&sortBy=&descending=&page=&pageSize=`.
+  `search` is a simple contains-match on name/MRN (no full-text search
+  infra); `sortBy` is a fixed vocabulary (`lastName` default, `dateOfBirth`,
+  `createdAt`) switched in code, never a client-supplied column name.
+- **Soft delete**: `DELETE /{id}` sets `DeletedAt`, never removes the row
+  (billing/audit history must survive it) — `TenantAccessService.PatientsFor`
+  excludes soft-deleted charts by default, so a deleted patient reads as
+  inaccessible (403), not silently missing. `PATCH /{id}/restore` undoes it.
+- **View audit**: opening a chart (`GET /{id}`) writes a `patient.viewed`
+  audit event — deliberately only there, not inside the shared
+  `RequirePatientAccessAsync` chokepoint every other patient-scoped
+  controller also calls, since auditing "viewed" on every one of those
+  (Update, documents, consents, messages, insurance...) would just be noise
+  on top of the specific event each of those already records.
+- **Timeline**: `GET /{id}/timeline` returns appointments/notes/documents/
+  invoices/payments, newest first, grouped by module. `forms` is always an
+  empty array — there's no patient-facing intake-forms module in this app
+  yet, and this keeps the shape consistent rather than omitting the key.
+- **Registration fields**: preferred language, primary location, and a
+  primary care provider distinct from the referring provider (both
+  reference `ReferringProvider` — an outside physician, not this clinic's
+  own staff).
+
+New child-record controllers, each resolving the patient via
+`RequirePatientAccessAsync` first (same tenant/caseload scoping as the
+chart itself):
+
+- `PatientAllergiesController` (`/api/v1/patients/{id}/allergies`) — severity-
+  tiered, never hard-deleted (a corrected allergy is deactivated with a
+  reason, not erased).
+- `PatientMedicationsController` (`/api/v1/patients/{id}/medications`) —
+  active/discontinued med list.
+- `PatientDiagnosesController` (`/api/v1/patients/{id}/diagnoses`) +
+  `DiagnosisCodesController` (`/api/v1/diagnosis-codes`, read-only ICD-10-CM
+  catalog search) — structured, billing-grade diagnoses additive to (not a
+  replacement for) the existing free-text `Patient.Diagnoses` chart-header
+  summary.
+
+Secure patient documents (`PatientDocumentsController`,
+`DocumentService`) already existed with everything this phase asked for:
+a storage abstraction (`IFileStorage` — local disk today via
+`LocalFileStorage`, swappable for blob storage without touching any
+controller), file-type/size validation (`StorageOptions`), and audit events
+on both upload and download.
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -222,9 +272,15 @@ can never have a standing `OrganizationId`.
 | `tm.compliance` | Total Motion  | `DemoPass123!`  | Compliance |
 | `tm.patient`    | Total Motion  | `DemoPass123!`  | Patient (portal login linked to Jordan Ellis' chart) |
 
-Also seeded per organization: patients, appointment types, service prices,
-and (Source Motion only) an insurance payer — enough that every page in the
-app has real data to show immediately.
+Also seeded per organization: 4 fictional patients each (Source Motion:
+Taylor Brooks, Riley Simmons, Harper Ellison, Quinn Alvarez; Total Motion:
+Jordan Ellis, Reese Whitfield) with realistic allergies, medications,
+structured ICD-10 diagnoses, a primary care provider, and insurance
+(including one patient with primary + secondary policies with different
+subscribers, to exercise that specifically); a small ~18-row shared ICD-10
+catalog (`DiagnosisCode`, org-independent reference data); appointment
+types; service prices; and a payer per organization — enough that every
+page in the app has real data to show immediately.
 
 ## Authorization, and audit
 

@@ -16,5 +16,8 @@ public class CreatePatientRequestValidator : AbstractValidator<CreatePatientRequ
             .GreaterThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-130)).WithMessage("Date of birth is not plausible.");
         RuleFor(r => r.Email).EmailAddress().When(r => !string.IsNullOrWhiteSpace(r.Email));
         RuleFor(r => r.Phone).MaximumLength(30).When(r => !string.IsNullOrWhiteSpace(r.Phone));
+        RuleFor(r => r.Address).MaximumLength(300).When(r => !string.IsNullOrWhiteSpace(r.Address));
+        RuleFor(r => r.EmergencyContact).MaximumLength(200).When(r => !string.IsNullOrWhiteSpace(r.EmergencyContact));
+        RuleFor(r => r.PreferredLanguage).MaximumLength(60).When(r => !string.IsNullOrWhiteSpace(r.PreferredLanguage));
     }
 }

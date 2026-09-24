@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PhysioTrac.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using PhysioTrac.Infrastructure.Persistence;
 namespace PhysioTrac.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PhysioTracDbContext))]
-    partial class PhysioTracDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924125053_AddPatientClinicalDetailsAndSoftDelete")]
+    partial class AddPatientClinicalDetailsAndSoftDelete
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

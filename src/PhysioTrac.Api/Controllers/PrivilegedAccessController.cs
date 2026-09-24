@@ -182,5 +182,5 @@ public class PrivilegedAccessController : ControllerBase
 
     private static PatientDto ToPatientDto(Patient p) => new(
         p.Id, p.MedicalRecordNumber, p.FirstName, p.LastName, p.FullName,
-        p.DateOfBirth, p.Age, p.Phone, p.Email, p.AssignedTherapistId, p.Status);
+        p.DateOfBirth, p.Age, p.Phone, p.Email, p.AssignedTherapistId, p.Status, p.PrimaryLocationId);
 }

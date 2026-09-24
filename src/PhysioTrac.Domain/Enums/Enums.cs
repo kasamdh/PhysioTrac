@@ -65,3 +65,12 @@ public enum SessionRevokedReason
     AccountDeleted,
     AdminRevoked
 }
+
+public enum AllergySeverity
+{
+    Unknown,
+    Mild,
+    Moderate,
+    Severe,
+    LifeThreatening
+}

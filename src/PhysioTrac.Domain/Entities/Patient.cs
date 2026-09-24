@@ -20,6 +20,21 @@ public class Patient : BaseEntity
     public string? EmergencyContact { get; set; }
     public string? Diagnoses { get; set; }
     public string? Precautions { get; set; }
+    public string? PreferredLanguage { get; set; }
+
+    /// <summary>The patient's own home clinic for scheduling/reporting
+    /// defaults -- distinct from a Provider's Locations (which locations a
+    /// clinician works out of). Nullable: a patient isn't required to have
+    /// one, e.g. a fully-remote telehealth caseload.</summary>
+    public Guid? PrimaryLocationId { get; set; }
+    public Location? PrimaryLocation { get; set; }
+
+    /// <summary>The patient's primary care physician -- an outside provider,
+    /// same category as ReferringProviderId below, and often (but not
+    /// always) the same actual person. Deliberately a separate field rather
+    /// than reusing ReferringProviderId for both roles.</summary>
+    public Guid? PrimaryCareProviderId { get; set; }
+    public ReferringProvider? PrimaryCareProvider { get; set; }
 
     public string? PharmacyName { get; set; }
     public string? PharmacyPhone { get; set; }
@@ -37,9 +52,8 @@ public class Patient : BaseEntity
     public Guid? AssignedTherapistId { get; set; }
 
     /// <summary>The outside physician who referred this patient in, if any --
-    /// distinct from PrimaryCareProviderId (not yet a separate field; a
-    /// patient's PCP and referring provider are often, but not always, the
-    /// same person -- this codebase doesn't yet distinguish them).</summary>
+    /// distinct from PrimaryCareProviderId above; often, but not always,
+    /// the same actual person.</summary>
     public Guid? ReferringProviderId { get; set; }
     public ReferringProvider? ReferringProvider { get; set; }
 
@@ -48,6 +62,15 @@ public class Patient : BaseEntity
     public Guid? PortalUserId { get; set; }
 
     public PatientStatus Status { get; set; } = PatientStatus.Active;
+
+    /// <summary>Soft delete -- a chart is never hard-deleted (billing/audit
+    /// history must survive), matching PatientDocument's own DeletedAt
+    /// convention. TenantAccessService.PatientsFor excludes these by
+    /// default; RequirePatientAccessAsync still 403s rather than exposing
+    /// whether a given id ever existed.</summary>
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedById { get; set; }
+    public bool IsDeleted => DeletedAt is not null;
 
     public string FullName => (FirstName + " " + LastName).Trim();
 
@@ -71,4 +94,7 @@ public class Patient : BaseEntity
     public ICollection<Consent> Consents { get; set; } = new List<Consent>();
     public ICollection<HomeExerciseProgram> HomeExercisePrograms { get; set; } = new List<HomeExerciseProgram>();
     public ICollection<Message> Messages { get; set; } = new List<Message>();
+    public ICollection<PatientAllergy> Allergies { get; set; } = new List<PatientAllergy>();
+    public ICollection<PatientMedication> Medications { get; set; } = new List<PatientMedication>();
+    public ICollection<PatientDiagnosis> DiagnosisRecords { get; set; } = new List<PatientDiagnosis>();
 }

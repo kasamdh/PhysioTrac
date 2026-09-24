@@ -57,7 +57,7 @@ public class TenantAccessService : ITenantAccessService
         // PatientsFor need an IQueryable back, not a Task<IQueryable>; any
         // ForbiddenException it raises still propagates to the caller.
         var organizationId = OrganizationRequiredSync(user);
-        var query = _db.Patients.Where(p => p.OrganizationId == organizationId);
+        var query = _db.Patients.Where(p => p.OrganizationId == organizationId && p.DeletedAt == null);
 
         // The PATIENT-role check is deliberately first and unconditional —
         // before `clinical` is even consulted. Every other role's `clinical`

@@ -143,4 +143,75 @@ public class DocumentServiceTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteAsync(uploaded.Id, actor));
     }
+
+    /// <summary>Two independent tenants sharing one DocumentService/db --
+    /// an Org B actor must never be able to list, upload for, download, or
+    /// delete anything belonging to Org A's patient, the same non-negotiable
+    /// this app tests for patients themselves.</summary>
+    private static (PhysioTracDbContext Db, DocumentService Service, Organization OrgB, TestCurrentUser OrgBActor) AddSecondOrganization(PhysioTracDbContext db)
+    {
+        var orgB = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        db.Organizations.Add(orgB);
+        db.SaveChanges();
+
+        var audit = new AuditService(db);
+        var tenantAccess = new TenantAccessService(db, audit);
+        var storage = new InMemoryFileStorage();
+        var options = Options.Create(new StorageOptions());
+        var orgBActor = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = orgB.Id, Role = UserRole.Scheduler };
+
+        return (db, new DocumentService(db, tenantAccess, storage, audit, options), orgB, orgBActor);
+    }
+
+    [Fact]
+    public async Task Upload_ForAnotherOrganizationsPatient_ThrowsForbidden_AndPersistsNothing()
+    {
+        var (db, _, _, org, patient, _) = NewService();
+        var (_, orgBService, _, orgBActor) = AddSecondOrganization(db);
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.ForbiddenException>(
+            () => orgBService.UploadAsync(ValidRequest(patient.Id), orgBActor));
+
+        Assert.Empty(await db.PatientDocuments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ListForPatient_AnotherOrganizationsPatient_ThrowsForbidden()
+    {
+        var (db, service, _, _, patient, actor) = NewService();
+        await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var (_, orgBService, _, orgBActor) = AddSecondOrganization(db);
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.ForbiddenException>(
+            () => orgBService.ListForPatientAsync(patient.Id, orgBActor));
+    }
+
+    [Fact]
+    public async Task Download_AnotherOrganizationsDocument_ThrowsForbidden()
+    {
+        var (db, service, _, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var (_, orgBService, _, orgBActor) = AddSecondOrganization(db);
+
+        // Org B's actor knows the document's real id (e.g. guessed/leaked) --
+        // OrganizationRequiredAsync + the org check inside LoadDocumentInOrgAsync
+        // must still reject it before RequirePatientAccessAsync is even reached.
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.NotFoundException>(
+            () => orgBService.DownloadAsync(uploaded.Id, orgBActor));
+    }
+
+    [Fact]
+    public async Task Delete_AnotherOrganizationsDocument_ThrowsNotFound_AndNeverDeletesIt()
+    {
+        var (db, service, storage, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var (_, orgBService, _, orgBActor) = AddSecondOrganization(db);
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.NotFoundException>(
+            () => orgBService.DeleteAsync(uploaded.Id, orgBActor));
+
+        var stillThere = await db.PatientDocuments.FindAsync(uploaded.Id);
+        Assert.False(stillThere!.IsDeleted);
+        Assert.True(storage.Files.ContainsKey(uploaded.StorageKey));
+    }
 }

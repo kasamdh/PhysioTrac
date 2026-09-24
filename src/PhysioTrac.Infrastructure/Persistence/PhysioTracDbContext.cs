@@ -51,6 +51,9 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<ReferringProvider> ReferringProviders => Set<ReferringProvider>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<ProviderLicense> ProviderLicenses => Set<ProviderLicense>();
+    public DbSet<PatientAllergy> PatientAllergies => Set<PatientAllergy>();
+    public DbSet<PatientMedication> PatientMedications => Set<PatientMedication>();
+    public DbSet<PatientDiagnosis> PatientDiagnoses => Set<PatientDiagnosis>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -110,6 +113,15 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(p => p.ReferringProvider).WithMany()
                 .HasForeignKey(p => p.ReferringProviderId).OnDelete(DeleteBehavior.SetNull);
+            // Restrict, not SetNull -- SQL Server rejects two SetNull/cascade
+            // paths from ReferringProviders down to Patients (error 1785,
+            // same class of conflict as ClaimTransactions' two FKs to Claims
+            // earlier this session). ReferringProviderId keeps SetNull as
+            // the original relationship; this one is Restrict instead.
+            e.HasOne(p => p.PrimaryCareProvider).WithMany()
+                .HasForeignKey(p => p.PrimaryCareProviderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.PrimaryLocation).WithMany()
+                .HasForeignKey(p => p.PrimaryLocationId).OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<ReferringProvider>(e =>
@@ -159,6 +171,39 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(l => l.Status).HasConversion<string>().HasMaxLength(16);
             e.HasOne(l => l.Provider).WithMany(p => p.Licenses)
                 .HasForeignKey(l => l.ProviderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<PatientAllergy>(e =>
+        {
+            e.HasIndex(a => a.PatientId);
+            e.Property(a => a.Severity).HasConversion<string>().HasMaxLength(20);
+            e.HasOne(a => a.Patient).WithMany(p => p.Allergies)
+                .HasForeignKey(a => a.PatientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<PatientMedication>(e =>
+        {
+            e.HasIndex(m => m.PatientId);
+            e.HasOne(m => m.Patient).WithMany(p => p.Medications)
+                .HasForeignKey(m => m.PatientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<PatientDiagnosis>(e =>
+        {
+            e.HasIndex(d => d.PatientId);
+            e.HasOne(d => d.Patient).WithMany(p => p.DiagnosisRecords)
+                .HasForeignKey(d => d.PatientId).OnDelete(DeleteBehavior.Cascade);
+            // Restrict, not Cascade -- DiagnosisCode is shared reference
+            // data (see its own doc comment); a patient's diagnosis history
+            // must never be able to delete a catalog row out from under
+            // every other tenant.
+            e.HasOne(d => d.DiagnosisCode).WithMany()
+                .HasForeignKey(d => d.DiagnosisCodeId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<DiagnosisCode>(e =>
+        {
+            e.HasIndex(c => c.Code).IsUnique();
         });
 
         builder.Entity<AppointmentType>(e =>
