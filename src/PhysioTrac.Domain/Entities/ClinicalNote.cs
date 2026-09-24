@@ -35,6 +35,18 @@ public class ClinicalNote : BaseEntity
     public int? DurationWeeks { get; set; }
     public DateOnly? ReassessmentDue { get; set; }
 
+    /// <summary>The Medicare-style physician certification of this note's
+    /// plan of care -- deliberately separate from the therapist's own
+    /// SignedAt/SignatureName, since real-world certification is a distinct
+    /// step (often days later, by an outside physician, not the treating
+    /// therapist). CertifyPlanOfCareAsync is one of the few writes allowed
+    /// on an already-Signed/Locked note -- see EnforceSignedNoteImmutability,
+    /// which permits only these two fields (plus UpdatedAt) to change post-
+    /// signature, never the clinical narrative itself.</summary>
+    public DateOnly? PlanOfCareCertifiedDate { get; set; }
+    public Guid? PlanOfCareCertifyingProviderId { get; set; }
+    public ReferringProvider? PlanOfCareCertifyingProvider { get; set; }
+
     public string? SignatureName { get; set; }
 
     /// <summary>Snapshot of the signer's own Credential field (e.g. "PT, DPT")

@@ -1,5 +1,9 @@
 namespace PhysioTrac.Domain.Enums;
 
+/// <summary>Dry Needling CONSENT is deliberately not a value here -- it's
+/// already modeled as ConsentType.DryNeedlingConsent in the existing
+/// Consent subsystem (a signed attestation, not a clinical note); only the
+/// treatment note itself (DryNeedlingTreatment) belongs in this enum.</summary>
 public enum NoteType
 {
     Evaluation,
@@ -10,6 +14,9 @@ public enum NoteType
     ReEvaluation,
     Discharge,
     Handoff,
+    PlanOfCare,
+    DryNeedlingTreatment,
+    PelvicHealthEvaluation,
 }
 
 /// <summary>Locked is a further, manual step past Signed -- Signed already

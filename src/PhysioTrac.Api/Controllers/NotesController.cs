@@ -68,6 +68,30 @@ public class NotesController : ControllerBase
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
+    [HttpGet("patient/{patientId:guid}/pull-forward")]
+    public async Task<IActionResult> PullForward(Guid patientId)
+    {
+        try
+        {
+            var data = await _notes.GetPullForwardDataAsync(patientId, _currentUser, HttpContext.RequestAborted);
+            return Ok(data);
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    [HttpGet("patient/{patientId:guid}/progress-note-status")]
+    public async Task<IActionResult> ProgressNoteStatus(Guid patientId)
+    {
+        try
+        {
+            var status = await _notes.GetProgressNoteStatusAsync(patientId, _currentUser, HttpContext.RequestAborted);
+            return Ok(status);
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
     [HttpGet("{id:guid}/compliance")]
     public async Task<IActionResult> Compliance(Guid id)
     {
@@ -104,6 +128,19 @@ public class NotesController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    [HttpPost("{id:guid}/certify-poc")]
+    public async Task<IActionResult> CertifyPlanOfCare(Guid id, [FromBody] CertifyPlanOfCareRequest request)
+    {
+        try
+        {
+            var note = await _notes.CertifyPlanOfCareAsync(id, request, _currentUser, HttpContext.RequestAborted);
+            return Ok(ToDto(note));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
     [HttpGet("{id:guid}/versions")]
@@ -174,6 +211,7 @@ public class NotesController : ControllerBase
         n.Id, n.PatientId, n.TherapistId, n.AppointmentId, n.NoteType, n.Status, n.ServiceDate,
         n.Subjective, n.Objective, n.Interventions, n.Assessment, n.Plan,
         n.PlanOfCareStart, n.PlanOfCareEnd, n.FrequencyPerWeek, n.DurationWeeks, n.ReassessmentDue,
+        n.PlanOfCareCertifiedDate, n.PlanOfCareCertifyingProviderId,
         n.SignatureName, n.SignatureCredentials, n.SignedAt, n.SignatureIpAddress, n.SignatureHash,
         n.CosignRequired, n.CosignedById, n.CosignedAt);
 

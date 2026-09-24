@@ -234,6 +234,68 @@ signing, cross-org isolation). Built the rest:
 - **Goals gained a Term** (`GoalTerm.ShortTerm`/`LongTerm`) — the short/
   long-term distinction this phase asks for didn't exist as a field before.
 
+## PT note types
+
+Backend for "Phase 5B" — default templates and supporting logic for the nine
+PT note types on top of the Phase 5A engine; the per-type note-taking screens
+themselves stay deferred to the same future frontend phase as the engine
+itself. The engine (template resolution/versioning, Draft -> Signed -> Locked,
+e-signature, version history) is unchanged; this phase is templates, three
+new `ClinicalNote` fields, and two new read-only aggregation endpoints.
+
+- **Three new `NoteType` values** — `PlanOfCare`, `DryNeedlingTreatment`,
+  `PelvicHealthEvaluation` — joining the six that already existed
+  (Evaluation, Daily, SOAP, Progress, Re-evaluation, Discharge), covering all
+  nine of the types this phase asks for. Dry Needling *Consent* deliberately
+  isn't a `NoteType` — it's already `ConsentType.DryNeedlingConsent` in the
+  existing consent subsystem (a signed attestation, not a clinical note);
+  only the treatment note itself is new here. Widened the `NoteType` column
+  from `nvarchar(20)` to `nvarchar(30)` after noticing
+  `"PelvicHealthEvaluation"` (22 characters) would have been silently
+  truncated otherwise.
+- **Nine default Platform-scope templates** (`ClinicalNoteTemplate`, one per
+  `NoteType` this phase asks for), seeded so `ClinicalTemplateService
+  .ResolveAsync`'s most-specific-wins search always finds at least this
+  fallback for every tenant, before any org customizes anything more
+  specific.
+- **Plan-of-care certification** (`PlanOfCareCertifiedDate` /
+  `PlanOfCareCertifyingProviderId` on `ClinicalNote`,
+  `POST /notes/{id}/certify-poc`) — the Medicare-style physician
+  certification of a plan of care, deliberately modeled as separate from the
+  therapist's own `SignedAt`/`SignatureName`: in practice certification often
+  happens days later, by an outside physician, not the treating therapist.
+  `EnforceSignedNoteImmutability` (the DB-level guard from Phase 5A) gained a
+  second, narrowly-scoped exception for this — only these two fields plus
+  `UpdatedAt` may change on an already-Signed/Locked note, never the clinical
+  narrative itself.
+- **Pull-forward** (`GET /notes/patient/{id}/pull-forward`) — a pure read
+  returning what a new note for a patient should pre-populate: active
+  `FunctionalGoal`s, the most recently *signed* note's
+  `ObjectiveMeasurementsJson`, and unresolved `PatientDiagnosis` rows. The
+  note-creation UI (not built in this pass) decides what to actually copy
+  into the new note's fields; the backend just answers "what's current."
+- **Progress-note-due** (`Organization.ProgressNoteDueDays` /
+  `ProgressNoteDueVisitCount`, `GET /notes/patient/{id}/progress-note-status`)
+  — two independently configurable triggers, since "day count" and "visit
+  count" aren't the same kind of value: day-count auto-computes
+  `ReassessmentDue` as a calendar date the moment an Evaluation/Progress/
+  Re-evaluation note is created (`ComputeAutoReassessmentDue`), so it can be
+  compared against today; visit-count instead counts signed Daily/SOAP/
+  home-visit notes since the last progress-triggering note, computed live on
+  every call since "N visits since X" isn't a fixed date that can be
+  precomputed. Both can be configured at once; either or neither firing is
+  reported independently in the response.
+- **Linking notes to appointments** — `ClinicalNote.AppointmentId` already
+  existed; this phase's seed data is the first to actually populate it for
+  both organizations (a completed evaluation and a still-scheduled one),
+  since nothing previously exercised that link with real data.
+- Found and fixed a real bug while building this: `GetPullForwardDataAsync`
+  and `GetProgressNoteStatusAsync` initially filtered on `ClinicalNote
+  .IsSigned` (a computed C# property) directly inside an EF Core query —
+  that doesn't translate to SQL on any provider (caught by the in-memory
+  test suite, not by inspection) and was changed to compare `Status`
+  directly against `NoteStatus.Signed`/`Locked`.
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -384,6 +446,24 @@ subscribers, to exercise that specifically); a small ~18-row shared ICD-10
 catalog (`DiagnosisCode`, org-independent reference data); appointment
 types; service prices; and a payer per organization — enough that every
 page in the app has real data to show immediately.
+
+Also seeded: nine Platform-scope `ClinicalNoteTemplate` rows, one per PT note
+type from the "PT note types" phase above; a handful of sample
+`ClinicalNote`s per organization spanning those types (Source Motion:
+signed Evaluation + Plan of Care — the latter with its plan-of-care
+certification already recorded — + Daily + Dry Needling Treatment notes, a
+Discharge Summary, and one still-Draft Pelvic Health evaluation; Total
+Motion: the existing Draft evaluation now linked to its appointment, plus
+signed Progress, Daily x2, Re-evaluation, and SOAP notes), with
+`FunctionalGoal`s and a `Consent` (dry-needling) attached where relevant.
+Source Motion's org configures the day-count progress-note-due trigger
+(`ProgressNoteDueDays = 30`) and Total Motion the visit-count trigger
+(`ProgressNoteDueVisitCount = 2`), so both are demonstrated somewhere in the
+seed data. These sample notes are constructed already at `Signed` directly
+against the DbContext rather than through `SignNoteAsync` — there's no
+version-history snapshot or a "real" computed `SignatureHash` for seed data,
+the same shortcut this seeder already takes elsewhere (see its own doc
+comment) for bypassing the real provisioning flow.
 
 ## Authorization, and audit
 

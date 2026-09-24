@@ -69,4 +69,20 @@ public interface IClinicalNoteService
     Task<NoteIntervention> AddInterventionAsync(Guid noteId, CreateInterventionRequest request, ICurrentUser actor, CancellationToken ct = default);
 
     Task<IReadOnlyList<NoteIntervention>> ListInterventionsAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Records the physician certification of this note's plan of
+    /// care. One of the few writes allowed on an already-Signed/Locked note
+    /// -- see EnforceSignedNoteImmutability and PlanOfCareCertifiedDate's
+    /// own doc comment for why. Gated the same as finalizing (CanFinalizeNote),
+    /// since certifying is itself a clinical sign-off responsibility.</summary>
+    Task<ClinicalNote> CertifyPlanOfCareAsync(Guid noteId, CertifyPlanOfCareRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>What a new note for this patient should pre-populate --
+    /// active goals, the most recent note's objective measurements, and
+    /// active diagnoses. See PullForwardDataDto's own doc comment.</summary>
+    Task<PullForwardDataDto> GetPullForwardDataAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Whether a progress note is due for this patient right now.
+    /// See ProgressNoteStatusDto's own doc comment.</summary>
+    Task<ProgressNoteStatusDto> GetProgressNoteStatusAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
 }

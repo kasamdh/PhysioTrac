@@ -30,6 +30,17 @@ public class Organization : BaseEntity
     /// PT/Director cosignature before it's final. Conservative default (true).</summary>
     public bool PtaCosignRequired { get; set; } = true;
 
+    /// <summary>Progress-note due reminder policy -- either or both may be
+    /// set; null means that particular trigger is off. Day-count
+    /// auto-computes ClinicalNote.ReassessmentDue at Evaluation/Progress/
+    /// ReEvaluation creation time (ServiceDate + this many days) when the
+    /// caller didn't set one explicitly. Visit-count instead counts signed
+    /// Daily/Soap/HomeVisit notes since the last progress-triggering note
+    /// and flags "due now" once it reaches this threshold -- see
+    /// ClinicalNoteService.GetProgressNoteStatusAsync.</summary>
+    public int? ProgressNoteDueDays { get; set; }
+    public int? ProgressNoteDueVisitCount { get; set; }
+
     public DateTimeOffset? OnboardingCompletedAt { get; set; }
     public bool IsActive { get; set; } = true;
 

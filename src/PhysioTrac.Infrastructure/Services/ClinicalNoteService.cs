@@ -92,7 +92,11 @@ public class ClinicalNoteService : IClinicalNoteService
             PlanOfCareEnd = request.PlanOfCareEnd,
             FrequencyPerWeek = request.FrequencyPerWeek,
             DurationWeeks = request.DurationWeeks,
-            ReassessmentDue = request.ReassessmentDue,
+            // Auto-computed from the org's day-count policy when the caller
+            // didn't set one explicitly and this note type actually
+            // triggers a reassessment clock -- see
+            // Organization.ProgressNoteDueDays's own doc comment.
+            ReassessmentDue = request.ReassessmentDue ?? ComputeAutoReassessmentDue(request.NoteType, request.ServiceDate, organization),
             // Snapshotted at creation so a later org-policy change never
             // silently changes an in-progress note's cosign requirement.
             CosignRequired = organization.PtaCosignRequired && actor.Role == UserRole.Assistant,
@@ -230,6 +234,100 @@ public class ClinicalNoteService : IClinicalNoteService
             throw new ForbiddenException("You are not permitted to view this note.");
         }
         return await _db.ClinicalNoteVersions.Where(v => v.NoteId == note.Id).OrderBy(v => v.VersionNumber).ToListAsync(ct);
+    }
+
+    public async Task<ClinicalNote> CertifyPlanOfCareAsync(Guid noteId, CertifyPlanOfCareRequest request, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var note = await LoadNoteInOrgAsync(noteId, actor, ct);
+        if (!CanFinalizeNote(actor, note))
+        {
+            throw new ForbiddenException("You are not permitted to certify this note's plan of care.");
+        }
+
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        var provider = await _db.ReferringProviders.FirstOrDefaultAsync(
+            p => p.Id == request.CertifyingProviderId && p.OrganizationId == organization.Id, ct)
+            ?? throw new NotFoundException("Certifying provider was not found.");
+
+        note.PlanOfCareCertifiedDate = request.CertifiedDate;
+        note.PlanOfCareCertifyingProviderId = provider.Id;
+        note.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.RecordAuditEventAsync(actor.UserId, "note.poc_certified", nameof(ClinicalNote), note.Id, organization.Id,
+            patientId: note.PatientId, metadata: new { certifyingProviderId = provider.Id }, ct: ct);
+
+        return note;
+    }
+
+    public async Task<PullForwardDataDto> GetPullForwardDataAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, ct: ct);
+
+        var activeGoals = await _db.FunctionalGoals
+            .Where(g => g.PatientId == patient.Id && g.Status == GoalStatus.Active)
+            .OrderBy(g => g.TargetDate)
+            .Select(g => new FunctionalGoalDto(
+                g.Id, g.PatientId, g.AuthorId, g.FunctionalLimitation, g.FunctionalTask, g.Term,
+                g.BaselineValue, g.TargetValue, g.CurrentValue, g.Unit, g.MeasurementMethod,
+                g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt))
+            .ToListAsync(ct);
+
+        var lastNote = await _db.ClinicalNotes
+            .Where(n => n.PatientId == patient.Id && (n.Status == NoteStatus.Signed || n.Status == NoteStatus.Locked))
+            .OrderByDescending(n => n.ServiceDate).ThenByDescending(n => n.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        var activeDiagnoses = await _db.PatientDiagnoses
+            .Include(d => d.DiagnosisCode)
+            .Where(d => d.PatientId == patient.Id && d.ResolvedDate == null)
+            .OrderByDescending(d => d.IsPrimary)
+            .Select(d => new PullForwardDiagnosisDto(d.DiagnosisCodeId, d.DiagnosisCode!.Code, d.DiagnosisCode.Description, d.IsPrimary))
+            .ToListAsync(ct);
+
+        return new PullForwardDataDto(activeGoals, lastNote?.ObjectiveMeasurementsJson, activeDiagnoses);
+    }
+
+    public async Task<ProgressNoteStatusDto> GetProgressNoteStatusAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, ct: ct);
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var lastProgressTriggeringNote = await _db.ClinicalNotes
+            .Where(n => n.PatientId == patient.Id && (n.Status == NoteStatus.Signed || n.Status == NoteStatus.Locked) &&
+                (n.NoteType == NoteType.Evaluation || n.NoteType == NoteType.Progress || n.NoteType == NoteType.ReEvaluation))
+            .OrderByDescending(n => n.ServiceDate).ThenByDescending(n => n.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        var dueByDayCount = lastProgressTriggeringNote?.ReassessmentDue is DateOnly due && due < today;
+
+        var visitsSince = 0;
+        if (organization.ProgressNoteDueVisitCount is int threshold)
+        {
+            var sinceDate = lastProgressTriggeringNote?.ServiceDate ?? DateOnly.MinValue;
+            var sinceCreatedAt = lastProgressTriggeringNote?.CreatedAt ?? DateTimeOffset.MinValue;
+            visitsSince = await _db.ClinicalNotes.CountAsync(n =>
+                n.PatientId == patient.Id && (n.Status == NoteStatus.Signed || n.Status == NoteStatus.Locked) &&
+                (n.NoteType == NoteType.Daily || n.NoteType == NoteType.Soap || n.NoteType == NoteType.HomeVisit) &&
+                (n.ServiceDate > sinceDate || (n.ServiceDate == sinceDate && n.CreatedAt > sinceCreatedAt)), ct);
+        }
+        var dueByVisitCount = organization.ProgressNoteDueVisitCount is int t && visitsSince >= t;
+
+        return new ProgressNoteStatusDto(
+            dueByDayCount || dueByVisitCount, dueByDayCount, dueByVisitCount, visitsSince, lastProgressTriggeringNote?.ReassessmentDue);
+    }
+
+    /// <summary>Auto-computes ReassessmentDue at creation for the note types
+    /// that actually start a reassessment clock, when the org has a
+    /// day-count policy configured and the caller didn't set one explicitly.
+    /// Visit-count due-ness isn't a calendar date and so isn't set here --
+    /// see GetProgressNoteStatusAsync for that check instead.</summary>
+    private static DateOnly? ComputeAutoReassessmentDue(NoteType noteType, DateOnly serviceDate, Organization organization)
+    {
+        if (noteType is not (NoteType.Evaluation or NoteType.Progress or NoteType.ReEvaluation)) return null;
+        if (organization.ProgressNoteDueDays is not int days) return null;
+        return serviceDate.AddDays(days);
     }
 
     public async Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)

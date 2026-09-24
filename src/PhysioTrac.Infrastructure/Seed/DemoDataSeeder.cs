@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using PhysioTrac.Application.Configuration;
+using PhysioTrac.Application.Consents;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
 using PhysioTrac.Infrastructure.Identity;
@@ -49,7 +50,8 @@ public static class DemoDataSeeder
         }
 
         await SeedDiagnosisCodesAsync(db, ct);
-        await SeedPlatformSuperAdminAsync(userManager, seedOptions.DemoPassword, ct);
+        var superAdmin = await SeedPlatformSuperAdminAsync(userManager, seedOptions.DemoPassword, ct);
+        await SeedClinicalNoteTemplatesAsync(db, superAdmin.Id, ct);
         await SeedSourceMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
         await SeedTotalMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
     }
@@ -86,10 +88,53 @@ public static class DemoDataSeeder
     /// IsPlatformSuperAdmin requires Role == SuperAdmin AND OrganizationId
     /// == null, so unlike every other role this is seeded once, globally,
     /// not per-org.</summary>
-    private static async Task SeedPlatformSuperAdminAsync(UserManager<ApplicationUser> userManager, string demoPassword, CancellationToken ct)
+    private static async Task<ApplicationUser> SeedPlatformSuperAdminAsync(UserManager<ApplicationUser> userManager, string demoPassword, CancellationToken ct)
     {
-        await CreateUserAsync(userManager, organizationId: null, "superadmin", "superadmin@physiotrac.test",
+        return await CreateUserAsync(userManager, organizationId: null, "superadmin", "superadmin@physiotrac.test",
             "Platform", "Admin", UserRole.SuperAdmin, demoPassword, ct);
+    }
+
+    /// <summary>Platform-scope default templates -- one per PT note type
+    /// Phase 5B asks for, so ClinicalTemplateService.ResolveAsync's most-
+    /// specific-wins search always finds at least this fallback for every
+    /// tenant, even before an org configures anything more specific. Built
+    /// directly against the DbContext (bypassing ClinicalTemplateService.
+    /// CreateAsync's actor-based scope validation) the same way the
+    /// reference data above is seeded. SchemaJson content follows the shape
+    /// documented on ClinicalNoteTemplate itself; it's a starting point an
+    /// org admin is expected to customize, not a finished form design.</summary>
+    private static async Task SeedClinicalNoteTemplatesAsync(PhysioTracDbContext db, Guid createdById, CancellationToken ct)
+    {
+        ClinicalNoteTemplate Template(NoteType type, string name, string schemaJson) => new()
+        {
+            NoteType = type,
+            Scope = TemplateScope.Platform,
+            Name = name,
+            SchemaJson = schemaJson,
+            CreatedById = createdById,
+        };
+
+        db.ClinicalNoteTemplates.AddRange(
+            Template(NoteType.Evaluation, "Initial Evaluation",
+                """{"sections":[{"key":"subjective","label":"Subjective","fields":[{"key":"painScale","type":"painScale0to10"},{"key":"history","type":"text"}]},{"key":"objective","label":"Objective","fields":[{"key":"rom","type":"romTable"},{"key":"mmt","type":"mmtTable"},{"key":"outcomeMeasures","type":"outcomeMeasureRef"}]},{"key":"assessment","label":"Assessment","fields":[{"key":"diagnoses","type":"icd10Picker"},{"key":"functionalLimitations","type":"functionalLimitationsList"}]},{"key":"plan","label":"Plan of Care","fields":[{"key":"goals","type":"goalsList"},{"key":"cptCodes","type":"cptPicker"},{"key":"frequency","type":"planOfCareFrequency"}]}]}"""),
+            Template(NoteType.Daily, "Daily Treatment Note",
+                """{"sections":[{"key":"subjective","label":"Subjective","fields":[{"key":"painScale","type":"painScale0to10"}]},{"key":"objective","label":"Objective","fields":[{"key":"interventions","type":"cptPicker"}]},{"key":"assessment","label":"Assessment","fields":[{"key":"progress","type":"text"}]},{"key":"plan","label":"Plan","fields":[{"key":"nextVisit","type":"text"}]}]}"""),
+            Template(NoteType.Soap, "SOAP Note",
+                """{"sections":[{"key":"subjective","label":"Subjective","fields":[{"key":"painScale","type":"painScale0to10"}]},{"key":"objective","label":"Objective","fields":[{"key":"interventions","type":"cptPicker"}]},{"key":"assessment","label":"Assessment","fields":[{"key":"progress","type":"text"}]},{"key":"plan","label":"Plan","fields":[{"key":"nextVisit","type":"text"}]}]}"""),
+            Template(NoteType.Progress, "Progress Note",
+                """{"sections":[{"key":"objective","label":"Objective","fields":[{"key":"rom","type":"romTable"},{"key":"mmt","type":"mmtTable"},{"key":"outcomeMeasures","type":"outcomeMeasureRef"}]},{"key":"assessment","label":"Assessment","fields":[{"key":"goalsProgress","type":"goalsList"}]},{"key":"plan","label":"Plan","fields":[{"key":"goals","type":"goalsList"},{"key":"frequency","type":"planOfCareFrequency"}]}]}"""),
+            Template(NoteType.ReEvaluation, "Re-evaluation",
+                """{"sections":[{"key":"objective","label":"Objective","fields":[{"key":"rom","type":"romTable"},{"key":"mmt","type":"mmtTable"},{"key":"outcomeMeasures","type":"outcomeMeasureRef"}]},{"key":"assessment","label":"Assessment","fields":[{"key":"diagnoses","type":"icd10Picker"},{"key":"functionalLimitations","type":"functionalLimitationsList"}]},{"key":"plan","label":"Updated Plan of Care","fields":[{"key":"goals","type":"goalsList"},{"key":"frequency","type":"planOfCareFrequency"}]}]}"""),
+            Template(NoteType.Discharge, "Discharge Summary",
+                """{"sections":[{"key":"assessment","label":"Discharge Assessment","fields":[{"key":"outcomeMeasures","type":"outcomeMeasureRef"},{"key":"goalsFinalStatus","type":"goalsList"}]},{"key":"plan","label":"Discharge Plan","fields":[{"key":"dischargeDetails","type":"dischargeDetails"},{"key":"homeProgram","type":"text"}]}]}"""),
+            Template(NoteType.PlanOfCare, "Plan of Care",
+                """{"sections":[{"key":"plan","label":"Plan of Care","fields":[{"key":"diagnoses","type":"icd10Picker"},{"key":"goals","type":"goalsList"},{"key":"frequency","type":"planOfCareFrequency"},{"key":"certification","type":"planOfCareCertification"}]}]}"""),
+            Template(NoteType.DryNeedlingTreatment, "Dry Needling Treatment Note",
+                """{"sections":[{"key":"objective","label":"Treatment","fields":[{"key":"bodyRegions","type":"text"},{"key":"needleSites","type":"text"},{"key":"reaction","type":"text"}]},{"key":"plan","label":"Plan","fields":[{"key":"nextVisit","type":"text"}]}]}"""),
+            Template(NoteType.PelvicHealthEvaluation, "Pelvic Health/Women's Health Evaluation",
+                """{"sections":[{"key":"subjective","label":"Subjective","fields":[{"key":"painScale","type":"painScale0to10"},{"key":"history","type":"text"}]},{"key":"objective","label":"Objective","fields":[{"key":"functionalLimitations","type":"functionalLimitationsList"},{"key":"outcomeMeasures","type":"outcomeMeasureRef"}]},{"key":"assessment","label":"Assessment","fields":[{"key":"diagnoses","type":"icd10Picker"}]},{"key":"plan","label":"Plan of Care","fields":[{"key":"goals","type":"goalsList"},{"key":"frequency","type":"planOfCareFrequency"}]}]}"""));
+
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>Org 1000 -- the first real customer. Two physical locations
@@ -110,6 +155,10 @@ public static class DemoDataSeeder
             City = "Fuquay-Varina",
             State = "NC",
             ZipCode = "27526",
+            // Demonstrates the day-count progress-note trigger; Total Motion
+            // below configures the visit-count trigger instead, so both of
+            // Organization's independently-configurable policies are seeded.
+            ProgressNoteDueDays = 30,
         };
         db.Organizations.Add(organization);
         await db.SaveChangesAsync(ct);
@@ -288,26 +337,26 @@ public static class DemoDataSeeder
             new PatientDiagnosis { PatientId = harper.Id, DiagnosisCodeId = diabetesCode.Id, IsPrimary = false, DiagnosedDate = new DateOnly(2023, 1, 15) },
             new PatientDiagnosis { PatientId = quinn.Id, DiagnosisCodeId = ankleSprainCode.Id, IsPrimary = true, DiagnosedDate = new DateOnly(2026, 8, 11), ResolvedDate = new DateOnly(2026, 9, 15) });
 
-        db.AppointmentTypes.AddRange(
-            new AppointmentType
-            {
-                OrganizationId = organization.Id,
-                Name = "Initial Evaluation",
-                Description = "New patient evaluation and plan of care",
-                DefaultDurationMinutes = 60,
-                Price = 175.00m,
-                RequiresNewPatient = true,
-                DefaultKind = AppointmentKind.Evaluation,
-            },
-            new AppointmentType
-            {
-                OrganizationId = organization.Id,
-                Name = "Follow-up Visit",
-                Description = "Standard follow-up treatment session",
-                DefaultDurationMinutes = 30,
-                Price = 95.00m,
-                DefaultKind = AppointmentKind.FollowUp,
-            });
+        var evalType = new AppointmentType
+        {
+            OrganizationId = organization.Id,
+            Name = "Initial Evaluation",
+            Description = "New patient evaluation and plan of care",
+            DefaultDurationMinutes = 60,
+            Price = 175.00m,
+            RequiresNewPatient = true,
+            DefaultKind = AppointmentKind.Evaluation,
+        };
+        var followUpType = new AppointmentType
+        {
+            OrganizationId = organization.Id,
+            Name = "Follow-up Visit",
+            Description = "Standard follow-up treatment session",
+            DefaultDurationMinutes = 30,
+            Price = 95.00m,
+            DefaultKind = AppointmentKind.FollowUp,
+        };
+        db.AppointmentTypes.AddRange(evalType, followUpType);
 
         db.ServicePrices.AddRange(
             new ServicePrice { OrganizationId = organization.Id, CptCode = "97110", Label = "Therapeutic Exercise", Price = 65.00m, CreatedById = admin.Id },
@@ -359,6 +408,181 @@ public static class DemoDataSeeder
                 EffectiveDate = new DateOnly(2024, 1, 1), CreatedById = admin.Id,
             });
 
+        // Phase 5B: sample appointments, notes (spanning six of the nine
+        // requested PT note types -- the other three are seeded for Total
+        // Motion below), goals, and a dry-needling consent, so pull-forward,
+        // progress-note-due, plan-of-care certification, and note-to-
+        // appointment linking all have real data to exercise.
+        var taylorEvalStart = DateTimeOffset.UtcNow.Date.AddDays(-35).AddHours(9);
+        var taylorEvalAppt = new Appointment
+        {
+            PatientId = taylor.Id,
+            TherapistId = therapist.Id,
+            ProviderId = provider.Id,
+            AppointmentTypeId = evalType.Id,
+            Kind = AppointmentKind.Evaluation,
+            Status = AppointmentStatus.Completed,
+            StartsAt = taylorEvalStart,
+            EndsAt = taylorEvalStart.AddMinutes(60),
+            CreatedById = admin.Id,
+        };
+        var harperDryNeedlingStart = DateTimeOffset.UtcNow.Date.AddDays(-10).AddHours(14);
+        var harperDryNeedlingAppt = new Appointment
+        {
+            PatientId = harper.Id,
+            TherapistId = therapist.Id,
+            ProviderId = provider.Id,
+            AppointmentTypeId = followUpType.Id,
+            Kind = AppointmentKind.FollowUp,
+            Status = AppointmentStatus.Completed,
+            StartsAt = harperDryNeedlingStart,
+            EndsAt = harperDryNeedlingStart.AddMinutes(30),
+            CreatedById = admin.Id,
+        };
+        db.Appointments.AddRange(taylorEvalAppt, harperDryNeedlingAppt);
+
+        db.FunctionalGoals.AddRange(
+            new FunctionalGoal
+            {
+                PatientId = taylor.Id, AuthorId = therapist.Id,
+                FunctionalLimitation = "Unable to ascend/descend stairs reciprocally",
+                FunctionalTask = "Reciprocal stair negotiation, 12 steps", Term = GoalTerm.ShortTerm,
+                BaselineValue = 0, TargetValue = 12, CurrentValue = 6, Unit = "steps",
+                MeasurementMethod = "Direct observation", TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(14)),
+                Status = GoalStatus.Active,
+            },
+            new FunctionalGoal
+            {
+                PatientId = harper.Id, AuthorId = therapist.Id,
+                FunctionalLimitation = "Unable to reach overhead to shelf height without pain",
+                FunctionalTask = "Pain-free overhead reach, shelf height", Term = GoalTerm.LongTerm,
+                BaselineValue = 90, TargetValue = 160, CurrentValue = 120, Unit = "degrees flexion",
+                MeasurementMethod = "Goniometry", TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(60)),
+                Status = GoalStatus.Active,
+            });
+
+        db.Consents.Add(new Consent
+        {
+            OrganizationId = organization.Id,
+            PatientId = harper.Id,
+            ConsentType = ConsentType.DryNeedlingConsent,
+            ConsentText = ConsentTypeText.For(ConsentType.DryNeedlingConsent),
+            SignedByName = "Harper Ellison",
+            RecordedById = admin.Id,
+            SignedAt = harperDryNeedlingStart.AddMinutes(-10),
+            IpAddress = "127.0.0.1",
+        });
+
+        // Signed notes below are constructed directly at Status == Signed
+        // rather than via ClinicalNoteService.SignNoteAsync -- there's no
+        // ClinicalNoteVersion snapshot or real computed SignatureHash for
+        // seed data, the same shortcut this seeder already takes for
+        // provisioning (see the class doc comment). EnforceSignedNoteImmutability
+        // only guards EntityState.Modified, never Added, so this is safe.
+        var taylorEvalNote = new ClinicalNote
+        {
+            PatientId = taylor.Id,
+            TherapistId = therapist.Id,
+            AppointmentId = taylorEvalAppt.Id,
+            NoteType = NoteType.Evaluation,
+            Status = NoteStatus.Signed,
+            ServiceDate = DateOnly.FromDateTime(taylorEvalStart.Date),
+            DiagnosisSnapshot = taylor.Diagnoses,
+            Subjective = "Patient reports 6/10 right knee pain and instability, 5 weeks post ACL reconstruction.",
+            Objective = "AROM 0-110 deg, quad lag 5 deg, effusion trace. Gait with slight antalgic pattern.",
+            Assessment = "Progressing appropriately for post-op phase II ACL reconstruction protocol.",
+            Plan = "Continue phase II strengthening, advance closed-chain exercise, reassess in 30 days.",
+            ReassessmentDue = DateOnly.FromDateTime(taylorEvalStart.Date).AddDays(30),
+            SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+            SignatureCredentials = "PT, DPT",
+            SignedAt = taylorEvalStart.AddMinutes(55),
+            SignatureIpAddress = "127.0.0.1",
+        };
+        var taylorPocNote = new ClinicalNote
+        {
+            PatientId = taylor.Id,
+            TherapistId = therapist.Id,
+            NoteType = NoteType.PlanOfCare,
+            Status = NoteStatus.Signed,
+            ServiceDate = DateOnly.FromDateTime(taylorEvalStart.Date),
+            DiagnosisSnapshot = taylor.Diagnoses,
+            Plan = "Skilled PT 2x/week for 12 weeks targeting ROM, strength, and return to reciprocal stair use.",
+            PlanOfCareStart = DateOnly.FromDateTime(taylorEvalStart.Date),
+            PlanOfCareEnd = DateOnly.FromDateTime(taylorEvalStart.Date).AddDays(84),
+            FrequencyPerWeek = 2,
+            DurationWeeks = 12,
+            // Physician certification, recorded a few days after the
+            // therapist's own note signature -- see PlanOfCareCertifiedDate's
+            // own doc comment for why this is a separate, later step.
+            PlanOfCareCertifiedDate = DateOnly.FromDateTime(taylorEvalStart.Date).AddDays(3),
+            PlanOfCareCertifyingProviderId = pcp.Id,
+            SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+            SignatureCredentials = "PT, DPT",
+            SignedAt = taylorEvalStart.AddMinutes(58),
+            SignatureIpAddress = "127.0.0.1",
+        };
+        var taylorDailyNote = new ClinicalNote
+        {
+            PatientId = taylor.Id,
+            TherapistId = therapist.Id,
+            NoteType = NoteType.Daily,
+            Status = NoteStatus.Signed,
+            ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-20)),
+            DiagnosisSnapshot = taylor.Diagnoses,
+            Subjective = "Reports improved confidence with stairs, pain now 3/10.",
+            Interventions = "Therapeutic exercise, neuromuscular re-education, gait training - 45 min.",
+            Assessment = "Tolerating increased load well, no adverse response.",
+            Plan = "Advance to single-leg balance progressions next visit.",
+            SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+            SignatureCredentials = "PT, DPT",
+            SignedAt = DateTimeOffset.UtcNow.AddDays(-20),
+            SignatureIpAddress = "127.0.0.1",
+        };
+        var harperDryNeedlingNote = new ClinicalNote
+        {
+            PatientId = harper.Id,
+            TherapistId = therapist.Id,
+            AppointmentId = harperDryNeedlingAppt.Id,
+            NoteType = NoteType.DryNeedlingTreatment,
+            Status = NoteStatus.Signed,
+            ServiceDate = DateOnly.FromDateTime(harperDryNeedlingStart.Date),
+            DiagnosisSnapshot = harper.Diagnoses,
+            Objective = "Dry needling to right infraspinatus and upper trapezius trigger points, 4 needles, 15 min.",
+            Assessment = "Immediate reduction in palpable muscle tone, no adverse reaction.",
+            Plan = "Continue dry needling every 2 weeks alongside standing plan of care.",
+            SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+            SignatureCredentials = "PT, DPT",
+            SignedAt = harperDryNeedlingStart.AddMinutes(28),
+            SignatureIpAddress = "127.0.0.1",
+        };
+        var rileyPelvicNote = new ClinicalNote
+        {
+            PatientId = riley.Id,
+            TherapistId = therapist.Id,
+            NoteType = NoteType.PelvicHealthEvaluation,
+            Status = NoteStatus.Draft,
+            ServiceDate = DateOnly.FromDateTime(DateTime.Today),
+            DiagnosisSnapshot = riley.Diagnoses,
+            Subjective = "Patient reports chronic low back pain with associated pelvic floor tension, onset 8 months ago.",
+        };
+        var quinnDischargeNote = new ClinicalNote
+        {
+            PatientId = quinn.Id,
+            TherapistId = therapist.Id,
+            NoteType = NoteType.Discharge,
+            Status = NoteStatus.Signed,
+            ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-14)),
+            DiagnosisSnapshot = quinn.Diagnoses,
+            Assessment = "Full resolution of right ankle sprain symptoms; single-leg hop test symmetric bilaterally.",
+            Plan = "Discharged to independent home exercise program, no further skilled PT indicated.",
+            SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+            SignatureCredentials = "PT, DPT",
+            SignedAt = DateTimeOffset.UtcNow.AddDays(-14),
+            SignatureIpAddress = "127.0.0.1",
+        };
+        db.ClinicalNotes.AddRange(
+            taylorEvalNote, taylorPocNote, taylorDailyNote, harperDryNeedlingNote, rileyPelvicNote, quinnDischargeNote);
+
         await db.SaveChangesAsync(ct);
     }
 
@@ -380,6 +604,11 @@ public static class DemoDataSeeder
             City = "Austin",
             State = "TX",
             ZipCode = "78701",
+            // Visit-count trigger, contrasting with Source Motion's
+            // day-count configuration above -- both of Organization's
+            // independently-configurable progress-note-due policies are
+            // exercised somewhere in the seed data.
+            ProgressNoteDueVisitCount = 2,
         };
         db.Organizations.Add(organization);
         await db.SaveChangesAsync(ct);
@@ -533,7 +762,7 @@ public static class DemoDataSeeder
         await db.SaveChangesAsync(ct);
 
         var appointmentStart = DateTimeOffset.UtcNow.Date.AddDays(1).AddHours(9);
-        db.Appointments.Add(new Appointment
+        var jordanAppt = new Appointment
         {
             PatientId = patient.Id,
             TherapistId = therapist.Id,
@@ -544,18 +773,100 @@ public static class DemoDataSeeder
             StartsAt = appointmentStart,
             EndsAt = appointmentStart.AddMinutes(60),
             CreatedById = admin.Id,
+        };
+        db.Appointments.Add(jordanAppt);
+
+        db.FunctionalGoals.Add(new FunctionalGoal
+        {
+            PatientId = patient.Id, AuthorId = therapist.Id,
+            FunctionalLimitation = "Unable to reach overhead without shoulder pain",
+            FunctionalTask = "Pain-free overhead reach for shelf-stocking work task", Term = GoalTerm.ShortTerm,
+            BaselineValue = 90, TargetValue = 160, CurrentValue = 110, Unit = "degrees flexion",
+            MeasurementMethod = "Goniometry", TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(21)),
+            Status = GoalStatus.Active,
         });
 
+        // Linked to the scheduled appointment above -- the "linking notes to
+        // appointments" requirement, demonstrated here for an upcoming visit
+        // (Source Motion's seed data demonstrates it for a completed one).
         db.ClinicalNotes.Add(new ClinicalNote
         {
             PatientId = patient.Id,
             TherapistId = therapist.Id,
+            AppointmentId = jordanAppt.Id,
             NoteType = NoteType.Evaluation,
             Status = NoteStatus.Draft,
             ServiceDate = DateOnly.FromDateTime(DateTime.Today),
             DiagnosisSnapshot = patient.Diagnoses,
             Subjective = "Patient reports right shoulder pain with overhead activity, onset 6 weeks ago.",
         });
+
+        // Signed directly at Status == Signed for the same reason as Source
+        // Motion's equivalent notes -- see that method's own comment.
+        var jordanProgressDate = DateTime.Today.AddDays(-15);
+        db.ClinicalNotes.Add(new ClinicalNote
+        {
+            PatientId = patient.Id,
+            TherapistId = therapist.Id,
+            NoteType = NoteType.Progress,
+            Status = NoteStatus.Signed,
+            ServiceDate = DateOnly.FromDateTime(jordanProgressDate),
+            DiagnosisSnapshot = patient.Diagnoses,
+            Objective = "AROM shoulder flexion improved to 110 deg from 90 deg baseline. MMT 4-/5 supraspinatus.",
+            Assessment = "Steady progress toward overhead-reach goal; tolerating progressive resistance well.",
+            Plan = "Continue current plan of care, advance resistance band program.",
+            SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+            SignatureCredentials = "PT, DPT",
+            SignedAt = new DateTimeOffset(jordanProgressDate, TimeSpan.Zero),
+            SignatureIpAddress = "127.0.0.1",
+        });
+        // Two signed Daily notes since the progress note above -- with
+        // ProgressNoteDueVisitCount == 2 on this organization, this pushes
+        // GetProgressNoteStatusAsync's visit-count trigger to "due" today.
+        db.ClinicalNotes.AddRange(
+            new ClinicalNote
+            {
+                PatientId = patient.Id, TherapistId = therapist.Id, NoteType = NoteType.Daily, Status = NoteStatus.Signed,
+                ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-10)),
+                DiagnosisSnapshot = patient.Diagnoses,
+                Interventions = "Therapeutic exercise, manual therapy to right shoulder - 30 min.",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-10), SignatureIpAddress = "127.0.0.1",
+            },
+            new ClinicalNote
+            {
+                PatientId = patient.Id, TherapistId = therapist.Id, NoteType = NoteType.Daily, Status = NoteStatus.Signed,
+                ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-4)),
+                DiagnosisSnapshot = patient.Diagnoses,
+                Interventions = "Therapeutic exercise, resistance band progression - 30 min.",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-4), SignatureIpAddress = "127.0.0.1",
+            });
+
+        db.ClinicalNotes.AddRange(
+            new ClinicalNote
+            {
+                PatientId = reese.Id, TherapistId = therapist.Id, NoteType = NoteType.ReEvaluation, Status = NoteStatus.Signed,
+                ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-20)),
+                DiagnosisSnapshot = reese.Diagnoses,
+                Objective = "Lumbar AROM flexion 50 deg (was 30 deg at eval). SLR negative bilaterally.",
+                Assessment = "Marked improvement in lumbar mobility and pain-free sitting tolerance.",
+                Plan = "Step down to 1x/week, transition toward independent home program.",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-20), SignatureIpAddress = "127.0.0.1",
+            },
+            new ClinicalNote
+            {
+                PatientId = reese.Id, TherapistId = therapist.Id, NoteType = NoteType.Soap, Status = NoteStatus.Signed,
+                ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-5)),
+                DiagnosisSnapshot = reese.Diagnoses,
+                Subjective = "Reports 2/10 low back pain, only with prolonged sitting.",
+                Objective = "Lumbar AROM within functional limits. Core stability improved.",
+                Assessment = "Nearing discharge readiness.",
+                Plan = "One more visit to reinforce home program, then discharge.",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-5), SignatureIpAddress = "127.0.0.1",
+            });
 
         await db.SaveChangesAsync(ct);
     }

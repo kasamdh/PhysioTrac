@@ -324,12 +324,14 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.HasIndex(n => new { n.TherapistId, n.ServiceDate });
             e.HasIndex(n => new { n.Status, n.ReassessmentDue });
             e.HasIndex(n => n.AppointmentId).IsUnique();
-            e.Property(n => n.NoteType).HasConversion<string>().HasMaxLength(20);
+            e.Property(n => n.NoteType).HasConversion<string>().HasMaxLength(30);
             e.Property(n => n.Status).HasConversion<string>().HasMaxLength(20);
             e.HasOne(n => n.Patient).WithMany(p => p.Notes)
                 .HasForeignKey(n => n.PatientId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(n => n.Appointment).WithOne()
                 .HasForeignKey<ClinicalNote>(n => n.AppointmentId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(n => n.PlanOfCareCertifyingProvider).WithMany()
+                .HasForeignKey(n => n.PlanOfCareCertifyingProviderId).OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<NoteAddendum>(e =>
@@ -348,7 +350,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         builder.Entity<ClinicalNoteTemplate>(e =>
         {
             e.HasIndex(t => new { t.OrganizationId, t.NoteType, t.Scope, t.State, t.LocationId, t.IsActive });
-            e.Property(t => t.NoteType).HasConversion<string>().HasMaxLength(20);
+            e.Property(t => t.NoteType).HasConversion<string>().HasMaxLength(30);
             e.Property(t => t.Scope).HasConversion<string>().HasMaxLength(16);
             e.Property(t => t.State).HasMaxLength(2).IsFixedLength();
             e.HasOne(t => t.Organization).WithMany()
@@ -637,19 +639,30 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             var originalStatus = (Domain.Enums.NoteStatus)entry.OriginalValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
             if (originalStatus is not (Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked)) continue;
 
-            // The one legitimate write to an already-Signed row: locking it
-            // (ClinicalNoteService.LockNoteAsync), which touches only Status
-            // and UpdatedAt and only moves Signed -> Locked. Anything else --
-            // any other field touched, or Status moving anywhere else --
-            // is exactly the "signed notes are immutable" violation this
-            // guards against.
+            // Two legitimate writes to an already-Signed/Locked row:
+            // 1. Locking it (ClinicalNoteService.LockNoteAsync) -- touches
+            //    only Status/UpdatedAt and only moves Signed -> Locked.
+            // 2. Certifying its plan of care (CertifyPlanOfCareAsync) --
+            //    touches only the two PlanOfCareCertified* fields plus
+            //    UpdatedAt, at any signed/locked status. Real-world PT
+            //    physician certification often happens days after the
+            //    therapist's own signature; this is administrative
+            //    metadata ABOUT the note, never the clinical narrative.
+            // Anything else -- any other field touched, or Status moving
+            // anywhere other than Signed -> Locked -- is exactly the
+            // "signed notes are immutable" violation this guards against.
             var newStatus = (Domain.Enums.NoteStatus)entry.CurrentValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
             var isLockTransition = originalStatus == Domain.Enums.NoteStatus.Signed && newStatus == Domain.Enums.NoteStatus.Locked;
-            var onlyStatusAndTimestampChanged = entry.Properties
-                .Where(p => p.IsModified)
-                .All(p => p.Metadata.Name is nameof(Domain.Entities.ClinicalNote.Status) or nameof(Domain.Entities.ClinicalNote.UpdatedAt));
+            var modifiedNames = entry.Properties.Where(p => p.IsModified).Select(p => p.Metadata.Name).ToHashSet();
 
-            if (!(isLockTransition && onlyStatusAndTimestampChanged))
+            var isLockWrite = isLockTransition &&
+                modifiedNames.All(n => n is nameof(Domain.Entities.ClinicalNote.Status) or nameof(Domain.Entities.ClinicalNote.UpdatedAt));
+            var isCertificationWrite = modifiedNames.All(n => n is
+                nameof(Domain.Entities.ClinicalNote.PlanOfCareCertifiedDate)
+                or nameof(Domain.Entities.ClinicalNote.PlanOfCareCertifyingProviderId)
+                or nameof(Domain.Entities.ClinicalNote.UpdatedAt));
+
+            if (!isLockWrite && !isCertificationWrite)
             {
                 throw new InvalidOperationException("Signed notes are immutable. Create an addendum instead.");
             }
