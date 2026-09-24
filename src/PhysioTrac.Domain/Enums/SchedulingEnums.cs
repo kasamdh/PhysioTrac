@@ -21,11 +21,18 @@ public enum AppointmentKind
     Progress,
     Discharge,
     Telehealth,
+    ReEvaluation,
 }
 
+/// <summary>Blocked/unavailable time is deliberately NOT a value here --
+/// blocking a provider's calendar is modeled as ProviderTimeOff, a separate
+/// entity with no PatientId, rather than a fake appointment kind that would
+/// need one anyway. The scheduling API/calendar surfaces both Appointments
+/// and ProviderTimeOff rows side by side.</summary>
 public enum AppointmentStatus
 {
     Scheduled,
+    Confirmed,
     CheckedIn,
     Completed,
     Cancelled,

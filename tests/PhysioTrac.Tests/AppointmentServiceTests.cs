@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using PhysioTrac.Application.Scheduling;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
@@ -28,7 +29,7 @@ public class AppointmentServiceTests
 
         var audit = new AuditService(db);
         var tenantAccess = new TenantAccessService(db, audit);
-        var service = new AppointmentService(db, tenantAccess, audit);
+        var service = new AppointmentService(db, tenantAccess, audit, new NoOpReminderService(NullLogger<NoOpReminderService>.Instance));
         return (db, service, org, patient);
     }
 
@@ -45,11 +46,11 @@ public class AppointmentServiceTests
         var therapistId = Guid.NewGuid();
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
-        var first = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null,
+        var first = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null, null,
             AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null);
         await service.CreateAsync(first, actor);
 
-        var overlapping = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null,
+        var overlapping = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null, null,
             AppointmentKind.FollowUp, start.AddMinutes(15), start.AddMinutes(45), false, null);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
@@ -63,11 +64,11 @@ public class AppointmentServiceTests
         var therapistId = Guid.NewGuid();
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
-        var first = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null,
+        var first = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null, null,
             AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null);
         await service.CreateAsync(first, actor);
 
-        var second = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null,
+        var second = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null, null,
             AppointmentKind.FollowUp, start.AddMinutes(30), start.AddMinutes(60), false, null);
         var result = await service.CreateAsync(second, actor);
 
@@ -81,7 +82,7 @@ public class AppointmentServiceTests
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
 
-        var request = new CreateAppointmentRequest(patient.Id, Guid.NewGuid(), null, null, null,
+        var request = new CreateAppointmentRequest(patient.Id, Guid.NewGuid(), null, null, null, null,
             AppointmentKind.FollowUp, start, start.AddMinutes(-10), false, null);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(request, actor));
@@ -94,7 +95,7 @@ public class AppointmentServiceTests
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
         var created = await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
+            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
 
         var cancelled = await service.CancelAsync(created.Id, actor);
 
@@ -108,7 +109,7 @@ public class AppointmentServiceTests
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
         var created = await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
+            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
         await service.CancelAsync(created.Id, actor);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CancelAsync(created.Id, actor));
@@ -124,9 +125,9 @@ public class AppointmentServiceTests
         var start = DateTimeOffset.UtcNow.AddDays(1);
 
         await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, therapistAId, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), scheduler);
+            patient.Id, therapistAId, null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), scheduler);
         await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, therapistBId, null, null, null, AppointmentKind.FollowUp, start.AddHours(2), start.AddHours(2).AddMinutes(30), false, null), scheduler);
+            patient.Id, therapistBId, null, null, null, null, AppointmentKind.FollowUp, start.AddHours(2), start.AddHours(2).AddMinutes(30), false, null), scheduler);
 
         var therapistA = new TestCurrentUser { UserId = therapistAId, OrganizationId = org.Id, Role = UserRole.Therapist };
         var visible = await service.ListForRangeAsync(therapistA, start.AddDays(-1), start.AddDays(2));

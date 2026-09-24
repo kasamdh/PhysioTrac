@@ -131,6 +131,56 @@ a storage abstraction (`IFileStorage` — local disk today via
 controller), file-type/size validation (`StorageOptions`), and audit events
 on both upload and download.
 
+## Scheduling and calendar
+
+Backend for "Phase 4"; the day/week/month React calendar UI itself
+(filtering, drag-and-drop) is the natural next phase, same sequencing as
+the last three. What already existed from earlier phases: `Appointment`,
+`AppointmentType` (org-configurable), `ProviderAvailability`,
+`ProviderTimeOff` (blocked time), `Waitlist` (the entity), and a basic
+therapist-only double-booking check. Built the rest:
+
+- **Conflict detection for all three named resources** — provider, patient,
+  and room — not just the therapist check that existed before.
+  `AppointmentService.FindConflictAsync` checks all four fields
+  (Therapist/Provider/Patient/Room) against every overlapping, non-
+  cancelled/non-no-show appointment; used by both `CreateAsync` and the new
+  `RescheduleAsync`. "Room" is a new, minimal `Room` entity
+  (`/api/v1/locations/{id}/rooms`) — a location has many rooms; there was
+  no resource to conflict-check against before this.
+- **Status transitions + history** — `Confirmed` added to `AppointmentStatus`
+  (was missing); `Confirm`/`CheckIn`/`Complete`/`MarkNoShow` actions each
+  validate legal prior states (e.g. `Complete` requires `CheckedIn` first)
+  and write to a new append-only `AppointmentStatusHistory` table
+  (`GET /{id}/history`).
+- **Recurring appointments** — `AppointmentSeries` (same weekday, every N
+  weeks, fixed occurrence count — not a general rrule engine) +
+  `POST /appointments/series`. All-or-nothing: every occurrence is conflict-
+  checked before any of them are created, so a series either books cleanly
+  or the caller gets back exactly which dates collided. "Edit one" is the
+  existing per-appointment actions; "edit series"
+  (`PATCH /series/{id}/cancel`) cancels every still-future, still-open
+  occurrence, leaving past/completed ones untouched.
+- **Drag-and-drop rescheduling** — `PATCH /{id}/reschedule`, the server-side
+  half: re-runs the exact same conflict check as create, minus the
+  appointment being moved.
+- **Reminder service interface** — `IReminderService` +
+  `NoOpReminderService` (logs what it would do). Called from
+  create/reschedule/cancel/no-show. A real SMS/email provider becomes a new
+  registered implementation; nothing else changes.
+- **Timezone/DST correctness** — `Appointment.StartsAt`/`EndsAt` are
+  `DateTimeOffset` (already absolute-time, not naive wall-clock), and
+  `Location.Timezone` is exposed via `LocationsController` for the
+  frontend's own conversion/display. Covered by tests proving conflict
+  detection is correct across differing UTC offsets and across a daylight-
+  saving transition.
+- **Every appointment belongs to one organization, patient, provider, and
+  location**: organization and patient always did (via `PatientId` ->
+  `Patient.OrganizationId`); `ProviderId`/`LocationDetailId` remain
+  nullable (a home-visit or telehealth appointment may have neither) —
+  loosening that to a hard requirement would be a real, separate schema
+  decision, not something to fold into this phase silently.
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)

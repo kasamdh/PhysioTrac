@@ -29,6 +29,9 @@ public class Appointment : BaseEntity
     public Guid? LocationDetailId { get; set; }
     public Domain.Entities.Location? LocationDetail { get; set; }
 
+    public Guid? RoomId { get; set; }
+    public Room? Room { get; set; }
+
     public bool IsHomeVisit { get; set; }
     public string? PrivateNotes { get; set; }
 
@@ -43,6 +46,14 @@ public class Appointment : BaseEntity
     /// <summary>When the patient confirmed this visit via the portal. Null
     /// means unconfirmed.</summary>
     public DateTimeOffset? ConfirmedAt { get; set; }
+
+    /// <summary>Set only for an occurrence generated as part of a recurring
+    /// series -- null for a one-off appointment. "Edit one" means changing
+    /// this row directly without touching SeriesId; "edit series" means
+    /// AppointmentService.UpdateSeriesAsync, which touches every other
+    /// still-future, still-Scheduled/Confirmed row sharing this id.</summary>
+    public Guid? SeriesId { get; set; }
+    public AppointmentSeries? Series { get; set; }
 
     public string ConfirmationNumber => $"APT-{Id.ToString("N")[..8].ToUpperInvariant()}";
 }

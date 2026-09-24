@@ -56,6 +56,7 @@ public class AppointmentTypesController : ControllerBase
                 Price = request.Price,
                 OnlineBookingEnabled = request.OnlineBookingEnabled,
                 RequiresNewPatient = request.RequiresNewPatient,
+                DefaultKind = request.DefaultKind,
             };
             _db.AppointmentTypes.Add(type);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
@@ -65,5 +66,5 @@ public class AppointmentTypesController : ControllerBase
     }
 
     private static AppointmentTypeDto ToDto(AppointmentType a) => new(
-        a.Id, a.Name, a.Description, a.DefaultDurationMinutes, a.Price, a.IsActive, a.OnlineBookingEnabled);
+        a.Id, a.Name, a.Description, a.DefaultDurationMinutes, a.Price, a.IsActive, a.OnlineBookingEnabled, a.DefaultKind);
 }

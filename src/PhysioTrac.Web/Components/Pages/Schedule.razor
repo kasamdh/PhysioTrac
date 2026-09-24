@@ -299,7 +299,7 @@ else
         var endsAt = startsAt.AddMinutes(_newDurationMinutes);
 
         var request = new CreateAppointmentRequest(
-            _newPatientId.Value, _newTherapistId.Value, _newProviderId, null, _newAppointmentTypeId,
+            _newPatientId.Value, _newTherapistId.Value, _newProviderId, null, null, _newAppointmentTypeId,
             _newKind, startsAt, endsAt, _newIsHomeVisit,
             string.IsNullOrWhiteSpace(_newReason) ? null : _newReason.Trim());
 

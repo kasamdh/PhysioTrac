@@ -26,6 +26,9 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<LocationClosure> LocationClosures => Set<LocationClosure>();
     public DbSet<BookingConfiguration> BookingConfigurations => Set<BookingConfiguration>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentStatusHistory> AppointmentStatusHistories => Set<AppointmentStatusHistory>();
+    public DbSet<AppointmentSeries> AppointmentSeries => Set<AppointmentSeries>();
+    public DbSet<Room> Rooms => Set<Room>();
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
     public DbSet<NoteAddendum> NoteAddenda => Set<NoteAddendum>();
     public DbSet<NoteIntervention> NoteInterventions => Set<NoteIntervention>();
@@ -278,6 +281,39 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(a => a.LocationDetailId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(a => a.AppointmentType).WithMany()
                 .HasForeignKey(a => a.AppointmentTypeId).OnDelete(DeleteBehavior.SetNull);
+            // Restrict, not SetNull -- Location already has one SetNull path
+            // to Appointment (LocationDetailId above); a second cascading
+            // path through Room would hit the same SQL Server multi-path
+            // error (1785) this session has already fixed twice.
+            e.HasOne(a => a.Room).WithMany()
+                .HasForeignKey(a => a.RoomId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(a => a.Series).WithMany(s => s.Occurrences)
+                .HasForeignKey(a => a.SeriesId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Room>(e =>
+        {
+            e.HasIndex(r => r.LocationId);
+            e.HasOne(r => r.Location).WithMany()
+                .HasForeignKey(r => r.LocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<AppointmentStatusHistory>(e =>
+        {
+            e.HasIndex(h => h.AppointmentId);
+            e.Property(h => h.FromStatus).HasConversion<string>().HasMaxLength(16);
+            e.Property(h => h.ToStatus).HasConversion<string>().HasMaxLength(16);
+            e.HasOne(h => h.Appointment).WithMany()
+                .HasForeignKey(h => h.AppointmentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<AppointmentSeries>(e =>
+        {
+            e.Property(s => s.Kind).HasConversion<string>().HasMaxLength(20);
+            e.HasOne(s => s.Organization).WithMany()
+                .HasForeignKey(s => s.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(s => s.Patient).WithMany()
+                .HasForeignKey(s => s.PatientId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ClinicalNote>(e =>
