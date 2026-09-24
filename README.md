@@ -296,6 +296,89 @@ new `ClinicalNote` fields, and two new read-only aggregation endpoints.
   test suite, not by inspection) and was changed to compare `Status`
   directly against `NoteStatus.Signed`/`Locked`.
 
+## Digital intake, consents, and patient portal
+
+Backend for "Phase 6." A gap analysis before writing any code found this
+codebase's patient-portal surface was already far more built out than the
+spec's phrasing suggested — appointments (`PortalBookingController`), online
+payments (`PatientPaymentsController`), and read access to home exercise
+programs, documents, consents, superbills, payment records, and billing
+statements were *already* patient-reachable, because every one of those
+list/read methods was already gated only by `ITenantAccessService
+.RequirePatientAccessAsync` (no staff-only role check), and that method's
+`PatientsFor` already resolves a Patient-role caller to their own chart via
+`PortalUserId` — first and unconditionally, before any other role logic. A
+patient calling with another patient's id — even in the same organization —
+was already rejected. So "invoices" needed no new Invoice entity at all
+(`PatientStatement` already *is* that, patient-readable already); it needed
+tests proving it, not new code. What genuinely didn't exist:
+
+- **Consent templates** (`ConsentTemplate`, `/api/v1/consent-templates`) —
+  a real, versioned, scoped config surface for consent language, structurally
+  identical to `ClinicalNoteTemplate`/`ClinicalTemplateService` (Platform ->
+  Organization -> State -> Location, most-specific-wins, new-version-
+  deactivates-old). `ConsentService.RecordAsync`/`RecordOwnAsync` now resolve
+  the org's current template and snapshot both its text *and* version onto
+  the `Consent` row (`Consent.TemplateVersion`, new); `ConsentTypeText`'s
+  static strings remain only as the fallback for a type/org with no template
+  configured yet (seeded as the Platform default for all five types, so a
+  fresh install resolves a real versioned template immediately).
+- **Patient self-service consent signing** (`POST /api/v1/portal/consents`,
+  `ConsentService.RecordOwnAsync`) — `RecordAsync` requires
+  `RoleSets.DocumentManagement`, so a patient could never sign their own
+  consent before this; the new method resolves "which patient" via
+  `RequirePortalPatientAsync` instead, with no staff role requirement and no
+  client-supplied patient id anywhere in its request shape.
+- **Digital intake forms** (`IntakeFormTemplate`/`IntakeFormSubmission`,
+  `/api/v1/intake-form-templates`, `/api/v1/portal/intake-form-submissions`)
+  — fully new. The template half mirrors the clinical/consent template
+  engines exactly (versioned, scoped, most-specific-wins), keyed by a string
+  `Key` rather than a fixed enum since an organization can define any number
+  of differently-purposed forms. The submission half is patient-portal-only,
+  snapshotting the exact template version a patient answered.
+- **Secure document sharing with expiring access** (`DocumentShareLink`,
+  `POST .../documents/{id}/share-links`, `GET /api/v1/shared-documents/{token}`)
+  — for handing a document to someone with no portal login at all (a
+  referring physician, e.g.). Only the token's SHA-256 hash is ever
+  persisted (reusing `InvitationTokenGenerator`, the same scheme staff
+  invitations already use) — a database read alone can never produce a
+  working link. `SharedDocumentsController` deliberately carries no
+  `[Authorize]`; the token, checked against `DocumentShareLink.IsUsable`
+  (not revoked, not expired), is the entire access control, and an unknown/
+  expired/revoked token all produce the identical 404 so a prober can't
+  distinguish them.
+- **`GET /api/v1/portal/me`** — the one missing piece for everything above:
+  nothing previously told a logged-in patient their own linked patient id,
+  which every existing patient-scoped route needs in its URL. Not a new
+  login flow (see below) — just the portal's bootstrap call.
+- **`HomeExerciseItem.MediaUrl`** — a link to a demonstration image/video;
+  actual media upload/hosting stays a frontend/CDN concern.
+
+**On "a separate login flow":** there isn't a technically distinct portal
+login endpoint, by design — Patient accounts sign in through the exact same
+cookie+CSRF `POST /api/v1/auth/login` as every other role, matching this
+session's standing architecture decisions (no JWT, no second auth stack).
+The separation is enforced entirely by authorization (`RequirePatientAccessAsync`
+/`RequirePortalPatientAsync`), which is what a "patient can only reach their
+own records" requirement actually needs; the frontend's portal being a
+visually/behaviorally distinct experience from the staff app is a screens
+question, deferred like every other screen this session.
+
+Tests added: `ConsentTemplateServiceTests`, `IntakeFormServiceTests`,
+new `ConsentServiceTests`/`DocumentServiceTests` cases for self-signing and
+share links, and a new `PatientPortalIsolationTests` suite that is Phase 6's
+explicit ask made concrete — for home exercise programs, documents,
+consents, and intake form submissions, one test per resource proving a
+patient portal account cannot reach another patient's records even within
+the *same* organization (the harder case than cross-org, since
+`OrganizationId` alone can't distinguish them there).
+
+Deferred, same as every prior phase: the actual React/Blazor portal screens
+(intake-form renderer, consent-signing UI, document/HEP/statement views) and
+a real form-builder UI for staff to author `IntakeFormTemplate`/
+`ConsentTemplate` `SchemaJson`/`BodyText` — both currently authored via the
+API directly.
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -464,6 +547,12 @@ against the DbContext rather than through `SignNoteAsync` — there's no
 version-history snapshot or a "real" computed `SignatureHash` for seed data,
 the same shortcut this seeder already takes elsewhere (see its own doc
 comment) for bypassing the real provisioning flow.
+
+Also seeded: one Platform-scope `ConsentTemplate` per `ConsentType` (so
+`ConsentService` always resolves a real, versioned template rather than
+falling back to the static `ConsentTypeText` constant, even on a freshly
+created database) and one starter Platform-scope `IntakeFormTemplate`
+(`new-patient-intake`) every organization can build on.
 
 ## Authorization, and audit
 

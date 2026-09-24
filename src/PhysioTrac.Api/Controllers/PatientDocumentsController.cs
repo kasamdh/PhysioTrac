@@ -87,10 +87,52 @@ public class PatientDocumentsController : ControllerBase
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
+    [HttpGet("{documentId:guid}/share-links")]
+    public async Task<IActionResult> ListShareLinks(Guid patientId, Guid documentId)
+    {
+        try
+        {
+            var links = await _documents.ListShareLinksAsync(documentId, _currentUser, HttpContext.RequestAborted);
+            return Ok(links.Select(ToShareLinkDto));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    [HttpPost("{documentId:guid}/share-links")]
+    public async Task<IActionResult> CreateShareLink(Guid patientId, Guid documentId, [FromBody] CreateShareLinkRequest request)
+    {
+        try
+        {
+            var (link, token) = await _documents.CreateShareLinkAsync(documentId, request.ExpiresInHours, _currentUser, HttpContext.RequestAborted);
+            return CreatedAtAction(nameof(ListShareLinks), new { patientId, documentId }, new CreatedDocumentShareLinkDto(ToShareLinkDto(link), token));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    [HttpPost("{documentId:guid}/share-links/{shareLinkId:guid}/revoke")]
+    public async Task<IActionResult> RevokeShareLink(Guid patientId, Guid documentId, Guid shareLinkId)
+    {
+        try
+        {
+            await _documents.RevokeShareLinkAsync(shareLinkId, _currentUser, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
     private static DocumentDto ToDto(PatientDocument d) => new(
         d.Id, d.PatientId, d.Category, d.OriginalFilename, d.ContentType, d.FileSizeBytes,
         d.Description, d.UploadedById, d.CreatedAt);
+
+    private static DocumentShareLinkDto ToShareLinkDto(DocumentShareLink l) => new(
+        l.Id, l.PatientDocumentId, l.ExpiresAt, l.RevokedAt, l.AccessCount, l.LastAccessedAt);
 }
+
+public record CreateShareLinkRequest(int ExpiresInHours);
 
 public class UploadDocumentForm
 {

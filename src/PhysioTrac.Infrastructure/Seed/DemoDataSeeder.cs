@@ -52,6 +52,7 @@ public static class DemoDataSeeder
         await SeedDiagnosisCodesAsync(db, ct);
         var superAdmin = await SeedPlatformSuperAdminAsync(userManager, seedOptions.DemoPassword, ct);
         await SeedClinicalNoteTemplatesAsync(db, superAdmin.Id, ct);
+        await SeedConsentAndIntakeTemplatesAsync(db, superAdmin.Id, ct);
         await SeedSourceMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
         await SeedTotalMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
     }
@@ -133,6 +134,35 @@ public static class DemoDataSeeder
                 """{"sections":[{"key":"objective","label":"Treatment","fields":[{"key":"bodyRegions","type":"text"},{"key":"needleSites","type":"text"},{"key":"reaction","type":"text"}]},{"key":"plan","label":"Plan","fields":[{"key":"nextVisit","type":"text"}]}]}"""),
             Template(NoteType.PelvicHealthEvaluation, "Pelvic Health/Women's Health Evaluation",
                 """{"sections":[{"key":"subjective","label":"Subjective","fields":[{"key":"painScale","type":"painScale0to10"},{"key":"history","type":"text"}]},{"key":"objective","label":"Objective","fields":[{"key":"functionalLimitations","type":"functionalLimitationsList"},{"key":"outcomeMeasures","type":"outcomeMeasureRef"}]},{"key":"assessment","label":"Assessment","fields":[{"key":"diagnoses","type":"icd10Picker"}]},{"key":"plan","label":"Plan of Care","fields":[{"key":"goals","type":"goalsList"},{"key":"frequency","type":"planOfCareFrequency"}]}]}"""));
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Platform-scope defaults for the two other Phase 6 template
+    /// engines -- one ConsentTemplate per ConsentType (so ConsentService
+    /// .RecordAsync/RecordOwnAsync always resolves a real, versioned
+    /// template rather than falling back to the static ConsentTypeText
+    /// constant) and one starter IntakeFormTemplate every org can build on.</summary>
+    private static async Task SeedConsentAndIntakeTemplatesAsync(PhysioTracDbContext db, Guid createdById, CancellationToken ct)
+    {
+        ConsentTemplate ConsentTpl(ConsentType type) => new()
+        {
+            ConsentType = type,
+            Scope = TemplateScope.Platform,
+            BodyText = ConsentTypeText.For(type),
+            CreatedById = createdById,
+        };
+
+        db.ConsentTemplates.AddRange(Enum.GetValues<ConsentType>().Select(ConsentTpl));
+
+        db.IntakeFormTemplates.Add(new IntakeFormTemplate
+        {
+            Key = "new-patient-intake",
+            Scope = TemplateScope.Platform,
+            Name = "New Patient Intake",
+            SchemaJson = """{"sections":[{"key":"demographics","label":"Demographics","fields":[{"key":"emergencyContact","type":"text"},{"key":"preferredLanguage","type":"text"}]},{"key":"history","label":"Medical History","fields":[{"key":"currentMedications","type":"text"},{"key":"allergies","type":"text"},{"key":"priorSurgeries","type":"text"}]},{"key":"insurance","label":"Insurance","fields":[{"key":"primaryPayer","type":"text"},{"key":"memberId","type":"text"}]}]}""",
+            CreatedById = createdById,
+        });
 
         await db.SaveChangesAsync(ct);
     }
@@ -467,6 +497,7 @@ public static class DemoDataSeeder
             PatientId = harper.Id,
             ConsentType = ConsentType.DryNeedlingConsent,
             ConsentText = ConsentTypeText.For(ConsentType.DryNeedlingConsent),
+            TemplateVersion = 1, // the seeded Platform-scope template's version
             SignedByName = "Harper Ellison",
             RecordedById = admin.Id,
             SignedAt = harperDryNeedlingStart.AddMinutes(-10),

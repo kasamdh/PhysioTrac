@@ -41,8 +41,8 @@ public class HomeExerciseProgramServiceTests
         patientId, "Phase 1 - Post-op Knee", "Perform daily, stop if pain exceeds 5/10.",
         new List<CreateHomeExerciseItemRequest>
         {
-            new("Quad sets", "Tighten thigh muscle, hold, release", 3, 10, 5, 2, null),
-            new("Heel slides", null, 3, 10, null, 2, null),
+            new("Quad sets", "Tighten thigh muscle, hold, release", 3, 10, 5, 2, null, null),
+            new("Heel slides", null, 3, 10, null, 2, null, null),
         });
 
     [Fact]
@@ -83,7 +83,7 @@ public class HomeExerciseProgramServiceTests
         var (_, service, _, patient, therapist) = NewService();
         var program = await service.CreateAsync(ValidRequest(patient.Id), therapist);
 
-        var newItem = await service.AddItemAsync(program.Id, new CreateHomeExerciseItemRequest("Ankle pumps", null, null, 20, null, 3, null), therapist);
+        var newItem = await service.AddItemAsync(program.Id, new CreateHomeExerciseItemRequest("Ankle pumps", null, null, 20, null, 3, null, null), therapist);
 
         Assert.Equal(2, newItem.Order);
     }
@@ -96,7 +96,7 @@ public class HomeExerciseProgramServiceTests
         await service.DiscontinueAsync(program.Id, therapist);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.AddItemAsync(program.Id, new CreateHomeExerciseItemRequest("Ankle pumps", null, null, null, null, null, null), therapist));
+            service.AddItemAsync(program.Id, new CreateHomeExerciseItemRequest("Ankle pumps", null, null, null, null, null, null, null), therapist));
     }
 
     [Fact]

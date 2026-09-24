@@ -53,6 +53,10 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<Consent> Consents => Set<Consent>();
     public DbSet<HomeExerciseProgram> HomeExercisePrograms => Set<HomeExerciseProgram>();
     public DbSet<HomeExerciseItem> HomeExerciseItems => Set<HomeExerciseItem>();
+    public DbSet<ConsentTemplate> ConsentTemplates => Set<ConsentTemplate>();
+    public DbSet<IntakeFormTemplate> IntakeFormTemplates => Set<IntakeFormTemplate>();
+    public DbSet<IntakeFormSubmission> IntakeFormSubmissions => Set<IntakeFormSubmission>();
+    public DbSet<DocumentShareLink> DocumentShareLinks => Set<DocumentShareLink>();
     public DbSet<ReferringProvider> ReferringProviders => Set<ReferringProvider>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<ProviderLicense> ProviderLicenses => Set<ProviderLicense>();
@@ -594,6 +598,47 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         {
             e.HasOne(i => i.Program).WithMany(p => p.Items)
                 .HasForeignKey(i => i.ProgramId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ConsentTemplate>(e =>
+        {
+            e.HasIndex(t => new { t.OrganizationId, t.ConsentType, t.Scope, t.State, t.LocationId, t.IsActive });
+            e.Property(t => t.ConsentType).HasConversion<string>().HasMaxLength(24);
+            e.Property(t => t.Scope).HasConversion<string>().HasMaxLength(16);
+            e.Property(t => t.State).HasMaxLength(2).IsFixedLength();
+            e.HasOne(t => t.Organization).WithMany()
+                .HasForeignKey(t => t.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(t => t.LocationDetail).WithMany()
+                .HasForeignKey(t => t.LocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<IntakeFormTemplate>(e =>
+        {
+            e.HasIndex(t => new { t.OrganizationId, t.Key, t.Scope, t.State, t.LocationId, t.IsActive });
+            e.Property(t => t.Key).HasMaxLength(64);
+            e.Property(t => t.Scope).HasConversion<string>().HasMaxLength(16);
+            e.Property(t => t.State).HasMaxLength(2).IsFixedLength();
+            e.HasOne(t => t.Organization).WithMany()
+                .HasForeignKey(t => t.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(t => t.LocationDetail).WithMany()
+                .HasForeignKey(t => t.LocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<IntakeFormSubmission>(e =>
+        {
+            e.HasIndex(s => new { s.PatientId, s.SubmittedAt });
+            e.Property(s => s.Status).HasConversion<string>().HasMaxLength(16);
+            e.HasOne(s => s.Patient).WithMany()
+                .HasForeignKey(s => s.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(s => s.IntakeFormTemplate).WithMany()
+                .HasForeignKey(s => s.IntakeFormTemplateId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<DocumentShareLink>(e =>
+        {
+            e.HasIndex(l => l.TokenHash).IsUnique();
+            e.HasOne(l => l.PatientDocument).WithMany()
+                .HasForeignKey(l => l.PatientDocumentId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 

@@ -56,6 +56,7 @@ public class HomeExerciseProgramService : IHomeExerciseProgramService
                 HoldSeconds = item.HoldSeconds,
                 FrequencyPerDay = item.FrequencyPerDay,
                 Notes = item.Notes,
+                MediaUrl = item.MediaUrl,
                 Order = order++,
             });
         }
@@ -96,6 +97,7 @@ public class HomeExerciseProgramService : IHomeExerciseProgramService
             HoldSeconds = request.HoldSeconds,
             FrequencyPerDay = request.FrequencyPerDay,
             Notes = request.Notes,
+            MediaUrl = request.MediaUrl,
             Order = nextOrder + 1,
         };
         _db.HomeExerciseItems.Add(item);

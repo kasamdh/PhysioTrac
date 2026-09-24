@@ -15,11 +15,13 @@ public class ConsentsController : ControllerBase
 {
     private readonly ICurrentUser _currentUser;
     private readonly IConsentService _consents;
+    private readonly IConsentTemplateService _templates;
 
-    public ConsentsController(ICurrentUser currentUser, IConsentService consents)
+    public ConsentsController(ICurrentUser currentUser, IConsentService consents, IConsentTemplateService templates)
     {
         _currentUser = currentUser;
         _consents = consents;
+        _templates = templates;
     }
 
     [HttpGet]
@@ -33,11 +35,23 @@ public class ConsentsController : ControllerBase
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
-    /// <summary>Returns the current fixed consent text for every type, so a
-    /// client can render "what am I agreeing to" before POSTing a signature.</summary>
+    /// <summary>Returns the currently-effective consent text and version for
+    /// every type -- the org's configured ConsentTemplate if one has been
+    /// created, otherwise the fixed ConsentTypeText fallback -- so a client
+    /// can render "what am I agreeing to" before POSTing a signature. This is
+    /// exactly what RecordAsync/RecordOwnAsync will snapshot if signed right
+    /// now.</summary>
     [HttpGet("text")]
-    public IActionResult GetConsentText() =>
-        Ok(Enum.GetValues<ConsentType>().Select(t => new { type = t, text = ConsentTypeText.For(t) }));
+    public async Task<IActionResult> GetConsentText()
+    {
+        var results = new List<object>();
+        foreach (var type in Enum.GetValues<ConsentType>())
+        {
+            var template = await _templates.ResolveAsync(_currentUser, type, null, null, HttpContext.RequestAborted);
+            results.Add(new { type, text = template?.BodyText ?? ConsentTypeText.For(type), version = template?.Version });
+        }
+        return Ok(results);
+    }
 
     [HttpPost]
     public async Task<IActionResult> Record(Guid patientId, [FromBody] RecordConsentBody body)
@@ -67,7 +81,7 @@ public class ConsentsController : ControllerBase
     }
 
     private static ConsentDto ToDto(Consent c) => new(
-        c.Id, c.PatientId, c.ConsentType, c.SignedByName, c.RecordedById, c.SignedAt, c.IsActive, c.RevokedAt);
+        c.Id, c.PatientId, c.ConsentType, c.SignedByName, c.RecordedById, c.SignedAt, c.IsActive, c.RevokedAt, c.TemplateVersion);
 }
 
 public record RecordConsentBody(ConsentType ConsentType, string SignedByName);

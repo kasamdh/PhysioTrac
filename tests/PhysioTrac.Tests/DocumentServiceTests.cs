@@ -214,4 +214,97 @@ public class DocumentServiceTests
         Assert.False(stillThere!.IsDeleted);
         Assert.True(storage.Files.ContainsKey(uploaded.StorageKey));
     }
+
+    [Fact]
+    public async Task CreateShareLink_ValidRequest_ReturnsAUsableToken()
+    {
+        var (_, service, _, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+
+        var (link, token) = await service.CreateShareLinkAsync(uploaded.Id, 24, actor);
+
+        Assert.False(string.IsNullOrEmpty(token));
+        Assert.Null(link.RevokedAt);
+        Assert.True(link.ExpiresAt > DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task CreateShareLink_ByPatientRole_ThrowsForbidden()
+    {
+        var (_, service, _, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var patientActor = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = patient.OrganizationId, Role = UserRole.Patient };
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.ForbiddenException>(
+            () => service.CreateShareLinkAsync(uploaded.Id, 24, patientActor));
+    }
+
+    [Fact]
+    public async Task DownloadViaShareLink_ValidToken_ReturnsContentAndIncrementsAccessCount()
+    {
+        var (db, service, _, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var (_, token) = await service.CreateShareLinkAsync(uploaded.Id, 24, actor);
+
+        // No ICurrentUser anywhere on this path -- the token alone is the
+        // access control, exactly as an unauthenticated caller would hit it.
+        var (document, content) = await service.DownloadViaShareLinkAsync(token);
+        using var reader = new StreamReader(content);
+        var text = await reader.ReadToEndAsync();
+
+        Assert.Equal("hello world", text);
+        Assert.Equal(uploaded.Id, document.Id);
+
+        var link = await db.DocumentShareLinks.FirstAsync(l => l.PatientDocumentId == uploaded.Id);
+        Assert.Equal(1, link.AccessCount);
+        Assert.NotNull(link.LastAccessedAt);
+    }
+
+    [Fact]
+    public async Task DownloadViaShareLink_UnknownToken_ThrowsNotFound()
+    {
+        var (_, service, _, _, _, _) = NewService();
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.NotFoundException>(
+            () => service.DownloadViaShareLinkAsync("not-a-real-token"));
+    }
+
+    [Fact]
+    public async Task DownloadViaShareLink_ExpiredToken_ThrowsNotFound()
+    {
+        var (db, service, _, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var (link, token) = await service.CreateShareLinkAsync(uploaded.Id, 1, actor);
+
+        link.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(-1);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.NotFoundException>(
+            () => service.DownloadViaShareLinkAsync(token));
+    }
+
+    [Fact]
+    public async Task DownloadViaShareLink_RevokedToken_ThrowsNotFound()
+    {
+        var (db, service, _, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var (link, token) = await service.CreateShareLinkAsync(uploaded.Id, 24, actor);
+
+        await service.RevokeShareLinkAsync(link.Id, actor);
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.NotFoundException>(
+            () => service.DownloadViaShareLinkAsync(token));
+    }
+
+    [Fact]
+    public async Task RevokeShareLink_AnotherOrganizationsLink_ThrowsNotFound()
+    {
+        var (db, service, _, _, patient, actor) = NewService();
+        var uploaded = await service.UploadAsync(ValidRequest(patient.Id), actor);
+        var (link, _) = await service.CreateShareLinkAsync(uploaded.Id, 24, actor);
+        var (_, orgBService, _, orgBActor) = AddSecondOrganization(db);
+
+        await Assert.ThrowsAsync<PhysioTrac.Application.Common.NotFoundException>(
+            () => orgBService.RevokeShareLinkAsync(link.Id, orgBActor));
+    }
 }

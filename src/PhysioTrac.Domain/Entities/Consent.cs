@@ -23,6 +23,13 @@ public class Consent : BaseEntity
     /// snapshotted at signing time -- never re-read from a live template.</summary>
     public string ConsentText { get; set; } = string.Empty;
 
+    /// <summary>Which <see cref="ConsentTemplate"/> version ConsentText was
+    /// copied from. Null when no ConsentTemplate had been configured yet at
+    /// signing time and ConsentService fell back to the static
+    /// ConsentTypeText content instead (see ConsentTemplate's own doc
+    /// comment).</summary>
+    public int? TemplateVersion { get; set; }
+
     /// <summary>Typed full name serving as the e-signature. Real handwritten-
     /// signature capture (a canvas/drawn signature) isn't built yet --
     /// this is a typed-name attestation, the same pattern

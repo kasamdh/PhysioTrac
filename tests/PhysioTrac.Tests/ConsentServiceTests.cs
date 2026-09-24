@@ -27,9 +27,10 @@ public class ConsentServiceTests
 
         var audit = new AuditService(db);
         var tenantAccess = new TenantAccessService(db, audit);
+        var templates = new ConsentTemplateService(db, tenantAccess, audit);
         var frontDesk = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Scheduler };
 
-        return (db, new ConsentService(db, tenantAccess, audit), org, patient, frontDesk);
+        return (db, new ConsentService(db, tenantAccess, audit, templates), org, patient, frontDesk);
     }
 
     [Fact]
@@ -98,5 +99,56 @@ public class ConsentServiceTests
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             service.RecordAsync(new RecordConsentRequest(patient.Id, ConsentType.ConsentToTreat, "Pat Patient"), patientActor, null));
+    }
+
+    [Fact]
+    public async Task RecordOwn_ValidSignature_ResolvesOwnPatientFromPortalSession()
+    {
+        var (db, service, _, patient, _) = NewService();
+        var portalUserId = Guid.NewGuid();
+        patient.PortalUserId = portalUserId;
+        await db.SaveChangesAsync();
+        var patientActor = new TestCurrentUser { UserId = portalUserId, OrganizationId = patient.OrganizationId, Role = UserRole.Patient };
+
+        var consent = await service.RecordOwnAsync(patientActor, new RecordOwnConsentRequest(ConsentType.HipaaAcknowledgment, "Pat Patient"), "203.0.113.5");
+
+        Assert.Equal(patient.Id, consent.PatientId);
+        Assert.Equal(portalUserId, consent.RecordedById);
+        Assert.Equal("203.0.113.5", consent.IpAddress);
+        // No ConsentTemplate configured in this in-memory db -- falls back
+        // to the static ConsentTypeText constant, with no template version.
+        Assert.Equal(ConsentTypeText.For(ConsentType.HipaaAcknowledgment), consent.ConsentText);
+        Assert.Null(consent.TemplateVersion);
+    }
+
+    [Fact]
+    public async Task RecordOwn_WhenAConsentTemplateIsConfigured_SnapshotsItsTextAndVersion()
+    {
+        var (db, service, org, patient, actor) = NewService();
+        var portalUserId = Guid.NewGuid();
+        patient.PortalUserId = portalUserId;
+        await db.SaveChangesAsync();
+        var patientActor = new TestCurrentUser { UserId = portalUserId, OrganizationId = patient.OrganizationId, Role = UserRole.Patient };
+
+        var audit = new AuditService(db);
+        var tenantAccess = new TenantAccessService(db, audit);
+        var templates = new ConsentTemplateService(db, tenantAccess, audit);
+        var orgAdmin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Admin };
+        await templates.CreateAsync(new CreateConsentTemplateRequest(
+            ConsentType.FinancialPolicy, TemplateScope.Organization, null, null, "Our custom financial policy language."), orgAdmin);
+
+        var consent = await service.RecordOwnAsync(patientActor, new RecordOwnConsentRequest(ConsentType.FinancialPolicy, "Pat Patient"), null);
+
+        Assert.Equal("Our custom financial policy language.", consent.ConsentText);
+        Assert.Equal(1, consent.TemplateVersion);
+    }
+
+    [Fact]
+    public async Task RecordOwn_ByStaffRole_ThrowsForbidden()
+    {
+        var (_, service, _, _, actor) = NewService();
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            service.RecordOwnAsync(actor, new RecordOwnConsentRequest(ConsentType.ConsentToTreat, "Pat Patient"), null));
     }
 }

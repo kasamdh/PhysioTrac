@@ -7,6 +7,7 @@ using PhysioTrac.Application.Configuration;
 using PhysioTrac.Application.Documents;
 using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Domain.Entities;
+using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
 
 namespace PhysioTrac.Infrastructure.Services;
@@ -116,6 +117,101 @@ public class DocumentService : IDocumentService
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
         await _audit.RecordAuditEventAsync(actor.UserId, "patient_document.deleted", nameof(PatientDocument), document.Id,
             organization.Id, patientId: document.PatientId, ct: ct);
+    }
+
+    public async Task<(DocumentShareLink Link, string RawToken)> CreateShareLinkAsync(Guid documentId, int expiresInHours, ICurrentUser actor, CancellationToken ct = default)
+    {
+        _tenantAccess.RequireRole(actor, RoleSets.DocumentManagement);
+        var document = await LoadDocumentInOrgAsync(documentId, actor, ct);
+        await _tenantAccess.RequirePatientAccessAsync(actor, document.PatientId, ct: ct);
+
+        if (expiresInHours is < 1 or > 24 * 30)
+        {
+            throw new InvalidOperationException("A share link must expire between 1 hour and 30 days from now.");
+        }
+
+        var (token, tokenHash) = InvitationTokenGenerator.Generate();
+        var link = new DocumentShareLink
+        {
+            PatientDocumentId = document.Id,
+            TokenHash = tokenHash,
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(expiresInHours),
+            CreatedById = actor.UserId,
+        };
+        _db.DocumentShareLinks.Add(link);
+        await _db.SaveChangesAsync(ct);
+
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        await _audit.RecordAuditEventAsync(actor.UserId, "patient_document.share_link_created", nameof(DocumentShareLink), link.Id,
+            organization.Id, patientId: document.PatientId, metadata: new { documentId = document.Id, expiresAt = link.ExpiresAt }, ct: ct);
+
+        return (link, token);
+    }
+
+    public async Task<IReadOnlyList<DocumentShareLink>> ListShareLinksAsync(Guid documentId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var document = await LoadDocumentInOrgAsync(documentId, actor, ct);
+        await _tenantAccess.RequirePatientAccessAsync(actor, document.PatientId, ct: ct);
+
+        return await _db.DocumentShareLinks
+            .Where(l => l.PatientDocumentId == document.Id)
+            .OrderByDescending(l => l.CreatedAt)
+            .ToListAsync(ct);
+    }
+
+    public async Task RevokeShareLinkAsync(Guid shareLinkId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        _tenantAccess.RequireRole(actor, RoleSets.DocumentManagement);
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        var link = await _db.DocumentShareLinks.Include(l => l.PatientDocument)
+            .FirstOrDefaultAsync(l => l.Id == shareLinkId, ct)
+            ?? throw new NotFoundException("Share link was not found.");
+        if (link.PatientDocument is null || link.PatientDocument.OrganizationId != organization.Id)
+        {
+            throw new NotFoundException("Share link was not found.");
+        }
+
+        if (link.RevokedAt is null)
+        {
+            link.RevokedAt = DateTimeOffset.UtcNow;
+            link.RevokedById = actor.UserId;
+            link.UpdatedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(ct);
+
+            await _audit.RecordAuditEventAsync(actor.UserId, "patient_document.share_link_revoked", nameof(DocumentShareLink), link.Id,
+                organization.Id, patientId: link.PatientDocument.PatientId, ct: ct);
+        }
+    }
+
+    public async Task<(PatientDocument Document, Stream Content)> DownloadViaShareLinkAsync(string rawToken, CancellationToken ct = default)
+    {
+        var tokenHash = InvitationTokenGenerator.Hash(rawToken);
+        var link = await _db.DocumentShareLinks.Include(l => l.PatientDocument)
+            .FirstOrDefaultAsync(l => l.TokenHash == tokenHash, ct);
+
+        // Deliberately the same NotFoundException for "no such token,"
+        // "expired," and "revoked" -- see IDocumentService.DownloadViaShareLinkAsync's
+        // own doc comment on why these must not be distinguishable.
+        if (link is null || link.PatientDocument is null || !link.IsUsable || link.PatientDocument.IsDeleted)
+        {
+            throw new NotFoundException("This share link is invalid or has expired.");
+        }
+
+        var document = link.PatientDocument;
+        var stream = await _fileStorage.OpenReadAsync(document.StorageKey, ct);
+
+        link.AccessCount++;
+        link.LastAccessedAt = DateTimeOffset.UtcNow;
+        link.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        // No authenticated actor exists on this path -- actorId is null,
+        // exactly like an anonymous webhook/system event elsewhere in this
+        // app's audit trail.
+        await _audit.RecordAuditEventAsync(null, "patient_document.downloaded_via_share_link", nameof(PatientDocument), document.Id,
+            document.OrganizationId, patientId: document.PatientId, metadata: new { shareLinkId = link.Id }, ct: ct);
+
+        return (document, stream);
     }
 
     private async Task<PatientDocument> LoadDocumentInOrgAsync(Guid documentId, ICurrentUser actor, CancellationToken ct)

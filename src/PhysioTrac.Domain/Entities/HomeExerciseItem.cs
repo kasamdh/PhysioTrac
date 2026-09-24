@@ -17,5 +17,11 @@ public class HomeExerciseItem : BaseEntity
     public int? HoldSeconds { get; set; }
     public int? FrequencyPerDay { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>Link to a demonstration image or video (YouTube, a stored
+    /// asset, etc.) -- stored as a plain URL, not an uploaded file; actual
+    /// media hosting/upload is a frontend/CDN concern outside this API.</summary>
+    public string? MediaUrl { get; set; }
+
     public int Order { get; set; }
 }

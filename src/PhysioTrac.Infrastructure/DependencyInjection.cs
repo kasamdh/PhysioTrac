@@ -9,6 +9,7 @@ using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Configuration;
 using PhysioTrac.Application.Consents;
 using PhysioTrac.Application.Documents;
+using PhysioTrac.Application.Intake;
 using PhysioTrac.Application.Messaging;
 using PhysioTrac.Application.Scheduling;
 using PhysioTrac.Application.Sessions;
@@ -60,6 +61,8 @@ public static class DependencyInjection
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConsentService, ConsentService>();
+        services.AddScoped<IConsentTemplateService, ConsentTemplateService>();
+        services.AddScoped<IIntakeFormService, IntakeFormService>();
         services.AddScoped<IHomeExerciseProgramService, HomeExerciseProgramService>();
         services.AddScoped<IMessageService, MessageService>();
 

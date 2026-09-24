@@ -15,7 +15,13 @@ public static class InvitationTokenGenerator
     {
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
         var token = Convert.ToBase64String(tokenBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+        var tokenHash = Hash(token);
         return (token, tokenHash);
     }
+
+    /// <summary>Hashes an already-issued raw token the same way
+    /// <see cref="Generate"/> does, for looking up a caller-supplied token
+    /// (e.g. a document share link) against the persisted hash.</summary>
+    public static string Hash(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 }

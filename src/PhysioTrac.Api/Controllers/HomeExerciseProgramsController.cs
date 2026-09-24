@@ -52,7 +52,7 @@ public class HomeExerciseProgramsController : ControllerBase
         {
             var item = await _programs.AddItemAsync(programId, request, _currentUser, HttpContext.RequestAborted);
             var dto = new HomeExerciseItemDto(
-                item.Id, item.Name, item.Description, item.Sets, item.Reps, item.HoldSeconds, item.FrequencyPerDay, item.Notes, item.Order);
+                item.Id, item.Name, item.Description, item.Sets, item.Reps, item.HoldSeconds, item.FrequencyPerDay, item.Notes, item.MediaUrl, item.Order);
             return CreatedAtAction(nameof(List), new { patientId }, dto);
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -88,5 +88,5 @@ public class HomeExerciseProgramsController : ControllerBase
     private static HomeExerciseProgramDto ToDto(HomeExerciseProgram p) => new(
         p.Id, p.PatientId, p.Title, p.GeneralInstructions, p.Status, p.CreatedById, p.CreatedAt,
         p.Items.OrderBy(i => i.Order).Select(i => new HomeExerciseItemDto(
-            i.Id, i.Name, i.Description, i.Sets, i.Reps, i.HoldSeconds, i.FrequencyPerDay, i.Notes, i.Order)).ToList());
+            i.Id, i.Name, i.Description, i.Sets, i.Reps, i.HoldSeconds, i.FrequencyPerDay, i.Notes, i.MediaUrl, i.Order)).ToList());
 }
