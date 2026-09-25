@@ -166,8 +166,12 @@ public class PatientSearchAndLifecycleTests
         var (db, org, admin, alpha, _) = await SeedAsync();
         db.PatientDocuments.Add(new PatientDocument
         {
-            OrganizationId = org.Id, PatientId = alpha.Id, UploadedById = admin.UserId,
-            OriginalFilename = "eval.pdf", ContentType = "application/pdf", StorageKey = "abc123",
+            OrganizationId = org.Id,
+            PatientId = alpha.Id,
+            UploadedById = admin.UserId,
+            OriginalFilename = "eval.pdf",
+            ContentType = "application/pdf",
+            StorageKey = "abc123",
         });
         await db.SaveChangesAsync();
 

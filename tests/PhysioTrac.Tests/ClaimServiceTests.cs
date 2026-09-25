@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Application.Billing;
+using PhysioTrac.Application.Common;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
 using PhysioTrac.Infrastructure.Persistence;
@@ -25,7 +26,10 @@ public class ClaimServiceTests
         var payer = new Payer { OrganizationId = org.Id, Name = "Acme Insurance" };
         var insurance = new PatientInsurance
         {
-            OrganizationId = org.Id, PatientId = patient.Id, PayerId = payer.Id, MemberId = "M1",
+            OrganizationId = org.Id,
+            PatientId = patient.Id,
+            PayerId = payer.Id,
+            MemberId = "M1",
             EffectiveDate = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1)),
         };
         db.Organizations.Add(org);
@@ -42,8 +46,12 @@ public class ClaimServiceTests
 
     private static Charge NewCharge(Guid orgId, Guid patientId, decimal amount) => new()
     {
-        OrganizationId = orgId, PatientId = patientId, ProviderId = Guid.NewGuid(),
-        ServiceDate = DateOnly.FromDateTime(DateTime.UtcNow), CptCode = "97110", ChargeAmount = amount,
+        OrganizationId = orgId,
+        PatientId = patientId,
+        ProviderId = Guid.NewGuid(),
+        ServiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
+        CptCode = "97110",
+        ChargeAmount = amount,
     };
 
     [Fact]
@@ -58,6 +66,22 @@ public class ClaimServiceTests
 
         var reloaded = await db.Charges.FirstAsync(c => c.Id == charge.Id);
         Assert.Equal(claim.Id, reloaded.ClaimId);
+    }
+
+    [Fact]
+    public async Task Get_ForAnotherOrganizationsClaim_ThrowsNotFound()
+    {
+        var (db, claims, _, org, patient, _, insurance, biller) = NewServices();
+        var charge = NewCharge(org.Id, patient.Id, 100m);
+        db.Charges.Add(charge);
+        await db.SaveChangesAsync();
+        var claim = await claims.CreateFromChargesAsync(new CreateClaimRequest(patient.Id, insurance.Id, new[] { charge.Id }), biller);
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        db.Organizations.Add(otherOrg);
+        await db.SaveChangesAsync();
+        var otherOrgBiller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = otherOrg.Id, Role = UserRole.Biller };
+
+        await Assert.ThrowsAsync<NotFoundException>(() => claims.GetAsync(claim.Id, otherOrgBiller));
     }
 
     [Fact]

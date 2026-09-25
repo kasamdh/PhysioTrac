@@ -79,6 +79,21 @@ public class MessageServiceTests
     }
 
     [Fact]
+    public async Task Send_ForAnotherOrganizationsPatient_ThrowsForbidden()
+    {
+        var (db, service, _, _, actor) = NewService();
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        var patientInOtherOrg = new Patient { OrganizationId = otherOrg.Id, FirstName = "Beta", LastName = "Brown", DateOfBirth = new DateOnly(1990, 1, 1) };
+        db.Organizations.Add(otherOrg);
+        db.Patients.Add(patientInOtherOrg);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            service.SendAsync(new SendMessageRequest(patientInOtherOrg.Id, "Hello"), actor));
+        Assert.Empty(await db.Messages.ToListAsync());
+    }
+
+    [Fact]
     public async Task MarkThreadRead_OnlyMarksOthersMessages_NotOwnSent()
     {
         var (db, service, org, patient, actor) = NewService();

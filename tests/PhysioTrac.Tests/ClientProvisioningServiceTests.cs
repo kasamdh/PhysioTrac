@@ -49,7 +49,10 @@ public class ClientProvisioningServiceTests
 
     private static TestCurrentUser PlatformSuperAdmin() => new()
     {
-        UserId = Guid.NewGuid(), OrganizationId = null, Role = UserRole.SuperAdmin, IsPlatformSuperAdmin = true,
+        UserId = Guid.NewGuid(),
+        OrganizationId = null,
+        Role = UserRole.SuperAdmin,
+        IsPlatformSuperAdmin = true,
     };
 
     [Fact]

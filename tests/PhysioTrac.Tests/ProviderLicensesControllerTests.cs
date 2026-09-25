@@ -87,7 +87,9 @@ public class ProviderLicensesControllerTests
         var (db, org, provider) = await SeedAsync();
         var license = new ProviderLicense
         {
-            ProviderId = provider.Id, State = "NC", LicenseNumber = "NC-PT-12345",
+            ProviderId = provider.Id,
+            State = "NC",
+            LicenseNumber = "NC-PT-12345",
             ExpirationDate = DateOnly.FromDateTime(DateTime.Today.AddYears(1)),
         };
         db.ProviderLicenses.Add(license);

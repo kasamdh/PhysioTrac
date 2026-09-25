@@ -9,7 +9,9 @@ public class PatientInsuranceTests
 {
     private static PatientInsurance Policy(DateOnly effective, DateOnly? termination = null) => new()
     {
-        EffectiveDate = effective, TerminationDate = termination, MemberId = "M123",
+        EffectiveDate = effective,
+        TerminationDate = termination,
+        MemberId = "M123",
     };
 
     [Fact]

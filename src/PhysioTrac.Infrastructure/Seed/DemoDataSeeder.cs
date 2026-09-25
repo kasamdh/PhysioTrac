@@ -457,10 +457,18 @@ public static class DemoDataSeeder
         db.PatientInsurancePolicies.AddRange(
             new PatientInsurance
             {
-                OrganizationId = organization.Id, PatientId = taylor.Id, PayerId = bcbs.Id, Rank = InsuranceRank.Primary,
-                PlanName = "BCBS PPO", MemberId = "BCBS-TB-4471", SubscriberName = "Taylor Brooks",
-                SubscriberDateOfBirth = taylor.DateOfBirth, RelationshipToSubscriber = RelationshipToSubscriber.Self,
-                EffectiveDate = new DateOnly(2026, 1, 1), Copay = 40m, CreatedById = admin.Id,
+                OrganizationId = organization.Id,
+                PatientId = taylor.Id,
+                PayerId = bcbs.Id,
+                Rank = InsuranceRank.Primary,
+                PlanName = "BCBS PPO",
+                MemberId = "BCBS-TB-4471",
+                SubscriberName = "Taylor Brooks",
+                SubscriberDateOfBirth = taylor.DateOfBirth,
+                RelationshipToSubscriber = RelationshipToSubscriber.Self,
+                EffectiveDate = new DateOnly(2026, 1, 1),
+                Copay = 40m,
+                CreatedById = admin.Id,
             },
             // Harper carries two policies -- primary through their own
             // employer, secondary as a dependent on a spouse's plan -- the
@@ -468,17 +476,32 @@ public static class DemoDataSeeder
             // RelationshipToSubscriber exist to model.
             new PatientInsurance
             {
-                OrganizationId = organization.Id, PatientId = harper.Id, PayerId = aetna.Id, Rank = InsuranceRank.Primary,
-                PlanName = "Aetna Choice POS II", MemberId = "AETNA-HE-8820", SubscriberName = "Harper Ellison",
-                SubscriberDateOfBirth = harper.DateOfBirth, RelationshipToSubscriber = RelationshipToSubscriber.Self,
-                EffectiveDate = new DateOnly(2025, 1, 1), Copay = 30m, CreatedById = admin.Id,
+                OrganizationId = organization.Id,
+                PatientId = harper.Id,
+                PayerId = aetna.Id,
+                Rank = InsuranceRank.Primary,
+                PlanName = "Aetna Choice POS II",
+                MemberId = "AETNA-HE-8820",
+                SubscriberName = "Harper Ellison",
+                SubscriberDateOfBirth = harper.DateOfBirth,
+                RelationshipToSubscriber = RelationshipToSubscriber.Self,
+                EffectiveDate = new DateOnly(2025, 1, 1),
+                Copay = 30m,
+                CreatedById = admin.Id,
             },
             new PatientInsurance
             {
-                OrganizationId = organization.Id, PatientId = harper.Id, PayerId = bcbs.Id, Rank = InsuranceRank.Secondary,
-                PlanName = "BCBS PPO", MemberId = "BCBS-ME-1290", SubscriberName = "Morgan Ellison",
-                SubscriberDateOfBirth = new DateOnly(1976, 5, 8), RelationshipToSubscriber = RelationshipToSubscriber.Spouse,
-                EffectiveDate = new DateOnly(2024, 1, 1), CreatedById = admin.Id,
+                OrganizationId = organization.Id,
+                PatientId = harper.Id,
+                PayerId = bcbs.Id,
+                Rank = InsuranceRank.Secondary,
+                PlanName = "BCBS PPO",
+                MemberId = "BCBS-ME-1290",
+                SubscriberName = "Morgan Ellison",
+                SubscriberDateOfBirth = new DateOnly(1976, 5, 8),
+                RelationshipToSubscriber = RelationshipToSubscriber.Spouse,
+                EffectiveDate = new DateOnly(2024, 1, 1),
+                CreatedById = admin.Id,
             });
 
         // Phase 5B: sample appointments, notes (spanning six of the nine
@@ -517,20 +540,32 @@ public static class DemoDataSeeder
         db.FunctionalGoals.AddRange(
             new FunctionalGoal
             {
-                PatientId = taylor.Id, AuthorId = therapist.Id,
+                PatientId = taylor.Id,
+                AuthorId = therapist.Id,
                 FunctionalLimitation = "Unable to ascend/descend stairs reciprocally",
-                FunctionalTask = "Reciprocal stair negotiation, 12 steps", Term = GoalTerm.ShortTerm,
-                BaselineValue = 0, TargetValue = 12, CurrentValue = 6, Unit = "steps",
-                MeasurementMethod = "Direct observation", TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(14)),
+                FunctionalTask = "Reciprocal stair negotiation, 12 steps",
+                Term = GoalTerm.ShortTerm,
+                BaselineValue = 0,
+                TargetValue = 12,
+                CurrentValue = 6,
+                Unit = "steps",
+                MeasurementMethod = "Direct observation",
+                TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(14)),
                 Status = GoalStatus.Active,
             },
             new FunctionalGoal
             {
-                PatientId = harper.Id, AuthorId = therapist.Id,
+                PatientId = harper.Id,
+                AuthorId = therapist.Id,
                 FunctionalLimitation = "Unable to reach overhead to shelf height without pain",
-                FunctionalTask = "Pain-free overhead reach, shelf height", Term = GoalTerm.LongTerm,
-                BaselineValue = 90, TargetValue = 160, CurrentValue = 120, Unit = "degrees flexion",
-                MeasurementMethod = "Goniometry", TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(60)),
+                FunctionalTask = "Pain-free overhead reach, shelf height",
+                Term = GoalTerm.LongTerm,
+                BaselineValue = 90,
+                TargetValue = 160,
+                CurrentValue = 120,
+                Unit = "degrees flexion",
+                MeasurementMethod = "Goniometry",
+                TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(60)),
                 Status = GoalStatus.Active,
             });
 
@@ -816,10 +851,18 @@ public static class DemoDataSeeder
 
         db.PatientInsurancePolicies.Add(new PatientInsurance
         {
-            OrganizationId = organization.Id, PatientId = patient.Id, PayerId = tmPayer.Id, Rank = InsuranceRank.Primary,
-            PlanName = "UHC Choice Plus", MemberId = "UHC-JE-3391", SubscriberName = "Jordan Ellis",
-            SubscriberDateOfBirth = patient.DateOfBirth, RelationshipToSubscriber = RelationshipToSubscriber.Self,
-            EffectiveDate = new DateOnly(2026, 1, 1), Copay = 35m, CreatedById = admin.Id,
+            OrganizationId = organization.Id,
+            PatientId = patient.Id,
+            PayerId = tmPayer.Id,
+            Rank = InsuranceRank.Primary,
+            PlanName = "UHC Choice Plus",
+            MemberId = "UHC-JE-3391",
+            SubscriberName = "Jordan Ellis",
+            SubscriberDateOfBirth = patient.DateOfBirth,
+            RelationshipToSubscriber = RelationshipToSubscriber.Self,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            Copay = 35m,
+            CreatedById = admin.Id,
         });
 
         var appointmentType = new AppointmentType
@@ -861,11 +904,17 @@ public static class DemoDataSeeder
 
         db.FunctionalGoals.Add(new FunctionalGoal
         {
-            PatientId = patient.Id, AuthorId = therapist.Id,
+            PatientId = patient.Id,
+            AuthorId = therapist.Id,
             FunctionalLimitation = "Unable to reach overhead without shoulder pain",
-            FunctionalTask = "Pain-free overhead reach for shelf-stocking work task", Term = GoalTerm.ShortTerm,
-            BaselineValue = 90, TargetValue = 160, CurrentValue = 110, Unit = "degrees flexion",
-            MeasurementMethod = "Goniometry", TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(21)),
+            FunctionalTask = "Pain-free overhead reach for shelf-stocking work task",
+            Term = GoalTerm.ShortTerm,
+            BaselineValue = 90,
+            TargetValue = 160,
+            CurrentValue = 110,
+            Unit = "degrees flexion",
+            MeasurementMethod = "Goniometry",
+            TargetDate = DateOnly.FromDateTime(DateTime.Today.AddDays(21)),
             Status = GoalStatus.Active,
         });
 
@@ -909,46 +958,66 @@ public static class DemoDataSeeder
         db.ClinicalNotes.AddRange(
             new ClinicalNote
             {
-                PatientId = patient.Id, TherapistId = therapist.Id, NoteType = NoteType.Daily, Status = NoteStatus.Signed,
+                PatientId = patient.Id,
+                TherapistId = therapist.Id,
+                NoteType = NoteType.Daily,
+                Status = NoteStatus.Signed,
                 ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-10)),
                 DiagnosisSnapshot = patient.Diagnoses,
                 Interventions = "Therapeutic exercise, manual therapy to right shoulder - 30 min.",
-                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
-                SignedAt = DateTimeOffset.UtcNow.AddDays(-10), SignatureIpAddress = "127.0.0.1",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+                SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-10),
+                SignatureIpAddress = "127.0.0.1",
             },
             new ClinicalNote
             {
-                PatientId = patient.Id, TherapistId = therapist.Id, NoteType = NoteType.Daily, Status = NoteStatus.Signed,
+                PatientId = patient.Id,
+                TherapistId = therapist.Id,
+                NoteType = NoteType.Daily,
+                Status = NoteStatus.Signed,
                 ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-4)),
                 DiagnosisSnapshot = patient.Diagnoses,
                 Interventions = "Therapeutic exercise, resistance band progression - 30 min.",
-                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
-                SignedAt = DateTimeOffset.UtcNow.AddDays(-4), SignatureIpAddress = "127.0.0.1",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+                SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-4),
+                SignatureIpAddress = "127.0.0.1",
             });
 
         db.ClinicalNotes.AddRange(
             new ClinicalNote
             {
-                PatientId = reese.Id, TherapistId = therapist.Id, NoteType = NoteType.ReEvaluation, Status = NoteStatus.Signed,
+                PatientId = reese.Id,
+                TherapistId = therapist.Id,
+                NoteType = NoteType.ReEvaluation,
+                Status = NoteStatus.Signed,
                 ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-20)),
                 DiagnosisSnapshot = reese.Diagnoses,
                 Objective = "Lumbar AROM flexion 50 deg (was 30 deg at eval). SLR negative bilaterally.",
                 Assessment = "Marked improvement in lumbar mobility and pain-free sitting tolerance.",
                 Plan = "Step down to 1x/week, transition toward independent home program.",
-                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
-                SignedAt = DateTimeOffset.UtcNow.AddDays(-20), SignatureIpAddress = "127.0.0.1",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+                SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-20),
+                SignatureIpAddress = "127.0.0.1",
             },
             new ClinicalNote
             {
-                PatientId = reese.Id, TherapistId = therapist.Id, NoteType = NoteType.Soap, Status = NoteStatus.Signed,
+                PatientId = reese.Id,
+                TherapistId = therapist.Id,
+                NoteType = NoteType.Soap,
+                Status = NoteStatus.Signed,
                 ServiceDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-5)),
                 DiagnosisSnapshot = reese.Diagnoses,
                 Subjective = "Reports 2/10 low back pain, only with prolonged sitting.",
                 Objective = "Lumbar AROM within functional limits. Core stability improved.",
                 Assessment = "Nearing discharge readiness.",
                 Plan = "One more visit to reinforce home program, then discharge.",
-                SignatureName = $"{therapist.FirstName} {therapist.LastName}", SignatureCredentials = "PT, DPT",
-                SignedAt = DateTimeOffset.UtcNow.AddDays(-5), SignatureIpAddress = "127.0.0.1",
+                SignatureName = $"{therapist.FirstName} {therapist.LastName}",
+                SignatureCredentials = "PT, DPT",
+                SignedAt = DateTimeOffset.UtcNow.AddDays(-5),
+                SignatureIpAddress = "127.0.0.1",
             });
 
         await db.SaveChangesAsync(ct);

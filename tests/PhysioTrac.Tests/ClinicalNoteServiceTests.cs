@@ -35,12 +35,16 @@ public class ClinicalNoteServiceTests
 
     private static TestCurrentUser Therapist(Guid orgId, Guid? userId = null) => new()
     {
-        UserId = userId ?? Guid.NewGuid(), OrganizationId = orgId, Role = UserRole.Therapist,
+        UserId = userId ?? Guid.NewGuid(),
+        OrganizationId = orgId,
+        Role = UserRole.Therapist,
     };
 
     private static TestCurrentUser Assistant(Guid orgId, Guid? userId = null) => new()
     {
-        UserId = userId ?? Guid.NewGuid(), OrganizationId = orgId, Role = UserRole.Assistant,
+        UserId = userId ?? Guid.NewGuid(),
+        OrganizationId = orgId,
+        Role = UserRole.Assistant,
     };
 
     private static CreateNoteRequest CompleteDailyNote(Guid patientId) => new(

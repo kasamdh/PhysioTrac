@@ -115,12 +115,28 @@ public class PortalBookingController : ControllerBase
 
     private static object ToDto(Appointment a) => new
     {
-        a.Id, a.PatientId, a.ProviderId, a.Kind, a.Status, a.StartsAt, a.EndsAt,
-        a.LocationDetailId, a.ReasonForVisit, a.ConfirmationNumber, a.ConfirmedAt,
+        a.Id,
+        a.PatientId,
+        a.ProviderId,
+        a.Kind,
+        a.Status,
+        a.StartsAt,
+        a.EndsAt,
+        a.LocationDetailId,
+        a.ReasonForVisit,
+        a.ConfirmationNumber,
+        a.ConfirmedAt,
     };
 
     private static object ToWaitlistDto(Waitlist w) => new
     {
-        w.Id, w.LocationId, w.AppointmentTypeId, w.ProviderId, w.EarliestDate, w.LatestDate, w.Notes, w.Status,
+        w.Id,
+        w.LocationId,
+        w.AppointmentTypeId,
+        w.ProviderId,
+        w.EarliestDate,
+        w.LatestDate,
+        w.Notes,
+        w.Status,
     };
 }

@@ -92,6 +92,35 @@ public class ConsentServiceTests
     }
 
     [Fact]
+    public async Task Record_ForAnotherOrganizationsPatient_ThrowsForbidden()
+    {
+        var (db, service, org, _, actor) = NewService();
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        var patientInOtherOrg = new Patient { OrganizationId = otherOrg.Id, FirstName = "Beta", LastName = "Brown", DateOfBirth = new DateOnly(1990, 1, 1) };
+        db.Organizations.Add(otherOrg);
+        db.Patients.Add(patientInOtherOrg);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            service.RecordAsync(new RecordConsentRequest(patientInOtherOrg.Id, ConsentType.ConsentToTreat, "Beta Brown"), actor, null));
+        Assert.Empty(await db.Consents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Revoke_ForAnotherOrganizationsConsent_ThrowsNotFound()
+    {
+        var (db, service, org, patient, actor) = NewService();
+        var consent = await service.RecordAsync(new RecordConsentRequest(patient.Id, ConsentType.ConsentToTreat, "Pat Patient"), actor, null);
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        db.Organizations.Add(otherOrg);
+        await db.SaveChangesAsync();
+        var otherOrgActor = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = otherOrg.Id, Role = UserRole.Scheduler };
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            service.RevokeAsync(consent.Id, new RevokeConsentRequest(null), otherOrgActor));
+    }
+
+    [Fact]
     public async Task Record_PatientRoleCannotRecordOnOwnBehalf()
     {
         var (_, service, _, patient, _) = NewService();

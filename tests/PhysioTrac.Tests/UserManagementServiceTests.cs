@@ -186,8 +186,13 @@ public class UserManagementServiceTests
         var (org1000, _) = await SeedOrgsAsync(db);
         var user = new ApplicationUser
         {
-            UserName = "s1000", Email = "s1000@test", OrganizationId = org1000.Id, Role = UserRole.Scheduler,
-            Status = UserStatus.Suspended, SuspendedAt = DateTimeOffset.UtcNow, SuspensionReason = "test",
+            UserName = "s1000",
+            Email = "s1000@test",
+            OrganizationId = org1000.Id,
+            Role = UserRole.Scheduler,
+            Status = UserStatus.Suspended,
+            SuspendedAt = DateTimeOffset.UtcNow,
+            SuspensionReason = "test",
         };
         await users.CreateAsync(user);
 

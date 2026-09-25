@@ -30,8 +30,14 @@ public class BillingReportServiceTests
 
     private static Charge NewCharge(Organization org, Patient patient, Guid providerId, DateOnly serviceDate, string cptCode, decimal amount, Guid? claimId = null, Guid? locationId = null) => new()
     {
-        OrganizationId = org.Id, PatientId = patient.Id, ProviderId = providerId, LocationId = locationId,
-        ServiceDate = serviceDate, CptCode = cptCode, ChargeAmount = amount, ClaimId = claimId,
+        OrganizationId = org.Id,
+        PatientId = patient.Id,
+        ProviderId = providerId,
+        LocationId = locationId,
+        ServiceDate = serviceDate,
+        CptCode = cptCode,
+        ChargeAmount = amount,
+        ClaimId = claimId,
     };
 
     [Fact]

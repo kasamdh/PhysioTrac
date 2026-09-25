@@ -393,9 +393,14 @@ public class ClinicalNoteService : IClinicalNoteService
 
         var intervention = new NoteIntervention
         {
-            NoteId = note.Id, Description = request.Description, BodyRegion = request.BodyRegion,
-            Category = request.Category, Minutes = request.Minutes, Units = request.Units,
-            IsTimed = request.IsTimed, Order = request.Order,
+            NoteId = note.Id,
+            Description = request.Description,
+            BodyRegion = request.BodyRegion,
+            Category = request.Category,
+            Minutes = request.Minutes,
+            Units = request.Units,
+            IsTimed = request.IsTimed,
+            Order = request.Order,
         };
         _db.NoteInterventions.Add(intervention);
         await _db.SaveChangesAsync(ct);
@@ -462,9 +467,19 @@ public class ClinicalNoteService : IClinicalNoteService
 
         var content = new
         {
-            note.NoteType, note.ServiceDate, note.Subjective, note.Objective, note.Interventions,
-            note.Assessment, note.Plan, note.PlanOfCareStart, note.PlanOfCareEnd,
-            note.FrequencyPerWeek, note.DurationWeeks, note.ReassessmentDue, note.Status,
+            note.NoteType,
+            note.ServiceDate,
+            note.Subjective,
+            note.Objective,
+            note.Interventions,
+            note.Assessment,
+            note.Plan,
+            note.PlanOfCareStart,
+            note.PlanOfCareEnd,
+            note.FrequencyPerWeek,
+            note.DurationWeeks,
+            note.ReassessmentDue,
+            note.Status,
         };
         _db.ClinicalNoteVersions.Add(new ClinicalNoteVersion
         {

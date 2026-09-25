@@ -26,8 +26,13 @@ public class PortalBookingServiceTests
         var appointmentType = new AppointmentType { OrganizationId = org.Id, Name = "Follow-up", DefaultDurationMinutes = 30, IsActive = true, OnlineBookingEnabled = true, RequiresNewPatient = false };
         var config = new BookingConfiguration
         {
-            OrganizationId = org.Id, OnlineBookingEnabled = true, AllowReturningPatients = true,
-            MinNoticeHours = 0, MaxAdvanceDays = 365, SlotIntervalMinutes = 30, PatientChangeCutoffHours = 24,
+            OrganizationId = org.Id,
+            OnlineBookingEnabled = true,
+            AllowReturningPatients = true,
+            MinNoticeHours = 0,
+            MaxAdvanceDays = 365,
+            SlotIntervalMinutes = 30,
+            PatientChangeCutoffHours = 24,
         };
         var portalUserId = Guid.NewGuid();
         var patient = new Patient { OrganizationId = org.Id, FirstName = "Pat", LastName = "Patient", DateOfBirth = new DateOnly(1990, 1, 1), PortalUserId = portalUserId };
@@ -35,8 +40,12 @@ public class PortalBookingServiceTests
         var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
         var availability = new ProviderAvailability
         {
-            ProviderId = provider.Id, LocationId = location.Id, DayOfWeek = tomorrow.ToWeekday(),
-            StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), Active = true,
+            ProviderId = provider.Id,
+            LocationId = location.Id,
+            DayOfWeek = tomorrow.ToWeekday(),
+            StartTime = new TimeOnly(9, 0),
+            EndTime = new TimeOnly(10, 0),
+            Active = true,
         };
         var link = new ProviderAppointmentType { ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id, Active = true };
 
@@ -94,8 +103,15 @@ public class PortalBookingServiceTests
         var soon = DateTimeOffset.UtcNow.AddHours(2); // less than the 24h PatientChangeCutoffHours
         var appointment = new Appointment
         {
-            PatientId = patient.Id, TherapistId = provider.UserId!.Value, ProviderId = provider.Id, LocationDetailId = location.Id,
-            AppointmentTypeId = type.Id, Status = AppointmentStatus.Scheduled, StartsAt = soon, EndsAt = soon.AddMinutes(30), CreatedById = Guid.NewGuid(),
+            PatientId = patient.Id,
+            TherapistId = provider.UserId!.Value,
+            ProviderId = provider.Id,
+            LocationDetailId = location.Id,
+            AppointmentTypeId = type.Id,
+            Status = AppointmentStatus.Scheduled,
+            StartsAt = soon,
+            EndsAt = soon.AddMinutes(30),
+            CreatedById = Guid.NewGuid(),
         };
         db.Appointments.Add(appointment);
         await db.SaveChangesAsync();
@@ -110,8 +126,15 @@ public class PortalBookingServiceTests
         var later = DateTimeOffset.UtcNow.AddDays(3);
         var appointment = new Appointment
         {
-            PatientId = patient.Id, TherapistId = provider.UserId!.Value, ProviderId = provider.Id, LocationDetailId = location.Id,
-            AppointmentTypeId = type.Id, Status = AppointmentStatus.Scheduled, StartsAt = later, EndsAt = later.AddMinutes(30), CreatedById = Guid.NewGuid(),
+            PatientId = patient.Id,
+            TherapistId = provider.UserId!.Value,
+            ProviderId = provider.Id,
+            LocationDetailId = location.Id,
+            AppointmentTypeId = type.Id,
+            Status = AppointmentStatus.Scheduled,
+            StartsAt = later,
+            EndsAt = later.AddMinutes(30),
+            CreatedById = Guid.NewGuid(),
         };
         db.Appointments.Add(appointment);
         await db.SaveChangesAsync();
@@ -130,8 +153,15 @@ public class PortalBookingServiceTests
         var later = DateTimeOffset.UtcNow.AddDays(3);
         var appointment = new Appointment
         {
-            PatientId = otherPatient.Id, TherapistId = provider.UserId!.Value, ProviderId = provider.Id, LocationDetailId = location.Id,
-            AppointmentTypeId = type.Id, Status = AppointmentStatus.Scheduled, StartsAt = later, EndsAt = later.AddMinutes(30), CreatedById = Guid.NewGuid(),
+            PatientId = otherPatient.Id,
+            TherapistId = provider.UserId!.Value,
+            ProviderId = provider.Id,
+            LocationDetailId = location.Id,
+            AppointmentTypeId = type.Id,
+            Status = AppointmentStatus.Scheduled,
+            StartsAt = later,
+            EndsAt = later.AddMinutes(30),
+            CreatedById = Guid.NewGuid(),
         };
         db.Appointments.Add(appointment);
         await db.SaveChangesAsync();
@@ -162,5 +192,29 @@ public class PortalBookingServiceTests
         var second = await service.JoinWaitlistAsync(patientUser, request);
 
         Assert.Equal(first.Id, second.Id);
+    }
+
+    // GetProviderSlotsAsync itself takes no organization/actor and does no
+    // cross-entity org check -- it trusts the provider/location/appointmentType
+    // IDs its caller passes in. That's only safe because every caller (this
+    // one included) resolves those IDs filtered by the patient's own
+    // OrganizationId first. This proves that filter actually blocks a
+    // same-request patient/location mismatch from a different org, which is
+    // what makes the missing check inside GetProviderSlotsAsync a non-issue.
+    [Fact]
+    public async Task Create_LocationFromAnotherOrganization_ThrowsBookingNotFound()
+    {
+        var (db, service, _, _, provider, type, _, patientUser) = SeedScenario();
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        var otherLocation = new Location { OrganizationId = otherOrg.Id, Name = "Other Clinic", Timezone = "UTC", IsActive = true };
+        db.Organizations.Add(otherOrg);
+        db.Locations.Add(otherLocation);
+        await db.SaveChangesAsync();
+        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+        var nineAm = new DateTimeOffset(tomorrow.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero);
+
+        await Assert.ThrowsAsync<BookingNotFoundException>(() =>
+            service.CreateAsync(patientUser, new PortalBookingRequest(otherLocation.Id, type.Id, provider.Id, nineAm, "Follow-up")));
+        Assert.Empty(await db.Appointments.ToListAsync());
     }
 }

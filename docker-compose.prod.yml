@@ -1,0 +1,67 @@
+## Production-oriented overlay for docker-compose.yml.
+##
+## This does NOT stand alone -- run it layered on top of the base file:
+##   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+##
+## What it changes vs. the base (dev) file:
+##   - ASPNETCORE_ENVIRONMENT=Production on api/web (disables Swagger UI,
+##     disables demo-data auto-seeding, enables HSTS -- see Program.cs).
+##   - SQL_SA_PASSWORD and SEED_DEMO_PASSWORD have NO fallback default here;
+##     compose refuses to start without them set in the environment/.env.
+##   - The sqlserver service's host port is removed -- nothing outside the
+##     compose network can reach port 1433 directly. In a real deployment
+##     you would not run the sqlserver container at all; see
+##     docs/DEPLOYMENT_AZURE.md / docs/DEPLOYMENT_AWS.md for using a managed,
+##     HIPAA-eligible database service instead and pointing ConnectionStrings__Default
+##     at that. This override is for a self-hosted/VM deployment only.
+##   - Memory/CPU limits are set so one runaway container can't starve the
+##     others on a single host.
+##   - restart: unless-stopped, so the stack survives a host reboot.
+##   - This file still does NOT terminate TLS. Put a reverse proxy (nginx,
+##     Caddy, or your cloud load balancer) in front that owns the
+##     certificate and forwards plaintext HTTP only on the private network
+##     to these containers -- never expose 5080/5073 directly to the
+##     internet without TLS in front of them.
+
+services:
+  sqlserver:
+    restart: unless-stopped
+    environment:
+      MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD -- no default in production}"
+    ports: []
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+
+  api:
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Server=sqlserver;Database=PhysioTrac;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD -- no default in production};TrustServerCertificate=True"
+      Seed__DemoPassword: "${SEED_DEMO_PASSWORD:?Set SEED_DEMO_PASSWORD -- no default in production}"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+
+  web:
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Server=sqlserver;Database=PhysioTrac;User Id=sa;Password=${SQL_SA_PASSWORD:?Set SQL_SA_PASSWORD -- no default in production};TrustServerCertificate=True"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  frontend:
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M

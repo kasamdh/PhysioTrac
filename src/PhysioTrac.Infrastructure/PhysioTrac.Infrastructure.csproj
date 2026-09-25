@@ -19,6 +19,16 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Pinned above Microsoft.Data.SqlClient's own transitive versions,
+         which carry known advisories (GHSA-wvxc-855f-jvrv, GHSA-m5vv-6r4h-3vj9,
+         GHSA-x674-v45j-fwxw, GHSA-447r-wph3-92pm); see the CI dependency-scan
+         job and the security docs for details. -->
+    <PackageReference Include="Azure.Identity" Version="1.11.4" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
+    <PackageReference Include="System.Formats.Asn1" Version="8.0.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

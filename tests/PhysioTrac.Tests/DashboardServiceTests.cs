@@ -29,14 +29,26 @@ public class DashboardServiceTests
 
     private static Patient NewPatient(Organization org, DateTimeOffset createdAt, Guid? assignedTherapistId = null, Guid? referringProviderId = null, Guid? locationId = null) => new()
     {
-        OrganizationId = org.Id, FirstName = "Pat", LastName = "Patient", DateOfBirth = new DateOnly(1990, 1, 1),
-        CreatedAt = createdAt, AssignedTherapistId = assignedTherapistId, ReferringProviderId = referringProviderId, PrimaryLocationId = locationId,
+        OrganizationId = org.Id,
+        FirstName = "Pat",
+        LastName = "Patient",
+        DateOfBirth = new DateOnly(1990, 1, 1),
+        CreatedAt = createdAt,
+        AssignedTherapistId = assignedTherapistId,
+        ReferringProviderId = referringProviderId,
+        PrimaryLocationId = locationId,
     };
 
     private static Appointment NewAppointment(Patient patient, Guid therapistId, Guid? providerId, AppointmentStatus status, DateTimeOffset startsAt, Guid? locationId = null) => new()
     {
-        PatientId = patient.Id, TherapistId = therapistId, ProviderId = providerId, Status = status,
-        StartsAt = startsAt, EndsAt = startsAt.AddMinutes(30), LocationDetailId = locationId, CreatedById = therapistId,
+        PatientId = patient.Id,
+        TherapistId = therapistId,
+        ProviderId = providerId,
+        Status = status,
+        StartsAt = startsAt,
+        EndsAt = startsAt.AddMinutes(30),
+        LocationDetailId = locationId,
+        CreatedById = therapistId,
     };
 
     [Fact]

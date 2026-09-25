@@ -844,10 +844,38 @@ echo PHI back to the client.
 ## Production considerations
 
 This is a HIPAA-oriented application **foundation**, not a certified-
-compliant product as shipped. Before any real patient data goes into a
-production deployment of this app, you still need: a signed BAA with your
-hosting provider, database encryption at rest and in transit, MFA/SSO for
-staff accounts, audit-log retention policy, PHI-safe logging (verify no
-identifiers leak into application logs or error trackers), and a real
-secrets-management story for connection strings and the SQL `sa`/app
-credentials (never the defaults in this README or in `docker-compose.yml`).
+compliant product as shipped, and no software can be "HIPAA compliant" on
+its own -- that's a property of an organization's administrative,
+physical, and technical safeguards together. See
+[docs/HIPAA_CHECKLIST.md](docs/HIPAA_CHECKLIST.md) for the full breakdown
+of what this codebase implements today versus what's still your
+responsibility: a signed BAA with every vendor in your deployment path, a
+completed risk analysis, an incident response and breach notification
+plan, written policies, staff training, and ongoing vendor review, at
+minimum.
+
+Beyond that checklist:
+
+- **Deploying to Azure or AWS** -- see
+  [docs/DEPLOYMENT_AZURE.md](docs/DEPLOYMENT_AZURE.md) /
+  [docs/DEPLOYMENT_AWS.md](docs/DEPLOYMENT_AWS.md) for a reference
+  architecture using each platform's BAA-eligible services.
+- **Backup, restore, and point-in-time recovery** for the SQL Server
+  database -- see [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).
+- **Production Docker configuration** -- `docker-compose.prod.yml` layers
+  onto the base `docker-compose.yml` (`docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`)
+  to set `ASPNETCORE_ENVIRONMENT=Production`, remove the `SQL_SA_PASSWORD`/
+  `SEED_DEMO_PASSWORD` fallback defaults (the stack refuses to start
+  without them explicitly set), drop the SQL Server container's host port
+  mapping, add per-service memory/CPU limits, and add `restart:
+  unless-stopped`. It still does not terminate TLS -- put a real reverse
+  proxy or load balancer in front that owns the certificate.
+- **CI** (`.github/workflows/ci.yml`) builds, tests, lints (`dotnet
+  format`, `oxlint`), and scans dependencies (NuGet/npm vulnerable-package
+  checks) and the repo (gitleaks) on every push/PR.
+- Database encryption at rest and in transit, MFA/SSO for staff accounts
+  (not yet implemented -- see the checklist), audit-log retention policy,
+  PHI-safe logging (verify no identifiers leak into application logs or
+  error trackers you add), and a real secrets-management story for
+  connection strings and credentials (never the defaults in this README
+  or in `docker-compose.yml`).

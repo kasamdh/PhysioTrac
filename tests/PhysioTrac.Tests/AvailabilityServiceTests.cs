@@ -26,15 +26,23 @@ public class AvailabilityServiceTests
         var appointmentType = new AppointmentType { OrganizationId = org.Id, Name = "Follow-up", DefaultDurationMinutes = 30 };
         var config = new BookingConfiguration
         {
-            OrganizationId = org.Id, OnlineBookingEnabled = true, MinNoticeHours = 0, MaxAdvanceDays = 365, SlotIntervalMinutes = 30,
+            OrganizationId = org.Id,
+            OnlineBookingEnabled = true,
+            MinNoticeHours = 0,
+            MaxAdvanceDays = 365,
+            SlotIntervalMinutes = 30,
         };
 
         // Availability tomorrow 09:00-10:00 — exactly two 30-minute slots.
         var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
         var availability = new ProviderAvailability
         {
-            ProviderId = provider.Id, LocationId = location.Id, DayOfWeek = tomorrow.ToWeekday(),
-            StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), Active = true,
+            ProviderId = provider.Id,
+            LocationId = location.Id,
+            DayOfWeek = tomorrow.ToWeekday(),
+            StartTime = new TimeOnly(9, 0),
+            EndTime = new TimeOnly(10, 0),
+            Active = true,
         };
 
         db.Organizations.Add(org);
@@ -72,8 +80,13 @@ public class AvailabilityServiceTests
         var nineAm = new DateTimeOffset(tomorrow.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero);
         db.Appointments.Add(new Appointment
         {
-            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id,
-            Status = AppointmentStatus.Scheduled, StartsAt = nineAm, EndsAt = nineAm.AddMinutes(30), CreatedById = Guid.NewGuid(),
+            PatientId = patient.Id,
+            TherapistId = Guid.NewGuid(),
+            ProviderId = provider.Id,
+            Status = AppointmentStatus.Scheduled,
+            StartsAt = nineAm,
+            EndsAt = nineAm.AddMinutes(30),
+            CreatedById = Guid.NewGuid(),
         });
         await db.SaveChangesAsync();
 
@@ -93,8 +106,13 @@ public class AvailabilityServiceTests
         var nineAm = new DateTimeOffset(tomorrow.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero);
         db.Appointments.Add(new Appointment
         {
-            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id,
-            Status = AppointmentStatus.Cancelled, StartsAt = nineAm, EndsAt = nineAm.AddMinutes(30), CreatedById = Guid.NewGuid(),
+            PatientId = patient.Id,
+            TherapistId = Guid.NewGuid(),
+            ProviderId = provider.Id,
+            Status = AppointmentStatus.Cancelled,
+            StartsAt = nineAm,
+            EndsAt = nineAm.AddMinutes(30),
+            CreatedById = Guid.NewGuid(),
         });
         await db.SaveChangesAsync();
 

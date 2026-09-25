@@ -24,7 +24,10 @@ public class IntakeFormServiceTests
         var org = new Organization { Name = "Client A", Slug = "client-a", ClientNumber = 1000 };
         var patient = new Patient
         {
-            OrganizationId = org.Id, FirstName = "Pat", LastName = "Patient", DateOfBirth = new DateOnly(1990, 1, 1),
+            OrganizationId = org.Id,
+            FirstName = "Pat",
+            LastName = "Patient",
+            DateOfBirth = new DateOnly(1990, 1, 1),
             PortalUserId = Guid.NewGuid(),
         };
         db.Organizations.Add(org);

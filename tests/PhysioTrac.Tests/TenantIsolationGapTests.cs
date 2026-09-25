@@ -70,7 +70,8 @@ public class TenantIsolationGapTests
     {
         var (db, org1000, org1001, _, admin) = await SeedAsync();
         var controller1001 = new CptCodeMappingsController(new TenantAccessService(db, new AuditService(db)),
-            new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1001.Id, Role = UserRole.Admin }, db) { ControllerContext = NewContext() };
+            new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1001.Id, Role = UserRole.Admin }, db)
+        { ControllerContext = NewContext() };
         await controller1001.Create(new CreateCptCodeMappingRequest(InterventionCategory.TherapeuticExercise, "97110"));
 
         var controller1000 = new CptCodeMappingsController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };

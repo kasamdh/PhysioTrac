@@ -20,6 +20,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Pinned above known-vulnerable transitive versions pulled in by
+         Microsoft.NET.Test.Sdk/Microsoft.Data.SqlClient; see the CI
+         dependency-scan job and the security docs for details. -->
+    <PackageReference Include="Azure.Identity" Version="1.11.4" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
+    <PackageReference Include="System.Formats.Asn1" Version="8.0.1" />
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

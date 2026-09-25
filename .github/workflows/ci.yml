@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend build, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore PhysioTrac.sln
+
+      - name: Format check (lint)
+        run: dotnet format PhysioTrac.sln --verify-no-changes
+
+      - name: Build
+        run: dotnet build PhysioTrac.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test PhysioTrac.sln --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: "**/test-results.trx"
+
+  backend-dependency-scan:
+    name: Backend dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore PhysioTrac.sln
+
+      - name: Check for known-vulnerable NuGet packages
+        run: |
+          set -e
+          output=$(dotnet list PhysioTrac.sln package --vulnerable --include-transitive 2>&1)
+          echo "$output"
+          if echo "$output" | grep -qi "has the following vulnerable packages"; then
+            echo "::error::Vulnerable NuGet package(s) detected -- see output above."
+            exit 1
+          fi
+
+  frontend:
+    name: Frontend build, test, lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test
+
+      - name: npm audit (fails only on high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

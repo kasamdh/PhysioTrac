@@ -48,7 +48,10 @@ public class PrivilegedAccessServiceTests
 
     private static TestCurrentUser SuperAdmin(Guid userId) => new()
     {
-        UserId = userId, OrganizationId = null, Role = UserRole.SuperAdmin, IsPlatformSuperAdmin = true,
+        UserId = userId,
+        OrganizationId = null,
+        Role = UserRole.SuperAdmin,
+        IsPlatformSuperAdmin = true,
     };
 
     [Fact]

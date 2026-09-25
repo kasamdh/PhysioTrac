@@ -35,12 +35,17 @@ public class TenantAccessServiceTests
 
         var patientA = new Patient
         {
-            OrganizationId = orgA.Id, FirstName = "Alice", LastName = "Anderson",
-            DateOfBirth = new DateOnly(1990, 1, 1), AssignedTherapistId = therapistAId,
+            OrganizationId = orgA.Id,
+            FirstName = "Alice",
+            LastName = "Anderson",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            AssignedTherapistId = therapistAId,
         };
         var patientB = new Patient
         {
-            OrganizationId = orgB.Id, FirstName = "Bob", LastName = "Brown",
+            OrganizationId = orgB.Id,
+            FirstName = "Bob",
+            LastName = "Brown",
             DateOfBirth = new DateOnly(1985, 5, 5),
         };
 

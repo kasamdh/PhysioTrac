@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Scheduling;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
@@ -35,7 +36,9 @@ public class AppointmentServiceTests
 
     private static TestCurrentUser Scheduler(Guid orgId) => new()
     {
-        UserId = Guid.NewGuid(), OrganizationId = orgId, Role = UserRole.Scheduler,
+        UserId = Guid.NewGuid(),
+        OrganizationId = orgId,
+        Role = UserRole.Scheduler,
     };
 
     [Fact]
@@ -113,6 +116,22 @@ public class AppointmentServiceTests
         await service.CancelAsync(created.Id, actor);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CancelAsync(created.Id, actor));
+    }
+
+    [Fact]
+    public async Task Cancel_ForAnotherOrganizationsAppointment_ThrowsNotFound()
+    {
+        var (db, service, org, patient) = NewService();
+        var actor = Scheduler(org.Id);
+        var start = DateTimeOffset.UtcNow.AddDays(1);
+        var created = await service.CreateAsync(new CreateAppointmentRequest(
+            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        db.Organizations.Add(otherOrg);
+        await db.SaveChangesAsync();
+        var otherOrgActor = Scheduler(otherOrg.Id);
+
+        await Assert.ThrowsAsync<NotFoundException>(() => service.CancelAsync(created.Id, otherOrgActor));
     }
 
     [Fact]

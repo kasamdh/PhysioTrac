@@ -33,8 +33,12 @@ public class PublicBookingServiceTests
         var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
         var availability = new ProviderAvailability
         {
-            ProviderId = provider.Id, LocationId = location.Id, DayOfWeek = tomorrow.ToWeekday(),
-            StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), Active = true,
+            ProviderId = provider.Id,
+            LocationId = location.Id,
+            DayOfWeek = tomorrow.ToWeekday(),
+            StartTime = new TimeOnly(9, 0),
+            EndTime = new TimeOnly(10, 0),
+            Active = true,
         };
         var link = new ProviderAppointmentType { ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id, Active = true };
 
@@ -113,6 +117,29 @@ public class PublicBookingServiceTests
             new PublicPatientInfo("Jane", "Doe", new DateOnly(1990, 1, 1), null, null, null, null), null), null));
     }
 
+    // Same rationale as PortalBookingServiceTests' equivalent case:
+    // GetProviderSlotsAsync has no org check of its own, so this proves the
+    // organization-filtered provider/location/type lookups above it in
+    // CreateBookingAsync are what actually stop a caller from pairing a
+    // valid org slug with another org's provider.
+    [Fact]
+    public async Task CreateBooking_ProviderFromAnotherOrganization_ThrowsBookingNotFound()
+    {
+        var (db, service, org, location, _, type) = SeedScenario();
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        var otherProvider = new Provider { OrganizationId = otherOrg.Id, FirstName = "Other", LastName = "Provider", UserId = Guid.NewGuid(), IsActive = true, OnlineBookingEnabled = true };
+        db.Organizations.Add(otherOrg);
+        db.Providers.Add(otherProvider);
+        await db.SaveChangesAsync();
+        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+        var nineAm = new DateTimeOffset(tomorrow.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero);
+
+        await Assert.ThrowsAsync<BookingNotFoundException>(() => service.CreateBookingAsync(new PublicBookingRequest(
+            org.Slug, location.Id, type.Id, otherProvider.Id, nineAm, true,
+            new PublicPatientInfo("Jane", "Doe", new DateOnly(1990, 1, 1), null, null, null, null), null), null));
+        Assert.Empty(await db.Appointments.ToListAsync());
+    }
+
     [Fact]
     public async Task GetAvailability_ExceedingRateLimit_ThrowsRateLimited()
     {
@@ -136,7 +163,11 @@ public class PublicBookingServiceTests
         var nineAm = new DateTimeOffset(tomorrow.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero);
         var existingPatient = new Patient
         {
-            OrganizationId = org.Id, FirstName = "Jane", LastName = "Doe", DateOfBirth = new DateOnly(1990, 1, 1), Email = "jane@example.com",
+            OrganizationId = org.Id,
+            FirstName = "Jane",
+            LastName = "Doe",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            Email = "jane@example.com",
         };
         db.Patients.Add(existingPatient);
         await db.SaveChangesAsync();

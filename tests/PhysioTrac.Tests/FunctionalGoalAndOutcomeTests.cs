@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Application.Clinical;
+using PhysioTrac.Application.Common;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
 using PhysioTrac.Infrastructure.Persistence;
@@ -61,6 +62,21 @@ public class FunctionalGoalAndOutcomeTests
         var updated = await goals.UpdateProgressAsync(goal.Id, new UpdateGoalProgressRequest(5), therapist);
 
         Assert.Equal(50, updated.ProgressPercent);
+    }
+
+    [Fact]
+    public async Task Goal_ApproveForAnotherOrganizationsGoal_ThrowsNotFound()
+    {
+        var (db, goals, _, org, patient, therapist) = NewServices();
+        var goal = await goals.CreateAsync(new CreateGoalRequest(
+            patient.Id, "Difficulty climbing stairs", "Climb 12 stairs without rail", GoalTerm.ShortTerm, 3, 12, "stairs", "Direct observation",
+            DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)), "Patient will climb 12 stairs independently."), therapist);
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        db.Organizations.Add(otherOrg);
+        await db.SaveChangesAsync();
+        var otherOrgTherapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = otherOrg.Id, Role = UserRole.Therapist };
+
+        await Assert.ThrowsAsync<NotFoundException>(() => goals.ApproveAsync(goal.Id, otherOrgTherapist));
     }
 
     [Fact]

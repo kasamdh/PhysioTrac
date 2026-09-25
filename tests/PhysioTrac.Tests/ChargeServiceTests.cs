@@ -131,7 +131,11 @@ public class ChargeServiceTests
         {
             note.InterventionItems.Add(new NoteIntervention
             {
-                Description = "Intervention", Category = category, Minutes = minutes, IsTimed = isTimed, Order = order++,
+                Description = "Intervention",
+                Category = category,
+                Minutes = minutes,
+                IsTimed = isTimed,
+                Order = order++,
             });
         }
         db.ClinicalNotes.Add(note);
@@ -196,7 +200,10 @@ public class ChargeServiceTests
         var (db, service, org, patient, biller) = NewService();
         var note = new ClinicalNote
         {
-            PatientId = patient.Id, TherapistId = Guid.NewGuid(), Status = NoteStatus.Draft, ServiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            PatientId = patient.Id,
+            TherapistId = Guid.NewGuid(),
+            Status = NoteStatus.Draft,
+            ServiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
         };
         db.ClinicalNotes.Add(note);
         await db.SaveChangesAsync();
@@ -246,8 +253,14 @@ public class ChargeServiceTests
 
         var appointment = new Appointment
         {
-            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id,
-            Status = AppointmentStatus.Completed, StartsAt = DateTimeOffset.UtcNow, EndsAt = DateTimeOffset.UtcNow.AddMinutes(30), CreatedById = biller.UserId,
+            PatientId = patient.Id,
+            TherapistId = Guid.NewGuid(),
+            ProviderId = provider.Id,
+            AppointmentTypeId = appointmentType.Id,
+            Status = AppointmentStatus.Completed,
+            StartsAt = DateTimeOffset.UtcNow,
+            EndsAt = DateTimeOffset.UtcNow.AddMinutes(30),
+            CreatedById = biller.UserId,
         };
         db.Appointments.Add(appointment);
         await db.SaveChangesAsync();
@@ -271,8 +284,14 @@ public class ChargeServiceTests
         await db.SaveChangesAsync();
         var appointment = new Appointment
         {
-            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id,
-            Status = AppointmentStatus.Completed, StartsAt = DateTimeOffset.UtcNow, EndsAt = DateTimeOffset.UtcNow.AddMinutes(30), CreatedById = biller.UserId,
+            PatientId = patient.Id,
+            TherapistId = Guid.NewGuid(),
+            ProviderId = provider.Id,
+            AppointmentTypeId = appointmentType.Id,
+            Status = AppointmentStatus.Completed,
+            StartsAt = DateTimeOffset.UtcNow,
+            EndsAt = DateTimeOffset.UtcNow.AddMinutes(30),
+            CreatedById = biller.UserId,
         };
         db.Appointments.Add(appointment);
         await db.SaveChangesAsync();
@@ -291,8 +310,14 @@ public class ChargeServiceTests
         await db.SaveChangesAsync();
         var appointment = new Appointment
         {
-            PatientId = patient.Id, TherapistId = Guid.NewGuid(), ProviderId = provider.Id, AppointmentTypeId = appointmentType.Id,
-            Status = AppointmentStatus.Scheduled, StartsAt = DateTimeOffset.UtcNow, EndsAt = DateTimeOffset.UtcNow.AddMinutes(30), CreatedById = biller.UserId,
+            PatientId = patient.Id,
+            TherapistId = Guid.NewGuid(),
+            ProviderId = provider.Id,
+            AppointmentTypeId = appointmentType.Id,
+            Status = AppointmentStatus.Scheduled,
+            StartsAt = DateTimeOffset.UtcNow,
+            EndsAt = DateTimeOffset.UtcNow.AddMinutes(30),
+            CreatedById = biller.UserId,
         };
         db.Appointments.Add(appointment);
         await db.SaveChangesAsync();

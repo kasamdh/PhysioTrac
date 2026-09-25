@@ -44,6 +44,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreatePatientRequestValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 

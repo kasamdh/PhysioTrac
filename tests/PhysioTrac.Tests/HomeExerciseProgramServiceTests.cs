@@ -23,8 +23,11 @@ public class HomeExerciseProgramServiceTests
         var therapistId = Guid.NewGuid();
         var patient = new Patient
         {
-            OrganizationId = org.Id, FirstName = "Pat", LastName = "Patient",
-            DateOfBirth = new DateOnly(1990, 1, 1), AssignedTherapistId = therapistId,
+            OrganizationId = org.Id,
+            FirstName = "Pat",
+            LastName = "Patient",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            AssignedTherapistId = therapistId,
         };
         db.Organizations.Add(org);
         db.Patients.Add(patient);
@@ -141,5 +144,18 @@ public class HomeExerciseProgramServiceTests
         var otherTherapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Therapist };
 
         await Assert.ThrowsAsync<ForbiddenException>(() => service.ListForPatientAsync(patient.Id, otherTherapist));
+    }
+
+    [Fact]
+    public async Task Discontinue_ForAnotherOrganizationsProgram_ThrowsNotFound()
+    {
+        var (db, service, _, patient, therapist) = NewService();
+        var program = await service.CreateAsync(ValidRequest(patient.Id), therapist);
+        var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
+        db.Organizations.Add(otherOrg);
+        await db.SaveChangesAsync();
+        var otherOrgTherapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = otherOrg.Id, Role = UserRole.Therapist };
+
+        await Assert.ThrowsAsync<NotFoundException>(() => service.DiscontinueAsync(program.Id, otherOrgTherapist));
     }
 }
