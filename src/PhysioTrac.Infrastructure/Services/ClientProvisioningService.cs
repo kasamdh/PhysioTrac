@@ -17,6 +17,8 @@ namespace PhysioTrac.Infrastructure.Services;
 /// <summary>Direct port of `care/client_management.py`.</summary>
 public class ClientProvisioningService : IClientProvisioningService
 {
+    private const int TrialLengthDays = 14;
+
     private readonly PhysioTracDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAuditService _audit;
@@ -63,10 +65,34 @@ public class ClientProvisioningService : IClientProvisioningService
             SubscriptionTier = request.SubscriptionTier,
             Timezone = request.Timezone,
             Comments = request.Comments?.Trim(),
+            // Every freshly provisioned client starts on a trial, not an
+            // immediately-active paid subscription -- ActivateClientAsync
+            // (or a future real Stripe webhook) is what actually moves it
+            // to Active.
+            Status = OrganizationStatus.Trial,
+            TrialEndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(TrialLengthDays)),
             CreatedById = actor.UserId,
             UpdatedById = actor.UserId,
         };
         _db.Organizations.Add(organization);
+        await _db.SaveChangesAsync(ct);
+
+        // The wizard's "first location" step -- reuses the organization's
+        // own address as a sensible default for a brand-new single-location
+        // clinic; staff can add/edit locations afterward like any other.
+        var firstLocation = new Location
+        {
+            OrganizationId = organization.Id,
+            Name = request.LocationName.Trim(),
+            AddressLine1 = organization.AddressLine1,
+            AddressLine2 = organization.AddressLine2,
+            City = organization.City,
+            State = organization.State,
+            ZipCode = organization.ZipCode,
+            Phone = organization.SupportPhone,
+            Timezone = request.Timezone,
+        };
+        _db.Locations.Add(firstLocation);
         await _db.SaveChangesAsync(ct);
 
         var administrator = new ApplicationUser
@@ -87,6 +113,8 @@ public class ClientProvisioningService : IClientProvisioningService
         var (token, activationUrl) = await IssueInvitationInternalAsync(organization, administrator.Id, ct);
 
         await _audit.RecordAuditEventAsync(actor.UserId, "client.created", nameof(Organization), organization.Id, organization.Id,
+            metadata: new { clientNumber = organization.ClientNumber }, ct: ct);
+        await _audit.RecordAuditEventAsync(actor.UserId, "client_location.created", nameof(Location), firstLocation.Id, organization.Id,
             metadata: new { clientNumber = organization.ClientNumber }, ct: ct);
         await _audit.RecordAuditEventAsync(actor.UserId, "client_admin.created", nameof(ApplicationUser), administrator.Id, organization.Id,
             metadata: new { clientNumber = organization.ClientNumber }, ct: ct);
@@ -117,6 +145,9 @@ public class ClientProvisioningService : IClientProvisioningService
         if (request.SubscriptionTier is not null) { organization.SubscriptionTier = request.SubscriptionTier.Value; changedFields.Add("subscription_tier"); }
         if (request.Timezone is not null) { organization.Timezone = request.Timezone; changedFields.Add("timezone"); }
         if (request.Comments is not null) { organization.Comments = request.Comments.Trim(); changedFields.Add("comments"); }
+        if (request.TrialEndDate is not null) { organization.TrialEndDate = request.TrialEndDate; changedFields.Add("trial_end_date"); }
+        if (request.StripeCustomerId is not null) { organization.StripeCustomerId = request.StripeCustomerId.Trim(); changedFields.Add("stripe_customer_id"); }
+        if (request.StripeSubscriptionId is not null) { organization.StripeSubscriptionId = request.StripeSubscriptionId.Trim(); changedFields.Add("stripe_subscription_id"); }
 
         organization.UpdatedById = actor.UserId;
         organization.UpdatedAt = DateTimeOffset.UtcNow;
@@ -163,10 +194,33 @@ public class ClientProvisioningService : IClientProvisioningService
         organization.SuspendedAt = null;
         organization.SuspendedById = null;
         organization.SuspensionReason = null;
+        organization.CancelledAt = null;
+        organization.CancelledById = null;
+        organization.CancellationReason = null;
         organization.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
 
         await _audit.RecordAuditEventAsync(actor.UserId, "client.reactivated", nameof(Organization), organization.Id, organization.Id,
+            metadata: new { clientNumber = organization.ClientNumber }, ct: ct);
+        return await ToDtoAsync(organization, ct);
+    }
+
+    public async Task<ClientDto> CancelClientAsync(long clientNumber, string reason, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var organization = await RequireOrganizationAsync(clientNumber, ct);
+        if (organization.Status == OrganizationStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Client is already cancelled.");
+        }
+        organization.Status = OrganizationStatus.Cancelled;
+        organization.IsActive = false;
+        organization.CancelledAt = DateTimeOffset.UtcNow;
+        organization.CancelledById = actor.UserId;
+        organization.CancellationReason = reason.Trim();
+        organization.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.RecordAuditEventAsync(actor.UserId, "client.cancelled", nameof(Organization), organization.Id, organization.Id,
             metadata: new { clientNumber = organization.ClientNumber }, ct: ct);
         return await ToDtoAsync(organization, ct);
     }
@@ -345,12 +399,21 @@ public class ClientProvisioningService : IClientProvisioningService
             .OrderBy(u => u.LastName).ThenBy(u => u.FirstName)
             .FirstOrDefaultAsync(ct);
         var userCount = await _db.Users.CountAsync(u => u.OrganizationId == org.Id, ct);
+        var locationCount = await _db.Locations.CountAsync(l => l.OrganizationId == org.Id, ct);
+        var patientCount = await _db.Patients.CountAsync(p => p.OrganizationId == org.Id && p.DeletedAt == null, ct);
+        // Storage usage is approximated from PatientDocument alone -- the
+        // only place this app stores caller-uploaded file bytes today (no
+        // image/video upload for HEP media, consent PDFs, etc. yet).
+        var storageBytesUsed = await _db.PatientDocuments
+            .Where(d => d.OrganizationId == org.Id && d.DeletedAt == null)
+            .SumAsync(d => d.FileSizeBytes, ct);
 
         return new ClientDto(
             org.Id, org.ClientNumber, org.Name, org.Slug, org.PortalUrl, org.SupportEmail, org.SupportPhone,
             org.City, org.State, org.AddressLine1, org.AddressLine2, org.ZipCode, org.Country,
-            org.SubscriptionTier, org.Timezone, org.Status, org.Comments, userCount,
+            org.SubscriptionTier, org.Timezone, org.Status, org.Comments, userCount, locationCount, patientCount, storageBytesUsed,
+            org.TrialEndDate, org.StripeCustomerId, org.StripeSubscriptionId,
             administrator is null ? null : new ClientAdminSummary(administrator.Id, $"{administrator.FirstName} {administrator.LastName}".Trim(), administrator.Email ?? string.Empty),
-            org.CreatedAt, org.UpdatedAt, org.SuspendedAt, org.ArchivedAt);
+            org.CreatedAt, org.UpdatedAt, org.SuspendedAt, org.CancelledAt, org.ArchivedAt);
     }
 }

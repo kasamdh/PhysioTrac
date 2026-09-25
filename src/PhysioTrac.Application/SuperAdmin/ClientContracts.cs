@@ -23,10 +23,17 @@ public record ClientDto(
     OrganizationStatus Status,
     string? Comments,
     int UserCount,
+    int LocationCount,
+    int PatientCount,
+    long StorageBytesUsed,
+    DateOnly? TrialEndDate,
+    string? StripeCustomerId,
+    string? StripeSubscriptionId,
     ClientAdminSummary? PrimaryAdmin,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? SuspendedAt,
+    DateTimeOffset? CancelledAt,
     DateTimeOffset? ArchivedAt);
 
 public record ProvisionClientRequest(
@@ -44,7 +51,8 @@ public record ProvisionClientRequest(
     string? Comments,
     string AdminFirstName,
     string AdminLastName,
-    string AdminEmail);
+    string AdminEmail,
+    string LocationName);
 
 public record UpdateClientRequest(
     string? ClientName,
@@ -58,7 +66,10 @@ public record UpdateClientRequest(
     string? Country,
     SubscriptionTier? SubscriptionTier,
     string? Timezone,
-    string? Comments);
+    string? Comments,
+    DateOnly? TrialEndDate,
+    string? StripeCustomerId,
+    string? StripeSubscriptionId);
 
 public record ProvisionedClientResult(ClientDto Client, Guid AdministratorId, string AdministratorEmail, string InvitationUrl, string DevelopmentInviteToken);
 

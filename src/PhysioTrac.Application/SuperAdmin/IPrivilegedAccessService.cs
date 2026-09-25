@@ -13,7 +13,10 @@ public interface IPrivilegedAccessService
 
     Task<PrivilegedAccessGrant?> ActiveGrantAsync(Guid organizationId, Guid actorId, CancellationToken ct = default);
 
-    Task<PrivilegedAccessGrant> RequestAsync(Guid organizationId, ICurrentUser actor, string reason, int durationHours, CancellationToken ct = default);
+    /// <summary>Throws <see cref="Common.ForbiddenException"/> if
+    /// currentPassword doesn't match the actor's own account -- the
+    /// reauthentication step the phase spec asks for.</summary>
+    Task<PrivilegedAccessGrant> RequestAsync(Guid organizationId, ICurrentUser actor, string reason, int durationHours, string currentPassword, CancellationToken ct = default);
 
     Task<PrivilegedAccessGrant> RevokeAsync(Guid grantId, ICurrentUser actor, CancellationToken ct = default);
 

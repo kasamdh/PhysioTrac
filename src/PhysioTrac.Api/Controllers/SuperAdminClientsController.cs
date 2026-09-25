@@ -117,6 +117,20 @@ public class SuperAdminClientsController : ControllerBase
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
+    [HttpPatch("{clientNumber:long}/cancel")]
+    public async Task<IActionResult> Cancel(long clientNumber, [FromBody] CancelClientRequest request)
+    {
+        try
+        {
+            RequireSuperAdmin();
+            var client = await _clients.CancelClientAsync(clientNumber, request.Reason, _currentUser, HttpContext.RequestAborted);
+            return Ok(new { client });
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
     [HttpPatch("{clientNumber:long}/activate")]
     public async Task<IActionResult> Activate(long clientNumber)
     {
@@ -148,3 +162,4 @@ public class SuperAdminClientsController : ControllerBase
 
 public record ArchiveClientRequest(string? Reason);
 public record SuspendClientRequest(string Reason);
+public record CancelClientRequest(string Reason);

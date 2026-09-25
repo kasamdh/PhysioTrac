@@ -8,6 +8,7 @@ using PhysioTrac.Application.Booking;
 using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Configuration;
 using PhysioTrac.Application.Consents;
+using PhysioTrac.Application.Dashboards;
 using PhysioTrac.Application.Documents;
 using PhysioTrac.Application.Intake;
 using PhysioTrac.Application.Messaging;
@@ -59,6 +60,8 @@ public static class DependencyInjection
         services.AddScoped<IClaimService, ClaimService>();
         services.AddScoped<IClaimTransactionService, ClaimTransactionService>();
         services.AddScoped<IBillingReportService, BillingReportService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IPlatformDashboardService, PlatformDashboardService>();
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConsentService, ConsentService>();

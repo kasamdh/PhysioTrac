@@ -45,4 +45,15 @@ public static class RoleSets
     {
         UserRole.Admin, UserRole.Director
     };
+
+    /// <summary>Every staff role a tenant can have -- i.e. everyone except
+    /// the platform-level SuperAdmin (who has no standing org access at
+    /// all) and Patient (the portal role). Used by dashboards whose content
+    /// isn't sensitive enough to need a narrower gate but still shouldn't be
+    /// patient-portal-reachable.</summary>
+    public static readonly IReadOnlySet<UserRole> AllStaff = new HashSet<UserRole>
+    {
+        UserRole.Admin, UserRole.Director, UserRole.Therapist, UserRole.Assistant,
+        UserRole.Scheduler, UserRole.Biller, UserRole.Compliance,
+    };
 }

@@ -43,7 +43,7 @@ public class ClientProvisioningServiceTests
         AddressLine1: "1 Main St", AddressLine2: null, City: "Springfield", State: "IL", ZipCode: "62701",
         Country: "United States", SubscriptionTier: SubscriptionTier.Professional, Timezone: "America/Chicago",
         Comments: null, AdminFirstName: "Ada", AdminLastName: "Admin",
-        AdminEmail: $"ada-{Slugify(name)}@riverside.example");
+        AdminEmail: $"ada-{Slugify(name)}@riverside.example", LocationName: "Main Clinic");
 
     private static string Slugify(string name) => name.ToLowerInvariant().Replace(" ", "-");
 
@@ -91,7 +91,7 @@ public class ClientProvisioningServiceTests
         var first = await service.ProvisionClientAsync(SampleRequest("Same Name"), actor);
         var second = await service.ProvisionClientAsync(new ProvisionClientRequest(
             "Same Name", "b@x.example", null, "1 St", null, "City", "ST", "00000", null,
-            SubscriptionTier.Starter, "America/Chicago", null, "A", "B", "b-admin@x.example"), actor);
+            SubscriptionTier.Starter, "America/Chicago", null, "A", "B", "b-admin@x.example", "Main Clinic"), actor);
 
         Assert.NotEqual(first.Client.Slug, second.Client.Slug);
         Assert.StartsWith(first.Client.Slug, second.Client.Slug);
@@ -122,6 +122,68 @@ public class ClientProvisioningServiceTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.SuspendClientAsync(provisioned.Client.ClientNumber!.Value, "reason again", actor));
+    }
+
+    [Fact]
+    public async Task ProvisionClient_StartsInTrial_WithATrialEndDateSet()
+    {
+        var (_, service, _) = NewService();
+        var provisioned = await service.ProvisionClientAsync(SampleRequest(), PlatformSuperAdmin());
+
+        Assert.Equal(OrganizationStatus.Trial, provisioned.Client.Status);
+        Assert.NotNull(provisioned.Client.TrialEndDate);
+        Assert.True(provisioned.Client.TrialEndDate > DateOnly.FromDateTime(DateTime.UtcNow));
+    }
+
+    [Fact]
+    public async Task ProvisionClient_CreatesTheFirstLocation()
+    {
+        var (db, service, _) = NewService();
+        var provisioned = await service.ProvisionClientAsync(SampleRequest(), PlatformSuperAdmin());
+
+        Assert.Equal(1, provisioned.Client.LocationCount);
+        var location = await db.Locations.SingleAsync(l => l.OrganizationId == provisioned.Client.Id);
+        Assert.Equal("Main Clinic", location.Name);
+        Assert.Equal("Springfield", location.City);
+    }
+
+    [Fact]
+    public async Task CancelClient_SetsCancelledStatusAndFields()
+    {
+        var (_, service, _) = NewService();
+        var actor = PlatformSuperAdmin();
+        var provisioned = await service.ProvisionClientAsync(SampleRequest(), actor);
+
+        var cancelled = await service.CancelClientAsync(provisioned.Client.ClientNumber!.Value, "Client stopped paying", actor);
+
+        Assert.Equal(OrganizationStatus.Cancelled, cancelled.Status);
+        Assert.NotNull(cancelled.CancelledAt);
+    }
+
+    [Fact]
+    public async Task CancelClient_AlreadyCancelled_Throws()
+    {
+        var (_, service, _) = NewService();
+        var actor = PlatformSuperAdmin();
+        var provisioned = await service.ProvisionClientAsync(SampleRequest(), actor);
+        await service.CancelClientAsync(provisioned.Client.ClientNumber!.Value, "reason", actor);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CancelClientAsync(provisioned.Client.ClientNumber!.Value, "reason again", actor));
+    }
+
+    [Fact]
+    public async Task ActivateClient_FromCancelled_ClearsCancellationFields()
+    {
+        var (_, service, _) = NewService();
+        var actor = PlatformSuperAdmin();
+        var provisioned = await service.ProvisionClientAsync(SampleRequest(), actor);
+        await service.CancelClientAsync(provisioned.Client.ClientNumber!.Value, "reason", actor);
+
+        var reactivated = await service.ActivateClientAsync(provisioned.Client.ClientNumber!.Value, actor);
+
+        Assert.Equal(OrganizationStatus.Active, reactivated.Status);
+        Assert.Null(reactivated.CancelledAt);
     }
 
     [Fact]

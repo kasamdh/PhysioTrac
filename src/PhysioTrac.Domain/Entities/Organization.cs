@@ -49,9 +49,31 @@ public class Organization : BaseEntity
     public DateTimeOffset? OnboardingCompletedAt { get; set; }
     public bool IsActive { get; set; } = true;
 
+    /// <summary>Only meaningful while Status == Trial -- set once, at
+    /// provisioning time (see ClientProvisioningService.ProvisionClientAsync).
+    /// Nothing currently auto-expires a trial past this date; it's
+    /// informational for support/sales until a real subscription-lifecycle
+    /// job exists.</summary>
+    public DateOnly? TrialEndDate { get; set; }
+
+    /// <summary>Placeholder identifiers for a future real Stripe
+    /// integration -- stored so the rest of the billing-admin UI has
+    /// somewhere to put them, but nothing in this codebase ever calls
+    /// Stripe with them. See the phase spec's own "no Stripe integration
+    /// yet" instruction.</summary>
+    public string? StripeCustomerId { get; set; }
+    public string? StripeSubscriptionId { get; set; }
+
     public DateTimeOffset? SuspendedAt { get; set; }
     public Guid? SuspendedById { get; set; }
     public string? SuspensionReason { get; set; }
+
+    /// <summary>Distinct from Suspended -- see OrganizationStatus's own doc
+    /// comment for why. Cleared if the client is later reactivated via
+    /// ActivateClientAsync, the same way SuspendedAt/SuspensionReason are.</summary>
+    public DateTimeOffset? CancelledAt { get; set; }
+    public Guid? CancelledById { get; set; }
+    public string? CancellationReason { get; set; }
 
     public DateTimeOffset? ArchivedAt { get; set; }
     public Guid? ArchivedById { get; set; }

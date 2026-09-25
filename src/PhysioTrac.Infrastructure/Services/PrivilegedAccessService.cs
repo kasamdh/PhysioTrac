@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.SuperAdmin;
 using PhysioTrac.Domain.Entities;
+using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
 
 namespace PhysioTrac.Infrastructure.Services;
@@ -13,11 +15,13 @@ public class PrivilegedAccessService : IPrivilegedAccessService
 {
     private readonly PhysioTracDbContext _db;
     private readonly IAuditService _audit;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public PrivilegedAccessService(PhysioTracDbContext db, IAuditService audit)
+    public PrivilegedAccessService(PhysioTracDbContext db, IAuditService audit, UserManager<ApplicationUser> userManager)
     {
         _db = db;
         _audit = audit;
+        _userManager = userManager;
     }
 
     public async Task<PrivilegedAccessGrant?> ActiveGrantAsync(Guid organizationId, Guid actorId, CancellationToken ct = default)
@@ -29,7 +33,7 @@ public class PrivilegedAccessService : IPrivilegedAccessService
             .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<PrivilegedAccessGrant> RequestAsync(Guid organizationId, ICurrentUser actor, string reason, int durationHours, CancellationToken ct = default)
+    public async Task<PrivilegedAccessGrant> RequestAsync(Guid organizationId, ICurrentUser actor, string reason, int durationHours, string currentPassword, CancellationToken ct = default)
     {
         if (!IPrivilegedAccessService.AllowedDurationsHours.Contains(durationHours))
         {
@@ -39,6 +43,16 @@ public class PrivilegedAccessService : IPrivilegedAccessService
         if (string.IsNullOrEmpty(reason))
         {
             throw new InvalidOperationException("A reason is required to request privileged clinical access.");
+        }
+
+        // Reauthentication: even an already-authenticated session must
+        // re-prove the actor's own password immediately before this
+        // break-glass grant is issued.
+        var actingUser = await _userManager.FindByIdAsync(actor.UserId.ToString())
+            ?? throw new ForbiddenException("Your account could not be re-authenticated.");
+        if (!await _userManager.CheckPasswordAsync(actingUser, currentPassword))
+        {
+            throw new ForbiddenException("Your password could not be confirmed. Re-enter it to request access.");
         }
 
         var grant = new PrivilegedAccessGrant

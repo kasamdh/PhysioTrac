@@ -10,4 +10,8 @@ public record PrivilegedAccessGrantDto(
     string? RevokedByName,
     bool IsActive);
 
-public record RequestPrivilegedAccessRequest(string Reason, int DurationHours);
+/// <summary>CurrentPassword is the reauthentication step: even an already-
+/// logged-in super admin must re-prove who they are immediately before
+/// gaining break-glass clinical access, the same "step-up auth" pattern a
+/// bank might require before a high-risk action.</summary>
+public record RequestPrivilegedAccessRequest(string Reason, int DurationHours, string CurrentPassword);

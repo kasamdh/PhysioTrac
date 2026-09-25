@@ -73,6 +73,26 @@ public class AuthController : ControllerBase
             return InvalidCredentials();
         }
 
+        // Unlike the checks above, a suspended/cancelled organization isn't
+        // an enumeration risk to disclose -- the account and password are
+        // already confirmed correct, and the org's own staff already know
+        // their subscription state. Mirrors the structured error
+        // ActivateInvitation already returns for the same condition, so the
+        // frontend has one shape to handle either way.
+        if (user.OrganizationId is Guid organizationId)
+        {
+            var organization = await _db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, HttpContext.RequestAborted);
+            if (organization is not null && organization.Status is OrganizationStatus.Suspended or OrganizationStatus.Cancelled)
+            {
+                await AuditAuthEventAsync(user, "auth.login.failed", ip, HttpContext.RequestAborted);
+                var code = organization.Status == OrganizationStatus.Suspended ? "ORGANIZATION_SUSPENDED" : "ORGANIZATION_CANCELLED";
+                var reason = organization.Status == OrganizationStatus.Suspended
+                    ? "Your organization account is currently suspended. Please contact your administrator."
+                    : "Your organization's subscription has been cancelled. Please contact support to reactivate.";
+                return StatusCode(403, new { timestamp = DateTimeOffset.UtcNow, status = 403, code, message = reason });
+            }
+        }
+
         var userAgent = Request.Headers.UserAgent.ToString();
         var session = await _sessions.CreateSessionAsync(user.Id, user.OrganizationId, user.Role, ip, userAgent, HttpContext.RequestAborted);
 

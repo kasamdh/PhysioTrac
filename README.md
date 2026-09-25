@@ -493,6 +493,108 @@ out of scope per the phase spec), and the billing screens themselves
 (charge review queue, claims worklist, aging dashboard) -- same as every
 prior phase's frontend deferral.
 
+## Dashboards, reports, and SaaS administration
+
+Backend for "Phase 8." Gap analysis found the platform-admin half already
+substantially built: `IClientProvisioningService.ProvisionClientAsync`
+already created an organization and its owner admin (just not a first
+location); suspend/reactivate already existed with full audit coverage; and
+`IPrivilegedAccessService` already *was* the "tenant support access with
+reason, time limit, and full audit trail" feature end to end -- it only
+lacked reauthentication. Dashboards, on the other hand, were fully
+greenfield -- `DashboardPage.tsx` is still the original scaffold's single
+patient-list placeholder, and no report/aggregation backend of any kind
+existed for anything in this phase's list except revenue/outstanding
+balances, which Phase 7's `BillingReportsController` (aging, revenue,
+patient balance) already covers.
+
+**Dashboards** (`IDashboardService`, `/api/v1/dashboards/*`) -- new-patients,
+cancellations/no-shows, provider productivity (visits, units), visits and
+retention, referral sources, and location performance, all computed live
+from existing data (Appointment/Patient/Charge/ReferringProvider/Location),
+no new persisted state. "Today's schedule" needed no new endpoint at all --
+it's exactly `IAppointmentService.ListForRangeAsync` for `[today, tomorrow)`,
+already exposed at `GET /api/v1/appointments`. Every dashboard is tenant-
+isolated via `OrganizationRequiredAsync` and role-gated to a staff role
+(`RoleSets.AllStaff`, new -- every role except the platform-level SuperAdmin
+and the patient-portal role); a Therapist/Assistant additionally sees only
+their own caseload/visits everywhere, the same narrowing
+`ListForRangeAsync` itself already applies, rather than being blocked
+outright. Location performance (it carries revenue) is Billing-gated
+instead. Retention is a specific, documented methodology (split the range
+in half; did a patient seen in the first half also return in the second?),
+not a claimed industry-standard formula -- see `VisitsAndRetentionDto`'s own
+doc comment.
+
+**Organization/location performance for the platform Super Admin**
+(`IPlatformDashboardService`, `GET /api/v1/super-admin/dashboards/organization-performance`)
+-- the one legitimate place this app aggregates across tenants, gated by
+`RequirePlatformSuperAdmin`, excluded-archived-orgs tested explicitly.
+
+**Platform Super Admin additions to the already-existing lifecycle:**
+- **Organization onboarding wizard now creates a first `Location`** (new
+  `ProvisionClientRequest.LocationName`), reusing the organization's own
+  address as a sensible default for a brand-new single-location clinic.
+- **Subscription fields**: `OrganizationStatus` gained `Trial` and
+  `Cancelled` (was just Active/Suspended) -- every freshly provisioned
+  client now starts in `Trial` with a 14-day `Organization.TrialEndDate`,
+  not immediately Active. `CancelClientAsync` (new) is tracked separately
+  from `SuspendClientAsync` -- a client's own subscription ending versus
+  support suspending them for cause -- even though both currently just
+  flip `Status` and block login/access identically; see
+  `OrganizationStatus`'s own doc comment. Added placeholder
+  `StripeCustomerId`/`StripeSubscriptionId` fields, per the phase's own "no
+  Stripe integration yet" instruction -- nothing anywhere calls Stripe with
+  them.
+- **Usage metrics** (`ClientDto.UserCount`/`LocationCount`/`PatientCount`/`StorageBytesUsed`)
+  -- UserCount already existed; the other three are new, computed live
+  (storage is approximated from `PatientDocument.FileSizeBytes`, the only
+  place this app stores caller-uploaded file bytes today).
+- **Reauthentication** added to the already-existing break-glass workflow
+  (`IPrivilegedAccessService.RequestAsync` gained a required
+  `CurrentPassword`, verified via `UserManager.CheckPasswordAsync` before a
+  grant is issued) -- even an already-authenticated Super Admin session
+  must re-prove its own password immediately before this specific
+  high-risk action, the "step-up auth" pattern this phase asks for.
+- **Suspended/cancelled organizations cannot log in** -- found live during
+  verification that this wasn't actually true before: `AuthController
+  .Login` never checked organization status at all (only the invitation-
+  activation flow did); a suspended org's users could still authenticate
+  and get a session, only failing on their first subsequent API call via
+  `OrganizationRequiredAsync`. Added the same check directly to `Login`,
+  returning the same structured `{code, message}` shape
+  `ActivateInvitation` already used for this, so the frontend has one shape
+  to handle either way.
+
+Found and fixed a real, previously-dormant bug while live-verifying the
+onboarding wizard against real SQL Server for the first time this session:
+`ClientNumberSequence.Id` (a `short`) was implicitly configured by EF Core's
+convention as an IDENTITY column, but `NextClientNumberAsync`'s raw SQL
+inserts `Id = 1` explicitly -- SQL Server error 544, since nothing toggles
+`IDENTITY_INSERT` on. Never triggered before because this path had only
+ever run against the in-memory test provider, which doesn't enforce real
+IDENTITY semantics. Fixed with `.ValueGeneratedNever()`, plus a migration
+that drops and recreates the (always-empty-or-single-row) table, since SQL
+Server has no in-place `ALTER COLUMN` to drop `IDENTITY`.
+
+Verified: dotnet build clean, full xUnit suite green (337/337, 26 new),
+migrations applied to local SQL Server with no cascade-path conflicts, and
+live-verified end-to-end against the running API + real SQL Server:
+provisioned a real client through the wizard (confirmed Trial status,
+14-day trial end date, first location, usage metrics all correct),
+privileged-access reauthentication (wrong password rejected, correct
+password issues a grant), suspending Source Motion and confirming its admin
+could no longer log in (`ORGANIZATION_SUSPENDED`) then reactivating and
+confirming login worked again, all six org dashboards against real seed
+data, and the cross-tenant organization-performance report (including its
+403 for a non-Super-Admin caller) -- then cleaned up all test data.
+
+Deferred: the dashboard/SaaS-admin screens themselves (chart rendering,
+the onboarding wizard UI, the usage-metrics/billing-admin panels) -- same
+as every prior phase's frontend deferral -- and any real trial-expiration
+job (nothing currently auto-transitions a `Trial` past its `TrialEndDate`;
+it's informational until a subscription-lifecycle job exists).
+
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)

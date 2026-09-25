@@ -17,6 +17,13 @@ public interface IClientProvisioningService
 
     Task<ClientDto> ActivateClientAsync(long clientNumber, ICurrentUser actor, CancellationToken ct = default);
 
+    /// <summary>A client's own subscription ending -- distinct from
+    /// SuspendClientAsync (for-cause, reversible by support) even though
+    /// both currently just flip Status and block login/access. See
+    /// OrganizationStatus's own doc comment for why they're tracked
+    /// separately.</summary>
+    Task<ClientDto> CancelClientAsync(long clientNumber, string reason, ICurrentUser actor, CancellationToken ct = default);
+
     /// <summary>Soft-delete. Data is never removed; access is blocked like suspension.</summary>
     Task<ClientDto> ArchiveClientAsync(long clientNumber, string? reason, ICurrentUser actor, CancellationToken ct = default);
 

@@ -91,6 +91,16 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         builder.Entity<ClientNumberSequence>(e =>
         {
             e.HasKey(c => c.Id);
+            // Without this, EF Core's convention treats a numeric PK as an
+            // IDENTITY column -- but this table is deliberately a single,
+            // always-Id=1 row that ClientProvisioningService.NextClientNumberAsync
+            // inserts explicitly (see the entity's own doc comment). An
+            // IDENTITY column rejects that explicit insert with SQL Server
+            // error 544 unless IDENTITY_INSERT is toggled on, which nothing
+            // here does -- found live, since this path had never been
+            // exercised against real SQL Server before (only the in-memory
+            // provider, which doesn't enforce real IDENTITY semantics).
+            e.Property(c => c.Id).ValueGeneratedNever();
         });
 
         builder.Entity<ClientInvitation>(e =>

@@ -69,7 +69,7 @@ public class PrivilegedAccessController : ControllerBase
         {
             RequireSuperAdmin();
             var client = await RequireClientAsync(clientNumber, HttpContext.RequestAborted);
-            var grant = await _privilegedAccess.RequestAsync(client.Id, _currentUser, request.Reason, request.DurationHours, HttpContext.RequestAborted);
+            var grant = await _privilegedAccess.RequestAsync(client.Id, _currentUser, request.Reason, request.DurationHours, request.CurrentPassword, HttpContext.RequestAborted);
             return CreatedAtAction(nameof(ListGrants), new { clientNumber }, new { grant = await ToDtoAsync(grant, HttpContext.RequestAborted) });
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
