@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -17,12 +19,14 @@ public class PatientPaymentsController : ControllerBase
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
     private readonly PhysioTracDbContext _db;
+    private readonly IAuditService _audit;
 
-    public PatientPaymentsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    public PatientPaymentsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db, IAuditService audit)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
         _db = db;
+        _audit = audit;
     }
 
     /// <summary>Staff-facing view of a patient's online payment history.</summary>
@@ -43,6 +47,7 @@ public class PatientPaymentsController : ControllerBase
     /// succeeded or not, via `care/payment_processor.py`'s seam. Never
     /// accepts card/CVV data — only a processor reference.</summary>
     [HttpPost]
+    [EnableRateLimiting(RateLimitPolicies.Portal)]
     public async Task<IActionResult> Create([FromBody] CreatePatientPaymentRequest request)
     {
         try
@@ -63,6 +68,11 @@ public class PatientPaymentsController : ControllerBase
             };
             _db.PatientPayments.Add(payment);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "patient_payment.attempted", nameof(PatientPayment), payment.Id,
+                organization.Id, patientId: patient.Id, metadata: new { amount = payment.Amount, status = payment.Status.ToString() }, ct: HttpContext.RequestAborted);
+
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, payment);
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }

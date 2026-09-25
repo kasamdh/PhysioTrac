@@ -31,7 +31,7 @@ public class FunctionalGoalAndOutcomeTests
         var audit = new AuditService(db);
         var tenantAccess = new TenantAccessService(db, audit);
         var therapist = new TestCurrentUser { UserId = therapistId, OrganizationId = org.Id, Role = UserRole.Therapist };
-        return (db, new FunctionalGoalService(db, tenantAccess, audit), new OutcomeScoreService(db, tenantAccess), org, patient, therapist);
+        return (db, new FunctionalGoalService(db, tenantAccess, audit), new OutcomeScoreService(db, tenantAccess, audit), org, patient, therapist);
     }
 
     [Fact]

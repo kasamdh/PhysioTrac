@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Api.Contracts;
 using PhysioTrac.Application.Audit;
@@ -16,6 +17,7 @@ namespace PhysioTrac.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
+[EnableRateLimiting(RateLimitPolicies.Auth)]
 public class AuthController : ControllerBase
 {
     private readonly SignInManager<ApplicationUser> _signInManager;

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Tenancy;
@@ -12,11 +13,13 @@ public class OutcomeScoreService : IOutcomeScoreService
 {
     private readonly PhysioTracDbContext _db;
     private readonly ITenantAccessService _tenantAccess;
+    private readonly IAuditService _audit;
 
-    public OutcomeScoreService(PhysioTracDbContext db, ITenantAccessService tenantAccess)
+    public OutcomeScoreService(PhysioTracDbContext db, ITenantAccessService tenantAccess, IAuditService audit)
     {
         _db = db;
         _tenantAccess = tenantAccess;
+        _audit = audit;
     }
 
     public async Task<OutcomeScore> RecordAsync(RecordOutcomeScoreRequest request, ICurrentUser actor, CancellationToken ct = default)
@@ -36,6 +39,8 @@ public class OutcomeScoreService : IOutcomeScoreService
         var existing = await _db.OutcomeScores.FirstOrDefaultAsync(
             o => o.PatientId == patient.Id && o.Measure == request.Measure && o.MeasuredOn == request.MeasuredOn, ct);
 
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+
         if (existing is not null)
         {
             existing.Score = request.Score;
@@ -44,6 +49,11 @@ public class OutcomeScoreService : IOutcomeScoreService
             existing.NoteId = request.NoteId;
             existing.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(ct);
+
+            // OutcomeScore has no OrganizationId of its own, so it isn't
+            // covered by EntityChangeAuditInterceptor.
+            await _audit.RecordAuditEventAsync(actor.UserId, "outcome_score.updated", nameof(OutcomeScore), existing.Id,
+                organization.Id, patientId: patient.Id, metadata: new { measure = existing.Measure.ToString() }, ct: ct);
             return existing;
         }
 
@@ -60,6 +70,9 @@ public class OutcomeScoreService : IOutcomeScoreService
         };
         _db.OutcomeScores.Add(score);
         await _db.SaveChangesAsync(ct);
+
+        await _audit.RecordAuditEventAsync(actor.UserId, "outcome_score.recorded", nameof(OutcomeScore), score.Id,
+            organization.Id, patientId: patient.Id, metadata: new { measure = score.Measure.ToString() }, ct: ct);
         return score;
     }
 

@@ -45,7 +45,7 @@ public class PatientClinicalDetailControllersTests
         // rule working as intended, not a bug in this test's setup.
         var (db, org1000, patient, _, _) = await SeedAsync();
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new PatientAllergiesController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };
+        var controller = new PatientAllergiesController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db)) { ControllerContext = NewContext() };
 
         await controller.Create(patient.Id, new CreatePatientAllergyRequest("Penicillin", "Hives", AllergySeverity.Moderate, null));
         var result = Assert.IsType<OkObjectResult>(await controller.List(patient.Id));
@@ -58,7 +58,7 @@ public class PatientClinicalDetailControllersTests
     {
         var (db, org1000, _, _, patientIn1001) = await SeedAsync();
         var therapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Therapist };
-        var controller = new PatientAllergiesController(new TenantAccessService(db, new AuditService(db)), therapist, db) { ControllerContext = NewContext() };
+        var controller = new PatientAllergiesController(new TenantAccessService(db, new AuditService(db)), therapist, db, new AuditService(db)) { ControllerContext = NewContext() };
 
         var result = Assert.IsType<ObjectResult>(await controller.Create(
             patientIn1001.Id, new CreatePatientAllergyRequest("Latex", null, AllergySeverity.Mild, null)));
@@ -71,7 +71,7 @@ public class PatientClinicalDetailControllersTests
     {
         var (db, org1000, patient, _, _) = await SeedAsync();
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new PatientAllergiesController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };
+        var controller = new PatientAllergiesController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db)) { ControllerContext = NewContext() };
         var created = Assert.IsType<CreatedAtActionResult>(await controller.Create(patient.Id, new CreatePatientAllergyRequest("Latex", null, AllergySeverity.Mild, null)));
         var dto = Assert.IsType<PatientAllergyDto>(created.Value);
 
@@ -88,7 +88,7 @@ public class PatientClinicalDetailControllersTests
     {
         var (db, org1000, patient, _, _) = await SeedAsync();
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new PatientMedicationsController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };
+        var controller = new PatientMedicationsController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db)) { ControllerContext = NewContext() };
 
         var created = Assert.IsType<CreatedAtActionResult>(await controller.Create(
             patient.Id, new CreatePatientMedicationRequest("Ibuprofen", "400mg", "As needed", null, null, null)));
@@ -104,7 +104,7 @@ public class PatientClinicalDetailControllersTests
     {
         var (db, org1000, _, _, patientIn1001) = await SeedAsync();
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new PatientMedicationsController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };
+        var controller = new PatientMedicationsController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db)) { ControllerContext = NewContext() };
 
         var result = Assert.IsType<ObjectResult>(await controller.Create(
             patientIn1001.Id, new CreatePatientMedicationRequest("Ibuprofen", null, null, null, null, null)));
@@ -122,7 +122,7 @@ public class PatientClinicalDetailControllersTests
         await db.SaveChangesAsync();
 
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new PatientDiagnosesController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };
+        var controller = new PatientDiagnosesController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db)) { ControllerContext = NewContext() };
 
         await controller.Create(patient.Id, new CreatePatientDiagnosisRequest(code.Id, true, DateOnly.FromDateTime(DateTime.Today), null));
         var result = Assert.IsType<OkObjectResult>(await controller.List(patient.Id));
@@ -142,7 +142,7 @@ public class PatientClinicalDetailControllersTests
         await db.SaveChangesAsync();
 
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new PatientDiagnosesController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };
+        var controller = new PatientDiagnosesController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db)) { ControllerContext = NewContext() };
         var created = Assert.IsType<CreatedAtActionResult>(await controller.Create(patient.Id, new CreatePatientDiagnosisRequest(code.Id, true, null, null)));
         var dto = Assert.IsType<PatientDiagnosisDto>(created.Value);
 
@@ -159,7 +159,7 @@ public class PatientClinicalDetailControllersTests
         await db.SaveChangesAsync();
 
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new PatientDiagnosesController(new TenantAccessService(db, new AuditService(db)), admin, db) { ControllerContext = NewContext() };
+        var controller = new PatientDiagnosesController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db)) { ControllerContext = NewContext() };
 
         var result = Assert.IsType<ObjectResult>(await controller.Create(patientIn1001.Id, new CreatePatientDiagnosisRequest(code.Id, false, null, null)));
         Assert.Equal(403, result.StatusCode);

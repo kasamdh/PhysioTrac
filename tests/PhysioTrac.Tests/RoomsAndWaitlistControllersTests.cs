@@ -26,7 +26,7 @@ public class RoomsControllerTests
         await db.SaveChangesAsync();
 
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Admin };
-        var controller = new RoomsController(new TenantAccessService(db, new AuditService(db)), admin, db)
+        var controller = new RoomsController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -52,7 +52,7 @@ public class RoomsControllerTests
         await db.SaveChangesAsync();
 
         var admin = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org1000.Id, Role = UserRole.Admin };
-        var controller = new RoomsController(new TenantAccessService(db, new AuditService(db)), admin, db)
+        var controller = new RoomsController(new TenantAccessService(db, new AuditService(db)), admin, db, new AuditService(db))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -72,7 +72,7 @@ public class RoomsControllerTests
         await db.SaveChangesAsync();
 
         var therapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Therapist };
-        var controller = new RoomsController(new TenantAccessService(db, new AuditService(db)), therapist, db)
+        var controller = new RoomsController(new TenantAccessService(db, new AuditService(db)), therapist, db, new AuditService(db))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };

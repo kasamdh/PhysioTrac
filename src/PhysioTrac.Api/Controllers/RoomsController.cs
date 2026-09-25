@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -21,12 +22,14 @@ public class RoomsController : ControllerBase
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
     private readonly PhysioTracDbContext _db;
+    private readonly IAuditService _audit;
 
-    public RoomsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    public RoomsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db, IAuditService audit)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
         _db = db;
+        _audit = audit;
     }
 
     [HttpGet]
@@ -61,6 +64,12 @@ public class RoomsController : ControllerBase
             var room = new Room { LocationId = location.Id, Name = request.Name.Trim() };
             _db.Rooms.Add(room);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            // Room has no OrganizationId of its own (only via Location), so
+            // it isn't covered by EntityChangeAuditInterceptor.
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "room.created", nameof(Room), room.Id,
+                location.OrganizationId, ct: HttpContext.RequestAborted);
+
             return CreatedAtAction(nameof(List), new { locationId }, ToDto(room));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -80,6 +89,10 @@ public class RoomsController : ControllerBase
             room.IsActive = false;
             room.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "room.deactivated", nameof(Room), room.Id,
+                location.OrganizationId, ct: HttpContext.RequestAborted);
+
             return Ok(ToDto(room));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }

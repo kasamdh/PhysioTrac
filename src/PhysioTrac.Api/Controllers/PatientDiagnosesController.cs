@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -20,12 +21,14 @@ public class PatientDiagnosesController : ControllerBase
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
     private readonly PhysioTracDbContext _db;
+    private readonly IAuditService _audit;
 
-    public PatientDiagnosesController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    public PatientDiagnosesController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db, IAuditService audit)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
         _db = db;
+        _audit = audit;
     }
 
     [HttpGet]
@@ -66,6 +69,10 @@ public class PatientDiagnosesController : ControllerBase
             _db.PatientDiagnoses.Add(diagnosis);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
 
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "patient_diagnosis.created", nameof(PatientDiagnosis), diagnosis.Id,
+                organization.Id, patientId: patient.Id, metadata: new { diagnosisCode = diagnosisCode.Code }, ct: HttpContext.RequestAborted);
+
             diagnosis.DiagnosisCode = diagnosisCode;
             return CreatedAtAction(nameof(List), new { patientId }, ToDto(diagnosis));
         }
@@ -87,6 +94,11 @@ public class PatientDiagnosesController : ControllerBase
             diagnosis.ResolvedDate = DateOnly.FromDateTime(DateTime.UtcNow);
             diagnosis.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "patient_diagnosis.resolved", nameof(PatientDiagnosis), diagnosis.Id,
+                organization.Id, patientId: patient.Id, ct: HttpContext.RequestAborted);
+
             return Ok(ToDto(diagnosis));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }

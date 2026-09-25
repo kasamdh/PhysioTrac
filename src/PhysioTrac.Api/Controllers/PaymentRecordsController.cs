@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -17,12 +18,14 @@ public class PaymentRecordsController : ControllerBase
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
     private readonly PhysioTracDbContext _db;
+    private readonly IAuditService _audit;
 
-    public PaymentRecordsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    public PaymentRecordsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db, IAuditService audit)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
         _db = db;
+        _audit = audit;
     }
 
     [HttpGet("patient/{patientId:guid}")]
@@ -67,6 +70,15 @@ public class PaymentRecordsController : ControllerBase
             };
             _db.PaymentRecords.Add(payment);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            // PaymentRecord has no OrganizationId of its own, so it isn't
+            // covered by EntityChangeAuditInterceptor -- a financial-record
+            // creation is exactly the kind of event that must never be
+            // audit-silent.
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "payment_record.created", nameof(PaymentRecord), payment.Id,
+                organization.Id, patientId: patient.Id, metadata: new { amount = payment.Amount, method = payment.Method?.ToString() }, ct: HttpContext.RequestAborted);
+
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, payment);
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }

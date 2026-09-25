@@ -24,6 +24,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 COPY --from=build /app/publish .
 
+# The base image ships a non-root "app" user (UID/GID 64198) specifically
+# for this -- switching to it means a container-escape or dependency RCE
+# doesn't hand the attacker root inside the container. WORKDIR/app's
+# contents must be readable by that user, which the COPY above already
+# gives it (owned by root, world-readable is the image default); nothing
+# here writes to the filesystem at runtime, so no explicit chown is needed.
+USER $APP_UID
+
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 

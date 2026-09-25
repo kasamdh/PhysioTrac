@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Booking;
 using PhysioTrac.Application.Common;
@@ -14,6 +15,7 @@ namespace PhysioTrac.Api.Controllers;
 [ApiController]
 [Route("api/v1/portal")]
 [Authorize]
+[EnableRateLimiting(RateLimitPolicies.Portal)]
 public class PortalBookingController : ControllerBase
 {
     private readonly ICurrentUser _currentUser;

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -21,12 +22,14 @@ public class PatientAllergiesController : ControllerBase
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
     private readonly PhysioTracDbContext _db;
+    private readonly IAuditService _audit;
 
-    public PatientAllergiesController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    public PatientAllergiesController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db, IAuditService audit)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
         _db = db;
+        _audit = audit;
     }
 
     [HttpGet]
@@ -68,6 +71,14 @@ public class PatientAllergiesController : ControllerBase
             };
             _db.PatientAllergies.Add(allergy);
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            // PatientAllergy carries no OrganizationId of its own, so it
+            // isn't covered by EntityChangeAuditInterceptor -- this explicit
+            // call is the only audit trail a new allergy record gets.
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "patient_allergy.created", nameof(PatientAllergy), allergy.Id,
+                organization.Id, patientId: patient.Id, ct: HttpContext.RequestAborted);
+
             return CreatedAtAction(nameof(List), new { patientId }, ToDto(allergy));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -87,6 +98,11 @@ public class PatientAllergiesController : ControllerBase
             allergy.Notes = request?.Reason is { Length: > 0 } reason ? $"{allergy.Notes}\n[deactivated: {reason}]".Trim() : allergy.Notes;
             allergy.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "patient_allergy.deactivated", nameof(PatientAllergy), allergy.Id,
+                organization.Id, patientId: patient.Id, ct: HttpContext.RequestAborted);
+
             return Ok(ToDto(allergy));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }

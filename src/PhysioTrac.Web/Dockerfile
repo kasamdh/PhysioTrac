@@ -35,6 +35,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 COPY --from=build /app/publish .
 
+# See PhysioTrac.Api/Dockerfile's identical line for why.
+USER $APP_UID
+
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 

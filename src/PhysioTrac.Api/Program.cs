@@ -1,7 +1,11 @@
+using System.Net;
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Api;
 using PhysioTrac.Api.Auth;
 using PhysioTrac.Api.Authorization;
 using PhysioTrac.Api.Filters;
@@ -123,10 +127,72 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Per-IP fixed-window limits, complementing (not replacing) the per-account
+// failed-login lockout above -- see SecurityOptions' own doc comment on
+// why both exist. RemoteIpAddress is used directly, not a forwarded-header
+// value, since this API isn't known to sit behind a trusted proxy that
+// sets one; a real deployment behind a load balancer/reverse proxy would
+// need to configure ForwardedHeadersOptions first so this reads the real
+// client IP instead of the proxy's.
+static string ClientIpKey(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { detail = "Too many requests. Please wait and try again." }, ct);
+    };
+
+    // Baseline for every endpoint, even ones with no [EnableRateLimiting]
+    // attribute -- stacks with (doesn't replace) the stricter named
+    // policies below on the specific controllers that use them.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientIpKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = security.GlobalRateLimitPermitsPerWindow,
+            Window = TimeSpan.FromSeconds(security.GlobalRateLimitWindowSeconds),
+        }));
+
+    options.AddPolicy(RateLimitPolicies.Auth, context =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientIpKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = security.AuthRateLimitPermitsPerWindow,
+            Window = TimeSpan.FromSeconds(security.AuthRateLimitWindowSeconds),
+        }));
+
+    options.AddPolicy(RateLimitPolicies.Portal, context =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientIpKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = security.PortalRateLimitPermitsPerWindow,
+            Window = TimeSpan.FromSeconds(security.PortalRateLimitWindowSeconds),
+        }));
+});
+
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+});
+
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseSerilogRequestLogging();
+
+// HSTS tells the browser to upgrade to HTTPS on its own for MaxAge -- only
+// meaningful, and only enabled, once there's a real certificate to enforce;
+// in Development this API is reached over plain HTTP on localhost, where
+// forcing HSTS would just make the browser cache a broken HTTPS upgrade for
+// a port that was never serving TLS. UseHttpsRedirection() below still
+// applies in every environment.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
 
 // Applies pending migrations and seeds the demo dataset on startup.
 // Development-only, deliberately: a production database is never
@@ -151,6 +217,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors(FrontendCorsPolicy);
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseMiddleware<SessionValidationMiddleware>();

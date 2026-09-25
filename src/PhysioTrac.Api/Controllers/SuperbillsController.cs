@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -18,12 +19,14 @@ public class SuperbillsController : ControllerBase
     private readonly ITenantAccessService _tenantAccess;
     private readonly ICurrentUser _currentUser;
     private readonly PhysioTracDbContext _db;
+    private readonly IAuditService _audit;
 
-    public SuperbillsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db)
+    public SuperbillsController(ITenantAccessService tenantAccess, ICurrentUser currentUser, PhysioTracDbContext db, IAuditService audit)
     {
         _tenantAccess = tenantAccess;
         _currentUser = currentUser;
         _db = db;
+        _audit = audit;
     }
 
     [HttpGet("patient/{patientId:guid}")]
@@ -70,6 +73,12 @@ public class SuperbillsController : ControllerBase
 
             foreach (var charge in charges) charge.SuperbillId = superbill.Id;
             if (charges.Count > 0) await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            // Superbill has no OrganizationId of its own, so it isn't
+            // covered by EntityChangeAuditInterceptor.
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            await _audit.RecordAuditEventAsync(_currentUser.UserId, "superbill.created", nameof(Superbill), superbill.Id,
+                organization.Id, patientId: patient.Id, metadata: new { amount = superbill.Amount, chargeCount = charges.Count }, ct: HttpContext.RequestAborted);
 
             return CreatedAtAction(nameof(ListForPatient), new { patientId = patient.Id }, superbill);
         }
