@@ -502,7 +502,7 @@ public class ClinicalNoteService : IClinicalNoteService
         if (note.AppointmentId is not Guid appointmentId) return;
         var appointment = await _db.Appointments.FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
         if (appointment is null) return;
-        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn)) return;
+        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn or AppointmentStatus.InProgress)) return;
 
         appointment.Status = AppointmentStatus.Completed;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;

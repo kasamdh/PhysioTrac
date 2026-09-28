@@ -133,7 +133,7 @@ public class WaitlistControllerTests
 
         var start = DateTimeOffset.UtcNow.AddDays(1);
         var result = Assert.IsType<OkObjectResult>(await controller.Convert(entry.Id,
-            new ConvertWaitlistEntryRequest(Guid.NewGuid(), null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30))));
+            new ConvertWaitlistEntryRequest(TestTherapists.Add(db, org.Id), null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30))));
 
         Assert.NotNull(await db.Appointments.FirstOrDefaultAsync());
         var listResult = Assert.IsType<OkObjectResult>(await controller.List(WaitlistStatus.Fulfilled));

@@ -46,6 +46,22 @@ public static class RoleSets
         UserRole.Admin, UserRole.Director
     };
 
+    /// <summary>May knowingly book outside a provider's availability, or
+    /// double-book when the organization allows it, with a recorded reason
+    /// (audited as schedule.conflict_override).</summary>
+    public static readonly IReadOnlySet<UserRole> ScheduleOverride = new HashSet<UserRole>
+    {
+        UserRole.Admin, UserRole.Director
+    };
+
+    /// <summary>May change providers' weekly working hours and time off --
+    /// the front desk runs the schedule, so Scheduler alongside admins.
+    /// Clinicians see their hours but don't edit them.</summary>
+    public static readonly IReadOnlySet<UserRole> AvailabilityManagement = new HashSet<UserRole>
+    {
+        UserRole.Admin, UserRole.Director, UserRole.Scheduler
+    };
+
     /// <summary>Every staff role a tenant can have -- i.e. everyone except
     /// the platform-level SuperAdmin (who has no standing org access at
     /// all) and Patient (the portal role). Used by dashboards whose content

@@ -181,6 +181,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         builder.Entity<Provider>(e =>
         {
             e.HasIndex(p => new { p.OrganizationId, p.LastName, p.FirstName });
+            e.Property(p => p.Discipline).HasConversion<string>().HasMaxLength(8);
             e.HasOne(p => p.Organization).WithMany()
                 .HasForeignKey(p => p.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(p => p.Locations).WithMany(l => l.Providers)

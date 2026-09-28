@@ -32,14 +32,22 @@ public record AppointmentDto(
 public record CreateAppointmentRequest(
     Guid PatientId, Guid TherapistId, Guid? ProviderId, Guid? LocationDetailId, Guid? RoomId, Guid? AppointmentTypeId,
     AppointmentKind Kind, DateTimeOffset StartsAt, DateTimeOffset EndsAt,
-    bool IsHomeVisit, string? ReasonForVisit);
+    bool IsHomeVisit, string? ReasonForVisit, string? OverrideReason = null, string? Notes = null);
 
-public record RescheduleAppointmentRequest(DateTimeOffset StartsAt, DateTimeOffset EndsAt, Guid? ProviderId, Guid? LocationDetailId, Guid? RoomId);
+public record RescheduleAppointmentRequest(
+    DateTimeOffset StartsAt, DateTimeOffset EndsAt, Guid? ProviderId, Guid? LocationDetailId, Guid? RoomId, string? OverrideReason = null);
 
 public record CreateAppointmentSeriesRequest(
     Guid PatientId, Guid TherapistId, Guid? ProviderId, Guid? LocationDetailId, Guid? RoomId, Guid? AppointmentTypeId,
     AppointmentKind Kind, DateTimeOffset FirstStartsAt, DateTimeOffset FirstEndsAt,
-    int IntervalWeeks, int OccurrenceCount, string? ReasonForVisit);
+    int IntervalWeeks, int OccurrenceCount, string? ReasonForVisit,
+    string? Notes = null, IReadOnlyList<Weekday>? DaysOfWeek = null, DateOnly? EndDate = null, bool SkipConflicting = false);
+
+/// <summary>One generated occurrence of a proposed series and every rule
+/// it would break -- empty Violations means it can be booked.</summary>
+public record SeriesOccurrencePreviewDto(DateTimeOffset StartsAt, DateTimeOffset EndsAt, IReadOnlyList<SchedulingViolation> Violations);
+
+public record SeriesPreviewDto(int Bookable, int Conflicting, IReadOnlyList<SeriesOccurrencePreviewDto> Occurrences);
 
 public record AppointmentSeriesDto(Guid Id, int IntervalWeeks, int OccurrenceCount, bool IsActive, IReadOnlyList<AppointmentDto> Occurrences);
 
