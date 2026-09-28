@@ -130,8 +130,8 @@ public class ProviderAvailabilityServiceTests
     }
 
     [Theory]
-    [InlineData(UserRole.Therapist)]
     [InlineData(UserRole.Biller)]
+    [InlineData(UserRole.Compliance)]
     public async Task Changes_ByARoleOutsideAvailabilityManagement_AreForbidden(UserRole role)
     {
         var f = new SchedulingFixture();
@@ -153,5 +153,22 @@ public class ProviderAvailabilityServiceTests
         await Assert.ThrowsAsync<NotFoundException>(() => NewService(f).GetAsync(f.Pt.Id, otherAdmin));
         await Assert.ThrowsAsync<NotFoundException>(() =>
             NewService(f).CreateTimeOffAsync(f.Pt.Id, new CreateTimeOffRequest(f.At(9), f.At(10), TimeOffReason.Other, null), otherAdmin));
+    }
+
+    [Theory]
+    [InlineData(UserRole.Therapist)]
+    [InlineData(UserRole.Assistant)]
+    public async Task PtsAndPtas_CanManageAnyProvidersHours_LikeAdmins(UserRole role)
+    {
+        var f = new SchedulingFixture();
+        var service = NewService(f);
+        var clinician = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = f.Org.Id, Role = role };
+
+        var updated = await service.ReplaceWeeklyHoursAsync(f.Pt.Id,
+            new ReplaceWeeklyHoursRequest([Window(f, Weekday.Monday, "09:00", "13:00")]), clinician);
+        await service.CreateTimeOffAsync(f.Pt.Id, new CreateTimeOffRequest(f.At(10), f.At(11), TimeOffReason.Meeting, null), clinician);
+
+        Assert.True(updated.CanManage);
+        Assert.Single(updated.WeeklyHours);
     }
 }

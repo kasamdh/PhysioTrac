@@ -24,7 +24,9 @@ public class TenantAccessService : ITenantAccessService
 
     public async Task<Organization> OrganizationRequiredAsync(ICurrentUser user, CancellationToken ct = default)
     {
-        if (user.IsPlatformSuperAdmin)
+        // (While access control is off, a SuperAdmin works inside a clinic --
+        // see AccessControl.SuperAdminOrganizationId.)
+        if (user.IsPlatformSuperAdmin && AccessControl.Enabled)
         {
             throw new ForbiddenException("Platform administrators must use the super-admin workspace.");
         }
@@ -84,12 +86,24 @@ public class TenantAccessService : ITenantAccessService
         // patient-scoped read (GET /api/v1/patients, document/consent/
         // message listing) despite registration/scheduling/billing being
         // those roles' entire job per the spec.
-        if (user.Role is UserRole.Admin or UserRole.Director or UserRole.Compliance or UserRole.Scheduler or UserRole.Biller)
+        // Therapists see the whole roster too (clinic decision, 2026-09-28):
+        // they cover each other's patients and register new ones, so a
+        // caseload-only view hid charts they legitimately work on. Assistants
+        // (PTAs) remain caseload-scoped.
+        if (user.Role is UserRole.Admin or UserRole.Director or UserRole.Compliance or UserRole.Scheduler or UserRole.Biller
+            or UserRole.Therapist)
         {
             return query;
         }
 
-        if (user.Role is UserRole.Therapist or UserRole.Assistant)
+        // Access control OFF: every staff role sees the organization's whole
+        // roster (the Patient-role check above already ran and still applies).
+        if (AccessControl.Bypasses(user.Role))
+        {
+            return query;
+        }
+
+        if (user.Role is UserRole.Assistant)
         {
             return query.Where(p => p.AssignedTherapistId == user.UserId);
         }
@@ -141,6 +155,9 @@ public class TenantAccessService : ITenantAccessService
 
     public void RequireRole(ICurrentUser user, IReadOnlySet<UserRole> roles)
     {
+        // Access control OFF (see AccessControl): every staff role passes,
+        // including the ad-hoc role lists some services pass in directly.
+        if (AccessControl.Bypasses(user.Role)) return;
         if (!roles.Contains(user.Role))
         {
             throw new ForbiddenException("Your role is not permitted to perform this action.");
@@ -149,6 +166,9 @@ public class TenantAccessService : ITenantAccessService
 
     public void RequirePlatformSuperAdmin(ICurrentUser user)
     {
+        // Access control OFF: organization staff can use the super-admin
+        // module too ("everyone is a super admin" while the product is built).
+        if (AccessControl.Bypasses(user.Role)) return;
         if (!user.IsPlatformSuperAdmin)
         {
             throw new ForbiddenException("Only platform super administrators can manage clients.");
@@ -178,7 +198,9 @@ public class TenantAccessService : ITenantAccessService
     /// that only checks <c>OrganizationId is null</c>.</summary>
     private Guid OrganizationRequiredSync(ICurrentUser user)
     {
-        if (user.IsPlatformSuperAdmin)
+        // (While access control is off, a SuperAdmin works inside a clinic --
+        // see AccessControl.SuperAdminOrganizationId.)
+        if (user.IsPlatformSuperAdmin && AccessControl.Enabled)
         {
             throw new ForbiddenException("Platform administrators must use the super-admin workspace.");
         }

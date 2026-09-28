@@ -17,7 +17,9 @@ namespace PhysioTrac.Infrastructure.Services;
 /// <summary>Direct port of `care/note_management.py`.</summary>
 public class ClinicalNoteService : IClinicalNoteService
 {
-    private static readonly HashSet<UserRole> FinalizingRoles = new() { UserRole.Admin, UserRole.Director };
+    /// <summary>Admin/Director may view, edit, sign, and co-sign any note --
+    /// and, while role-based access control is off, so may every staff role.</summary>
+    private static readonly IReadOnlySet<UserRole> FinalizingRoles = new RoleSet([UserRole.Admin, UserRole.Director]);
 
     private readonly PhysioTracDbContext _db;
     private readonly ITenantAccessService _tenantAccess;

@@ -35,7 +35,7 @@ public class ScheduleService : IScheduleService
         var config = await ConfigAsync(organization.Id, ct);
 
         var canSchedule = RoleSets.Scheduling.Contains(actor.Role);
-        var isClinician = actor.Role is UserRole.Therapist or UserRole.Assistant;
+        var isClinician = AccessControl.Enabled && actor.Role is UserRole.Therapist or UserRole.Assistant;
         var locations = await _db.Locations.Where(l => l.OrganizationId == organization.Id && l.IsActive)
             .OrderBy(l => l.Name).ToListAsync(ct);
         var types = await _db.AppointmentTypes.Where(t => t.OrganizationId == organization.Id && t.IsActive)
@@ -49,7 +49,7 @@ public class ScheduleService : IScheduleService
             config.AllowDoubleBookOverride,
             CanManageAvailability: RoleSets.AvailabilityManagement.Contains(actor.Role),
             locations.Select(l => new ScheduleLocationDto(l.Id, l.Name, l.Timezone, l.State)).ToList(),
-            (await VisibleProvidersQuery(actor, organization.Id).Include(p => p.Locations).OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToListAsync(ct))
+            (await OrganizationProviders(organization.Id).Include(p => p.Locations).OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToListAsync(ct))
                 .Select(ToProviderDto).ToList(),
             types.Select(t => new ScheduleAppointmentTypeDto(t.Id, t.Name, t.DefaultDurationMinutes, t.Color, t.DefaultKind)).ToList());
     }
@@ -60,7 +60,7 @@ public class ScheduleService : IScheduleService
         RequireSaneRange(query.From, query.To, maxDays: 62);
         var tz = await TimeZoneAsync(organization, query.LocationId, ct);
 
-        var appointments = SortByStart(await Filtered(actor, organization.Id, query).ToListAsync(ct));
+        var appointments = SortByStart(await Filtered(organization.Id, query).ToListAsync(ct));
         return new ScheduleRangeDto(tz.Id, await ToDtosAsync(appointments, ct));
     }
 
@@ -71,7 +71,7 @@ public class ScheduleService : IScheduleService
         var tz = await TimeZoneAsync(organization, locationId, ct);
         var (dayStart, dayEnd) = DayBounds(date, tz);
 
-        var appointments = SortByStart(await Filtered(actor, organization.Id, new ScheduleQuery(dayStart, dayEnd, providerId, locationId))
+        var appointments = SortByStart(await Filtered(organization.Id, new ScheduleQuery(dayStart, dayEnd, providerId, locationId))
             .ToListAsync(ct));
 
         // Columns: every active provider working at this location (or at all,
@@ -80,7 +80,7 @@ public class ScheduleService : IScheduleService
         // never silently vanish from the Day view.
         // A provider with no login can't be assigned appointments (every
         // booking needs a TherapistId), so an empty column for them is noise.
-        var providersQuery = VisibleProvidersQuery(actor, organization.Id).Where(p => p.IsActive && p.UserId != null);
+        var providersQuery = OrganizationProviders(organization.Id).Where(p => p.IsActive && p.UserId != null);
         if (locationId is Guid lid) providersQuery = providersQuery.Where(p => p.Locations.Any(l => l.Id == lid));
         if (providerId is Guid pid) providersQuery = providersQuery.Where(p => p.Id == pid);
         var providers = await providersQuery.Include(p => p.Locations).ToListAsync(ct);
@@ -140,7 +140,7 @@ public class ScheduleService : IScheduleService
         var (rangeStart, _) = DayBounds(from, tz);
         var (_, rangeEnd) = DayBounds(to, tz);
 
-        var starts = await Filtered(actor, organization.Id, new ScheduleQuery(rangeStart, rangeEnd, providerId, locationId))
+        var starts = await Filtered(organization.Id, new ScheduleQuery(rangeStart, rangeEnd, providerId, locationId))
             .Where(a => a.Status != AppointmentStatus.Cancelled)
             .Select(a => a.StartsAt)
             .ToListAsync(ct);
@@ -158,7 +158,7 @@ public class ScheduleService : IScheduleService
         var organization = await RequireStaffAsync(actor, ct);
         RequireSaneRange(query.From, query.To, maxDays: 400);
 
-        var filtered = Filtered(actor, organization.Id, query);
+        var filtered = Filtered(organization.Id, query);
         var total = await filtered.CountAsync(ct);
         var size = Math.Clamp(pageSize, 1, 100);
         var current = Math.Max(page, 1);
@@ -215,9 +215,9 @@ public class ScheduleService : IScheduleService
     }
 
     /// <summary>Same visibility rule as IAppointmentService.ListForRangeAsync:
-    /// the organization's appointments (tenant via Patient), narrowed to the
-    /// caller's own for Therapist/Assistant.</summary>
-    private IQueryable<Appointment> Filtered(ICurrentUser actor, Guid organizationId, ScheduleQuery query)
+    /// every appointment in the organization (tenant via Patient). PTs and
+    /// PTAs see the whole schedule, like admins (clinic decision, 2026-09-28).</summary>
+    private IQueryable<Appointment> Filtered(Guid organizationId, ScheduleQuery query)
     {
         var patients = _db.Patients.Where(p => p.OrganizationId == organizationId);
         if (!string.IsNullOrWhiteSpace(query.PatientSearch))
@@ -232,10 +232,6 @@ public class ScheduleService : IScheduleService
             .Where(a => a.StartsAt < query.To && a.EndsAt > query.From)
             .Join(patients, a => a.PatientId, p => p.Id, (a, p) => a);
 
-        if (actor.Role is UserRole.Therapist or UserRole.Assistant)
-        {
-            appointments = appointments.Where(a => a.TherapistId == actor.UserId);
-        }
         if (query.ProviderId is Guid pid) appointments = appointments.Where(a => a.ProviderId == pid);
         if (query.LocationId is Guid lid) appointments = appointments.Where(a => a.LocationDetailId == lid);
         if (query.Status is AppointmentStatus status) appointments = appointments.Where(a => a.Status == status);
@@ -243,13 +239,8 @@ public class ScheduleService : IScheduleService
         return appointments;
     }
 
-    private IQueryable<Provider> VisibleProvidersQuery(ICurrentUser actor, Guid organizationId)
-    {
-        var providers = _db.Providers.Where(p => p.OrganizationId == organizationId);
-        return actor.Role is UserRole.Therapist or UserRole.Assistant
-            ? providers.Where(p => p.UserId == actor.UserId)
-            : providers;
-    }
+    private IQueryable<Provider> OrganizationProviders(Guid organizationId) =>
+        _db.Providers.Where(p => p.OrganizationId == organizationId);
 
     private async Task<IReadOnlyList<ScheduleAppointmentDto>> ToDtosAsync(IReadOnlyList<Appointment> appointments, CancellationToken ct)
     {

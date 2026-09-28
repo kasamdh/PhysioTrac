@@ -1,3 +1,4 @@
+using PhysioTrac.Application.Tenancy;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using PhysioTrac.Application.Auth;
@@ -9,6 +10,19 @@ using PhysioTrac.Web.Components;
 using PhysioTrac.Web.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Role-based access control can be switched OFF while the product is being
+// built (AccessControl:Enabled=false in appsettings.Development.json) --
+// every staff login then has full access to every module. Never allowed
+// outside Development: refuse to start rather than run a real deployment
+// with role checks disabled.
+AccessControl.Enabled = builder.Configuration.GetValue("AccessControl:Enabled", true);
+if (!AccessControl.Enabled && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "AccessControl:Enabled is false, which is only allowed in Development. " +
+        "Remove the setting (or set it to true) before running in " + builder.Environment.EnvironmentName + ".");
+}
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -59,6 +73,9 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Access control OFF: give the platform SuperAdmin a clinic to work in.
+await AccessControlStartup.ResolveSuperAdminOrganizationAsync(app.Services);
 
 if (!app.Environment.IsDevelopment())
 {

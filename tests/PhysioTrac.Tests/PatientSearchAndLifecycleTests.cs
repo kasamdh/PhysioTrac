@@ -135,8 +135,8 @@ public class PatientSearchAndLifecycleTests
     public async Task Delete_ByUnauthorizedRole_Returns403_AndLeavesThePatientAlone()
     {
         var (db, org, _, alpha, _) = await SeedAsync();
-        var therapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Therapist };
-        var controller = NewController(db, therapist);
+        var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
+        var controller = NewController(db, biller);
 
         var result = Assert.IsType<ObjectResult>(await controller.Delete(alpha.Id));
         Assert.Equal(403, result.StatusCode);

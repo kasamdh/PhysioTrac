@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using PhysioTrac.Application.Auth;
+using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Domain.Enums;
 
 namespace PhysioTrac.Infrastructure.Identity;
@@ -29,8 +30,13 @@ public class ClaimsCurrentUser : ICurrentUser
     public Guid UserId => Guid.TryParse(
         Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : Guid.Empty;
 
+    /// <summary>The caller's organization. While access control is off, a
+    /// platform SuperAdmin (who has none) works inside
+    /// AccessControl.SuperAdminOrganizationId so every clinic module opens.</summary>
     public Guid? OrganizationId => Guid.TryParse(
-        Principal?.FindFirst(AppClaimTypes.OrganizationId)?.Value, out var orgId) ? orgId : null;
+        Principal?.FindFirst(AppClaimTypes.OrganizationId)?.Value, out var orgId)
+            ? orgId
+            : !AccessControl.Enabled && IsPlatformSuperAdmin ? AccessControl.SuperAdminOrganizationId : null;
 
     public UserRole Role => Enum.TryParse<UserRole>(
         Principal?.FindFirst(AppClaimTypes.Role)?.Value, out var role) ? role : UserRole.Patient;

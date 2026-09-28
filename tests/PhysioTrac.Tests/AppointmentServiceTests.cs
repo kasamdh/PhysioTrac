@@ -135,8 +135,10 @@ public class AppointmentServiceTests
     }
 
     [Fact]
-    public async Task ListForRange_TherapistRole_OnlySeesOwnAppointments()
+    public async Task ListForRange_TherapistRole_SeesTheWholeOrganizationsSchedule()
     {
+        // PTs and PTAs have the same schedule view as admins (clinic
+        // decision): a therapist sees colleagues' appointments too.
         var (db, service, org, patient) = NewService();
         var scheduler = Scheduler(org.Id);
         var therapistAId = TestTherapists.Add(db, org.Id);
@@ -151,7 +153,6 @@ public class AppointmentServiceTests
         var therapistA = new TestCurrentUser { UserId = therapistAId, OrganizationId = org.Id, Role = UserRole.Therapist };
         var visible = await service.ListForRangeAsync(therapistA, start.AddDays(-1), start.AddDays(2));
 
-        Assert.Single(visible);
-        Assert.Equal(therapistAId, visible[0].TherapistId);
+        Assert.Equal([therapistAId, therapistBId], visible.Select(a => a.TherapistId));
     }
 }

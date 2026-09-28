@@ -3,6 +3,7 @@ using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Scheduling;
+using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
 using PhysioTrac.Domain.Scheduling;
@@ -283,7 +284,7 @@ public class AppointmentService : IAppointmentService
         _tenantAccess.RequireRole(actor, Application.Tenancy.RoleSets.Scheduling);
         var (organization, appointment) = await LoadAppointmentInOrgAsync(appointmentId, actor, ct);
 
-        if (actor.Role is UserRole.Therapist or UserRole.Assistant)
+        if (AccessControl.Enabled && actor.Role is UserRole.Therapist or UserRole.Assistant)
         {
             var config = await _db.BookingConfigurations.FirstOrDefaultAsync(c => c.OrganizationId == organization.Id, ct);
             if (config is { TherapistsMayReschedule: false })
@@ -562,10 +563,8 @@ public class AppointmentService : IAppointmentService
             .Where(a => a.StartsAt < to && a.EndsAt > from)
             .Join(patients, a => a.PatientId, p => p.Id, (a, p) => a);
 
-        if (actor.Role is UserRole.Therapist or UserRole.Assistant)
-        {
-            query = query.Where(a => a.TherapistId == actor.UserId);
-        }
+        // Staff -- PTs and PTAs included -- see the organization's whole
+        // schedule (clinic decision, 2026-09-28); only Patient is narrowed.
         if (providerId is Guid pid)
         {
             query = query.Where(a => a.ProviderId == pid);

@@ -85,10 +85,12 @@ public class TenantAccessServiceTests
     }
 
     [Fact]
-    public async Task PatientsFor_Therapist_OnlySeesAssignedCaseload()
+    public async Task PatientsFor_Therapist_SeesWholeOrganization_ButNeverAnotherOrganization()
     {
-        var (db, orgA, _, patientA, _, therapistAId) = SeedTwoTenants();
-        // A second, unassigned patient in the same org the therapist should NOT see.
+        // Therapists cover each other's patients, so they see the whole
+        // roster -- including a patient assigned to nobody -- but tenant
+        // isolation still holds.
+        var (db, orgA, _, patientA, patientB, therapistAId) = SeedTwoTenants();
         var unassigned = new Patient { OrganizationId = orgA.Id, FirstName = "Carl", LastName = "Clark", DateOfBirth = new DateOnly(1970, 1, 1) };
         db.Patients.Add(unassigned);
         await db.SaveChangesAsync();
@@ -97,10 +99,12 @@ public class TenantAccessServiceTests
         var service = new TenantAccessService(db, audit);
         var therapist = new TestCurrentUser { UserId = therapistAId, OrganizationId = orgA.Id, Role = UserRole.Therapist };
 
-        var visible = service.PatientsFor(therapist).ToList();
+        var visible = service.PatientsFor(therapist).Select(p => p.Id).ToList();
 
-        Assert.Single(visible);
-        Assert.Equal(patientA.Id, visible[0].Id);
+        Assert.Equal(2, visible.Count);
+        Assert.Contains(patientA.Id, visible);
+        Assert.Contains(unassigned.Id, visible);
+        Assert.DoesNotContain(patientB.Id, visible);
     }
 
     [Fact]
@@ -136,22 +140,20 @@ public class TenantAccessServiceTests
     }
 
     [Fact]
-    public async Task PatientsFor_Therapist_StaysCaseloadScoped_EvenAfterSchedulerBillerFix()
+    public async Task PatientsFor_Assistant_StaysCaseloadScoped()
     {
-        // Guards against fixing the above by loosening clinical narrowing
-        // for everyone instead of specifically Scheduler/Biller -- a
-        // Therapist must never see a colleague's patient just because
-        // Scheduler/Biller now do.
-        var (db, orgA, _, patientA, _, therapistAId) = SeedTwoTenants();
+        // Widening the roster for Therapists must not widen it for PTAs:
+        // an Assistant still sees only patients assigned to them.
+        var (db, orgA, _, patientA, _, assignedUserId) = SeedTwoTenants();
         var unassigned = new Patient { OrganizationId = orgA.Id, FirstName = "Carl", LastName = "Clark", DateOfBirth = new DateOnly(1970, 1, 1) };
         db.Patients.Add(unassigned);
         await db.SaveChangesAsync();
 
         var audit = new AuditService(db);
         var service = new TenantAccessService(db, audit);
-        var therapist = new TestCurrentUser { UserId = therapistAId, OrganizationId = orgA.Id, Role = UserRole.Therapist };
+        var assistant = new TestCurrentUser { UserId = assignedUserId, OrganizationId = orgA.Id, Role = UserRole.Assistant };
 
-        var visible = service.PatientsFor(therapist).ToList();
+        var visible = service.PatientsFor(assistant).ToList();
 
         Assert.Single(visible);
         Assert.Equal(patientA.Id, visible[0].Id);

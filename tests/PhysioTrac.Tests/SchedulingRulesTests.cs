@@ -284,4 +284,19 @@ public class SchedulingRulesTests
         var completed = await f.Appointments.CompleteAsync(appointment.Id, f.Scheduler);
         Assert.Equal(AppointmentStatus.Completed, completed.Status);
     }
+
+    [Theory]
+    [InlineData(UserRole.Therapist)]
+    [InlineData(UserRole.Assistant)]
+    public async Task PtsAndPtas_CanOverrideAvailabilityRules_WithAReason_LikeAdmins(UserRole role)
+    {
+        var f = new SchedulingFixture();
+        var clinician = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = f.Org.Id, Role = role };
+
+        var withoutReason = await Rejected(() => f.Appointments.CreateAsync(f.Book(f.Pt, f.At(18)), clinician));
+        Assert.True(withoutReason.CanOverride);
+
+        var booked = await f.Appointments.CreateAsync(f.Book(f.Pt, f.At(18), overrideReason: "Evening slot requested"), clinician);
+        Assert.True(await f.Db.AuditEvents.AnyAsync(e => e.ObjectId == booked.Id && e.Action == "schedule.conflict_override"));
+    }
 }

@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { UserRoleLabels } from "../../features/auth/types";
-import { RoleSets } from "../../features/auth/permissions";
+import { RoleSets, canAccess } from "../../features/auth/permissions";
 import { fetchCurrentOrganization } from "../../features/organizations/api";
 import { useSelectedLocation } from "../../features/organizations/useSelectedLocation";
 import { useIdleTimeout } from "../../hooks/useIdleTimeout";
@@ -50,7 +50,7 @@ export function AppLayout() {
   // so phone-width pages get the full screen instead of 240px less.
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const visibleNavItems = navItems.filter((item) => !item.allowed || (user && item.allowed.has(user.role)));
+  const visibleNavItems = navItems.filter((item) => !item.allowed || canAccess(user, item.allowed));
 
   return (
     <div className="flex min-h-screen bg-surface-muted">

@@ -4,9 +4,8 @@ using PhysioTrac.Domain.Enums;
 namespace PhysioTrac.Application.Scheduling;
 
 /// <summary>Read-only queries behind the staff calendar (Day/Week/Month/
-/// Year/List). Every query is scoped to the caller's organization, and to
-/// just their own appointments for a Therapist/Assistant -- the same
-/// narrowing IAppointmentService.ListForRangeAsync applies. Patient-role
+/// Year/List). Every query is scoped to the caller's organization; all staff
+/// roles -- PTs and PTAs included -- see its whole schedule. Patient-role
 /// accounts are refused outright; they use the portal. Mutations stay on
 /// IAppointmentService.</summary>
 public interface IScheduleService

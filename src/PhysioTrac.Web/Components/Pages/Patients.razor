@@ -215,9 +215,9 @@ else
             Address = Clean(_address),
             EmergencyContact = Clean(_emergencyContact),
             PreferredLanguage = Clean(_preferredLanguage),
-            // A Therapist/Assistant only sees their own caseload, so a chart
-            // they register is assigned to them -- otherwise it would vanish
-            // from their list the moment it was saved.
+            // A clinician who registers a patient becomes their assigned
+            // therapist -- and an Assistant (still caseload-scoped) would
+            // otherwise lose sight of the chart the moment it was saved.
             AssignedTherapistId = CurrentUser.Role is UserRole.Therapist or UserRole.Assistant ? CurrentUser.UserId : null,
         };
         Db.Patients.Add(patient);

@@ -68,12 +68,10 @@ public interface IAppointmentService
     /// actually cancelled.</summary>
     Task<int> CancelSeriesAsync(Guid seriesId, ICurrentUser actor, CancellationToken ct = default);
 
-    /// <summary>Appointments visible to this caller: the whole org for
-    /// Admin/Director/Scheduler, just this caller's own for Therapist/
-    /// Assistant — mirrors <c>ITenantAccessService.PatientsFor</c>'s caseload
-    /// narrowing, applied to the schedule instead of the chart list.
-    /// Optional providerId/locationDetailId filters back the calendar's own
-    /// filter controls.</summary>
+    /// <summary>Appointments visible to this caller: the whole organization
+    /// for every staff role (PTs and PTAs included), just their own chart's
+    /// for a Patient-role portal account. Optional providerId/
+    /// locationDetailId filters back the calendar's own filter controls.</summary>
     Task<IReadOnlyList<Appointment>> ListForRangeAsync(
         ICurrentUser actor, DateTimeOffset from, DateTimeOffset to,
         Guid? providerId = null, Guid? locationDetailId = null, CancellationToken ct = default);

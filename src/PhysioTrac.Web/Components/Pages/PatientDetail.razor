@@ -1087,7 +1087,7 @@ else
     }
 
     private static string? CleanInput(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
+    private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist || AccessControl.Bypasses(CurrentUser.Role);
     private bool CanBill => RoleSets.Billing.Contains(CurrentUser.Role);
     private bool CanCollectPayments => RoleSets.PaymentCollection.Contains(CurrentUser.Role);
     private bool CanManageDocuments => RoleSets.DocumentManagement.Contains(CurrentUser.Role);

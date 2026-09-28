@@ -1,3 +1,4 @@
+using PhysioTrac.Application.Tenancy;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -241,5 +242,5 @@ public class AuthController : ControllerBase
 
     private static MeResponse ToMeResponse(ApplicationUser user) => new(
         user.Id, user.UserName ?? string.Empty, user.Email, user.Role,
-        user.OrganizationId, user.IsPlatformSuperAdmin, user.MustChangePassword);
+        user.OrganizationId, user.IsPlatformSuperAdmin, user.MustChangePassword, AccessControl.Enabled);
 }

@@ -130,6 +130,12 @@ There are two separate clinics (called *organizations* or *tenants*). They must 
 
 Each scenario lists **steps** and the **expected result**. Mark each one **Pass** or **Fail** and write down anything unexpected.
 
+> **Role-based access control is switched OFF in development.** While the software is being built, every staff login (admin, therapist, assistant, scheduler, biller, and so on) can use every module. The platform `superadmin` login can too: it keeps the super-admin (client management) module and works inside the first active clinic (Source Motion) for everything else. The setting is `AccessControl:Enabled` in `appsettings.Development.json` for both `PhysioTrac.Api` and `PhysioTrac.Web`.
+>
+> - Skip the scenarios that expect a staff role to be **blocked** (403, a missing button, "read-only"), or set the setting to `true` and restart the API and web app to test them.
+> - These are still enforced either way: logging in, clinic isolation (one clinic never sees another's data), and patient portal accounts seeing only their own record.
+> - The apps refuse to start with access control off outside Development.
+
 ### 6.1 Login and sessions
 
 | # | Steps | Expected |
@@ -145,7 +151,9 @@ Each scenario lists **steps** and the **expected result**. Mark each one **Pass*
 
 | # | Steps | Expected |
 |---|---|---|
-| P1 | Open **Patients** as `admin` | The 4 Source Motion patients are listed, and no Total Motion patients |
+| P1 | Open **Patients** as `admin` | All Source Motion patients are listed, and no Total Motion patients |
+| P1a | Open **Patients** as `therapist` | The same full Source Motion list as admin (therapists see every patient in their clinic) |
+| P1b | Open **Patients** as `assistant` | Only patients assigned to Avery Kim (PTAs see their own caseload) |
 | P2 | Search for "Taylor" | Taylor Brooks is found |
 | P3 | Open Taylor Brooks | Shows demographics, allergies, medications, diagnoses, insurance and notes |
 | P4 | Click **New patient**, fill in first name, last name and date of birth, then **Save** | Patient is saved and its page opens |
@@ -183,13 +191,13 @@ Demo data covers Sep 14 – Oct 11, 2026 at Source Motion (Jamie Chen PT, Sofia 
 | SC6 | New appointment: search a name that doesn't exist → **Create new patient** | Quick registration; the new patient is selected and can be booked. Registering the same name + DOB again offers the existing chart instead |
 | SC7 | New appointment with **2x weekly** for 6 visits → **Check dates** | Shows how many can be booked and lists each conflicting date with the reason; **Book N appointments** books only the clean ones |
 | SC8 | Drag an appointment to a new time in Day view | "Move appointment?" shows From and To; nothing changes until **Move appointment** |
-| SC9 | Drag an appointment to another PT's column during their lunch | "Scheduling conflict" with the reason; `scheduler` sees only **Choose another time** |
+| SC9 | As `scheduler`, drag an appointment to another PT's column during their lunch | "Scheduling conflict" with the reason; the scheduler sees only **Choose another time** (admins, PTs, and PTAs also get **Override**) |
 | SC10 | Drag a **New** (Initial Evaluation) visit onto the PTA's column | Blocked — a PTA can't perform evaluations; no override offered |
 | SC11 | As `admin`, drag a visit past a provider's end time | **Override and move** appears, disabled until a reason is typed; after moving, `AuditEvents` has `schedule.conflict_override` with the reason |
 | SC12 | Book the **same patient** twice at overlapping times | Rejected: "This patient already has another appointment…" — never overridable |
 | SC13 | **Provider hours**: add Saturday hours for a provider, save; open that Saturday in Day view | The column shows the new hours |
 | SC14 | Provider hours: add time off over an existing visit | Saved; a warning lists the visits that now need rescheduling (they are not moved automatically) |
-| SC15 | Log in as `therapist` | Schedule shows only their own column; Provider hours is read-only |
+| SC15 | Log in as `therapist` (PT) or `assistant` (PTA) | Same schedule access as admin: every provider's column and appointment, **Override** offered on conflicts, and Provider hours editable |
 | SC16 | Log in as `patient` and call `GET /api/v1/schedule/day?date=…` in Swagger | **403** |
 | SC17 | Open the Schedule page on a phone-sized window (≈390px wide) | Starts in **List** view; the sidebar is behind **☰ Menu**; no sideways scrolling |
 

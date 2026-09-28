@@ -45,17 +45,23 @@ public class ScheduleServiceTests
             (card.PatientName, card.MedicalRecordNumber, card.ProviderName, card.AppointmentTypeName, card.LocationName, card.DurationMinutes));
     }
 
-    [Fact]
-    public async Task Day_ForATherapist_ShowsOnlyTheirOwnColumnAndAppointments()
+    [Theory]
+    [InlineData(UserRole.Therapist)]
+    [InlineData(UserRole.Assistant)]
+    public async Task Day_ForAPtOrPta_ShowsEveryColumnAndAppointment_AndAdminLevelSettings(UserRole role)
     {
         var f = new SchedulingFixture();
         await f.Appointments.CreateAsync(f.Book(f.Pt, f.At(9)), f.Scheduler);
         await f.Appointments.CreateAsync(f.Book(f.Pta, f.At(9), patient: f.OtherPatient), f.Scheduler);
+        var clinician = role == UserRole.Therapist ? f.UserFor(f.Pt) : f.UserFor(f.Pta);
 
-        var day = await f.Schedule.GetDayAsync(f.UserFor(f.Pt), f.Monday, null, null);
+        var day = await f.Schedule.GetDayAsync(clinician, f.Monday, null, null);
+        var settings = await f.Schedule.GetSettingsAsync(clinician);
 
-        Assert.Equal(f.Pt.Id, Assert.Single(day.Providers).Provider.Id);
-        Assert.All(day.Appointments, a => Assert.Equal(f.Pt.Id, a.ProviderId));
+        Assert.Equal(2, day.Providers.Count);
+        Assert.Equal(2, day.Appointments.Count);
+        Assert.Equal(2, settings.Providers.Count);
+        Assert.True(settings.CanCreate && settings.CanReschedule && settings.CanOverride && settings.CanManageAvailability);
     }
 
     [Fact]

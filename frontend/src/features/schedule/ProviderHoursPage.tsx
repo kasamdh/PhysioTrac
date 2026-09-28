@@ -5,8 +5,8 @@ import { TimeOffPanel } from "./components/TimeOffPanel";
 import { WeeklyHoursEditor } from "./components/WeeklyHoursEditor";
 
 /** Provider working hours and time off -- what the Day view shades and the
- * booking rules enforce. Everyone on staff can look; Admin, Director, and
- * Scheduler can change it. */
+ * booking rules enforce. Everyone on staff can look; Admin, Director,
+ * Scheduler, PTs, and PTAs can change it. */
 export function ProviderHoursPage() {
   const [params, setParams] = useSearchParams();
   const settingsQuery = useQuery({ queryKey: ["schedule", "settings"], queryFn: fetchScheduleSettings });
@@ -52,14 +52,14 @@ export function ProviderHoursPage() {
         <>
           {!schedule.canManage && (
             <p className="rounded-md bg-info-light px-3 py-2 text-sm text-info">
-              You can view these hours. Changes are made by an administrator or the front desk.
+              You can view these hours. Changes are made by admins, the front desk, PTs, and PTAs.
             </p>
           )}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <section className="card" aria-labelledby="weekly-hours-title">
               <h2 id="weekly-hours-title" className="mb-1 text-base font-semibold text-text">Weekly working hours</h2>
               <p className="mb-3 text-sm text-text-muted">
-                Appointments outside these hours need an administrator's override. Times are in {schedule.timezone.replace("_", " ")} time.
+                Booking outside these hours needs an override with a reason (admins, PTs, and PTAs). Times are in {schedule.timezone.replace("_", " ")} time.
               </p>
               <WeeklyHoursEditor key={schedule.providerId} schedule={schedule} />
             </section>
