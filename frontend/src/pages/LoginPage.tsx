@@ -21,8 +21,10 @@ export function LoginPage() {
   } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
 
   if (user) {
-    const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? "/";
-    return <Navigate to={from} replace />;
+    // Keep the query string too, so a deep link like
+    // /schedule?view=week&date=... lands on that exact view after login.
+    const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
+    return <Navigate to={from ? `${from.pathname}${from.search ?? ""}` : "/"} replace />;
   }
 
   const onSubmit = handleSubmit(async (values) => {

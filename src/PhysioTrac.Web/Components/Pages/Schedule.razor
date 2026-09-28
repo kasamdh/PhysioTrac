@@ -14,6 +14,7 @@
 @inject ITenantAccessService TenantAccess
 @inject IAppointmentService Appointments
 @inject PhysioTracDbContext Db
+@inject IConfiguration Configuration
 
 <PageTitle>Schedule — PhysioTrac</PageTitle>
 
@@ -29,10 +30,16 @@ else
         <button class="btn-secondary" @onclick="() => ChangeWeek(-1)">&larr; Previous week</button>
         <strong class="text-text">@_weekStart.ToString("MMM d") – @_weekStart.AddDays(6).ToString("MMM d, yyyy")</strong>
         <button class="btn-secondary" @onclick="() => ChangeWeek(1)">Next week &rarr;</button>
-        @if (CanSchedule)
-        {
-            <button class="btn-primary ml-auto" @onclick="ToggleForm">@(_showForm ? "Cancel" : "New appointment")</button>
-        }
+        <div class="ml-auto flex flex-wrap items-center gap-3">
+            @if (CalendarUrl is not null)
+            {
+                <a class="btn-secondary no-underline" href="@CalendarUrl" target="_blank" rel="noopener">Open calendar view &#8599;</a>
+            }
+            @if (CanSchedule)
+            {
+                <button class="btn-primary" @onclick="ToggleForm">@(_showForm ? "Cancel" : "New appointment")</button>
+            }
+        </div>
     </div>
 
     @if (_showForm)
@@ -170,6 +177,14 @@ else
 
 @code {
     private DateTime _weekStart = StartOfWeek(DateTime.Today);
+
+    /// <summary>The same week in the React app's calendar (Day/Week/Month/
+    /// Year/List, drag-and-drop), at App:FrontendBaseUrl -- the same setting
+    /// the Api uses. No link when it isn't configured.</summary>
+    private string? CalendarUrl =>
+        Configuration["App:FrontendBaseUrl"] is { Length: > 0 } baseUrl
+            ? $"{baseUrl.TrimEnd('/')}/schedule?view=week&date={_weekStart:yyyy-MM-dd}"
+            : null;
     private IReadOnlyList<Appointment>? _appointments;
     private Dictionary<Guid, Patient> _patientsById = new();
     private Dictionary<Guid, ApplicationUser> _therapistsById = new();
