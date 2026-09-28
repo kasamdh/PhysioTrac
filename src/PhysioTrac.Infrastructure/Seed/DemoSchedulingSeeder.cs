@@ -71,7 +71,11 @@ public static class DemoSchedulingSeeder
         {
             db.ProviderAvailabilities.AddRange(list.Select(s => new ProviderAvailability
             {
-                ProviderId = providerId, LocationId = s.Location.Id, DayOfWeek = s.Day, StartTime = s.Start, EndTime = s.End,
+                ProviderId = providerId,
+                LocationId = s.Location.Id,
+                DayOfWeek = s.Day,
+                StartTime = s.Start,
+                EndTime = s.End,
             }));
         }
 
@@ -86,9 +90,15 @@ public static class DemoSchedulingSeeder
             .Select(p => p.FirstName + " " + p.LastName).ToListAsync(ct);
         db.Patients.AddRange(newPatients.Where(p => !existingNames.Contains($"{p.First} {p.Last}")).Select((p, i) => new Patient
         {
-            OrganizationId = organization.Id, FirstName = p.First, LastName = p.Last, DateOfBirth = p.Dob,
-            Phone = $"919-555-02{i + 10:00}", Email = $"{p.First.ToLowerInvariant()}.{p.Last.ToLowerInvariant()}@example.test",
-            PreferredLanguage = "English", PrimaryLocationId = fuquay.Id, AssignedTherapistId = i % 2 == 0 ? jamieUser.Id : sofiaUser.Id,
+            OrganizationId = organization.Id,
+            FirstName = p.First,
+            LastName = p.Last,
+            DateOfBirth = p.Dob,
+            Phone = $"919-555-02{i + 10:00}",
+            Email = $"{p.First.ToLowerInvariant()}.{p.Last.ToLowerInvariant()}@example.test",
+            PreferredLanguage = "English",
+            PrimaryLocationId = fuquay.Id,
+            AssignedTherapistId = i % 2 == 0 ? jamieUser.Id : sofiaUser.Id,
         }));
         await db.SaveChangesAsync(ct);
 
@@ -212,14 +222,22 @@ public static class DemoSchedulingSeeder
     {
         var provider = new Provider
         {
-            OrganizationId = organizationId, UserId = user.Id, FirstName = user.FirstName, LastName = user.LastName,
-            Credentials = credentials, Discipline = discipline, Specialty = specialty,
+            OrganizationId = organizationId,
+            UserId = user.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Credentials = credentials,
+            Discipline = discipline,
+            Specialty = specialty,
         };
         foreach (var location in locations) provider.Locations.Add(location);
         provider.Licenses.Add(new ProviderLicense
         {
-            State = "NC", LicenseNumber = licenseNumber, IssueDate = new DateOnly(2021, 5, 1),
-            ExpirationDate = DateOnly.FromDateTime(DateTime.Today.AddYears(2)), Status = ProviderLicenseStatus.Active,
+            State = "NC",
+            LicenseNumber = licenseNumber,
+            IssueDate = new DateOnly(2021, 5, 1),
+            ExpirationDate = DateOnly.FromDateTime(DateTime.Today.AddYears(2)),
+            Status = ProviderLicenseStatus.Active,
         });
         db.Providers.Add(provider);
         return provider;
@@ -233,8 +251,15 @@ public static class DemoSchedulingSeeder
     {
         var user = new ApplicationUser
         {
-            UserName = userName, Email = email, EmailConfirmed = true, OrganizationId = organizationId,
-            FirstName = firstName, LastName = lastName, Role = role, Credential = credential, MustUseMfa = false,
+            UserName = userName,
+            Email = email,
+            EmailConfirmed = true,
+            OrganizationId = organizationId,
+            FirstName = firstName,
+            LastName = lastName,
+            Role = role,
+            Credential = credential,
+            MustUseMfa = false,
         };
         var result = await userManager.CreateAsync(user, demoPassword);
         if (!result.Succeeded)

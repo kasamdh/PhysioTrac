@@ -66,7 +66,10 @@ public sealed class SchedulingFixture
     {
         var provider = new Provider
         {
-            OrganizationId = Org.Id, FirstName = first, LastName = last, Discipline = discipline,
+            OrganizationId = Org.Id,
+            FirstName = first,
+            LastName = last,
+            Discipline = discipline,
             Credentials = discipline == ProviderDiscipline.PTA ? "PTA" : "PT, DPT",
             UserId = TestTherapists.Add(Db, Org.Id, discipline == ProviderDiscipline.PTA ? UserRole.Assistant : UserRole.Therapist),
             Licenses = { TestTherapists.ValidLicense("NC") },
@@ -79,8 +82,11 @@ public sealed class SchedulingFixture
             {
                 Db.ProviderAvailabilities.Add(new ProviderAvailability
                 {
-                    ProviderId = provider.Id, LocationId = Clinic.Id, DayOfWeek = day,
-                    StartTime = new TimeOnly(8, 0), EndTime = new TimeOnly(17, 0),
+                    ProviderId = provider.Id,
+                    LocationId = Clinic.Id,
+                    DayOfWeek = day,
+                    StartTime = new TimeOnly(8, 0),
+                    EndTime = new TimeOnly(17, 0),
                 });
             }
         }
@@ -103,7 +109,8 @@ public sealed class SchedulingFixture
 
     public TestCurrentUser UserFor(Provider provider) => new()
     {
-        UserId = provider.UserId!.Value, OrganizationId = Org.Id,
+        UserId = provider.UserId!.Value,
+        OrganizationId = Org.Id,
         Role = provider.Discipline == ProviderDiscipline.PTA ? UserRole.Assistant : UserRole.Therapist,
     };
 }

@@ -224,9 +224,14 @@ public class AppointmentService : IAppointmentService
         // changed, so "who moved this patient off my schedule" is one query.
         var moveMetadata = new
         {
-            previousStart, newStart = appointment.StartsAt, previousEnd, newEnd = appointment.EndsAt,
-            previousProviderId, newProviderId = appointment.ProviderId,
-            previousLocationId, newLocationId = appointment.LocationDetailId,
+            previousStart,
+            newStart = appointment.StartsAt,
+            previousEnd,
+            newEnd = appointment.EndsAt,
+            previousProviderId,
+            newProviderId = appointment.ProviderId,
+            previousLocationId,
+            newLocationId = appointment.LocationDetailId,
             reason = string.IsNullOrWhiteSpace(request.OverrideReason) ? null : request.OverrideReason.Trim(),
         };
         await _audit.RecordAuditEventAsync(actor.UserId, "appointment.rescheduled", nameof(Appointment), appointment.Id, organization.Id,
