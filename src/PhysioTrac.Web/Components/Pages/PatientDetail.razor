@@ -39,7 +39,49 @@ else if (_patient is null)
 else
 {
     <div class="card mt-3">
-        <h1 class="text-xl font-semibold text-text">@_patient.FullName</h1>
+        <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-xl font-semibold text-text">@_patient.FullName</h1>
+            @if (CanManagePatient && !_editingPatient)
+            {
+                <button class="btn-secondary ml-3" @onclick="StartEditPatient">Edit</button>
+                @if (_confirmingArchive)
+                {
+                    <span class="ml-3 text-sm text-text-muted">Archive this patient?</span>
+                    <button class="link-danger ml-3" @onclick="ArchivePatient">Yes, archive</button>
+                    <button class="btn-secondary ml-3" @onclick="() => _confirmingArchive = false">No</button>
+                }
+                else
+                {
+                    <button class="link-danger ml-3" @onclick="() => _confirmingArchive = true">Archive</button>
+                }
+            }
+        </div>
+        @if (_patientError is not null)
+        {
+            <p class="alert-error mt-3">@_patientError</p>
+        }
+        @if (_editingPatient)
+        {
+            <div class="mt-3 max-w-md rounded-lg border border-border bg-surface-muted p-4">
+                <label class="field-label">First name <input @bind="_editFirstName" class="field-input" /></label>
+                <label class="field-label">Last name <input @bind="_editLastName" class="field-input" /></label>
+                <label class="field-label">Phone <input @bind="_editPhone" class="field-input" /></label>
+                <label class="field-label">Email <input type="email" @bind="_editEmail" class="field-input" /></label>
+                <label class="field-label">Address <input @bind="_editAddress" class="field-input" /></label>
+                <label class="field-label">Emergency contact <input @bind="_editEmergencyContact" class="field-input" /></label>
+                <label class="field-label">Preferred language <input @bind="_editPreferredLanguage" class="field-input" /></label>
+                <label class="field-label">Status
+                    <select @bind="_editStatus" class="field-input">
+                        @foreach (var status in Enum.GetValues<PatientStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </label>
+                <button class="btn-primary" @onclick="SavePatient">Save</button>
+                <button class="btn-secondary ml-3" @onclick="() => _editingPatient = false">Cancel</button>
+            </div>
+        }
         <dl class="mt-3 grid grid-cols-[140px_1fr] gap-y-2 text-sm">
             <dt class="font-medium text-text-muted">MRN</dt>
             <dd>@_patient.MedicalRecordNumber</dd>
@@ -51,6 +93,12 @@ else
             <dd>@(_patient.Phone ?? "—")</dd>
             <dt class="font-medium text-text-muted">Email</dt>
             <dd>@(_patient.Email ?? "—")</dd>
+            <dt class="font-medium text-text-muted">Address</dt>
+            <dd>@(_patient.Address ?? "—")</dd>
+            <dt class="font-medium text-text-muted">Emergency contact</dt>
+            <dd>@(_patient.EmergencyContact ?? "—")</dd>
+            <dt class="font-medium text-text-muted">Language</dt>
+            <dd>@(_patient.PreferredLanguage ?? "—")</dd>
         </dl>
     </div>
 
@@ -950,6 +998,95 @@ else
     private DateOnly _newStatementDueDate = DateOnly.FromDateTime(DateTime.Today.AddDays(30));
 
     private bool CanDocument => RoleSets.Clinical.Contains(CurrentUser.Role);
+
+    /// <summary>Same gate as PUT/DELETE /api/v1/patients/{id}.</summary>
+    private bool CanManagePatient => RoleSets.Scheduling.Contains(CurrentUser.Role);
+
+    private bool _editingPatient;
+    private bool _confirmingArchive;
+    private string? _patientError;
+    private string _editFirstName = string.Empty;
+    private string _editLastName = string.Empty;
+    private string? _editPhone;
+    private string? _editEmail;
+    private string? _editAddress;
+    private string? _editEmergencyContact;
+    private string? _editPreferredLanguage;
+    private PatientStatus _editStatus;
+
+    private void StartEditPatient()
+    {
+        _patientError = null;
+        _confirmingArchive = false;
+        _editFirstName = _patient!.FirstName;
+        _editLastName = _patient.LastName;
+        _editPhone = _patient.Phone;
+        _editEmail = _patient.Email;
+        _editAddress = _patient.Address;
+        _editEmergencyContact = _patient.EmergencyContact;
+        _editPreferredLanguage = _patient.PreferredLanguage;
+        _editStatus = _patient.Status;
+        _editingPatient = true;
+    }
+
+    private async Task SavePatient()
+    {
+        _patientError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Scheduling);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _patientError = ex.Message;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_editFirstName) || string.IsNullOrWhiteSpace(_editLastName))
+        {
+            _patientError = "First and last name are required.";
+            return;
+        }
+
+        _patient!.FirstName = _editFirstName.Trim();
+        _patient.LastName = _editLastName.Trim();
+        _patient.Phone = CleanInput(_editPhone);
+        _patient.Email = CleanInput(_editEmail);
+        _patient.Address = CleanInput(_editAddress);
+        _patient.EmergencyContact = CleanInput(_editEmergencyContact);
+        _patient.PreferredLanguage = CleanInput(_editPreferredLanguage);
+        _patient.Status = _editStatus;
+        _patient.UpdatedAt = DateTimeOffset.UtcNow;
+        await Db.SaveChangesAsync();
+
+        _editingPatient = false;
+    }
+
+    /// <summary>Soft delete, same as DELETE /api/v1/patients/{id} -- the
+    /// chart and its history stay in the database and can be restored from
+    /// the Patients page's "Show archived" view.</summary>
+    private async Task ArchivePatient()
+    {
+        _patientError = null;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Scheduling);
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _patientError = ex.Message;
+            return;
+        }
+
+        _patient!.DeletedAt = DateTimeOffset.UtcNow;
+        _patient.DeletedById = CurrentUser.UserId;
+        _patient.UpdatedAt = DateTimeOffset.UtcNow;
+        await Db.SaveChangesAsync();
+
+        Navigation.NavigateTo("/patients");
+    }
+
+    private static string? CleanInput(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private bool CanApproveGoals => CurrentUser.Role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
     private bool CanBill => RoleSets.Billing.Contains(CurrentUser.Role);
     private bool CanCollectPayments => RoleSets.PaymentCollection.Contains(CurrentUser.Role);
