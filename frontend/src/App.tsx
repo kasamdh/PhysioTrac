@@ -9,6 +9,8 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { SchedulePage } from "./features/schedule/SchedulePage";
+import { ProviderHoursPage } from "./features/schedule/ProviderHoursPage";
 
 export default function App() {
   return (
@@ -23,7 +25,8 @@ export default function App() {
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/patients" element={<PlaceholderPage title="Patients" />} />
-                    <Route path="/schedule" element={<PlaceholderPage title="Schedule" />} />
+                    <Route path="/schedule" element={<SchedulePage />} />
+                    <Route path="/schedule/hours" element={<ProviderHoursPage />} />
                     <Route path="/providers" element={<PlaceholderPage title="Providers" />} />
                     <Route path="/billing" element={<PlaceholderPage title="Billing" />} />
                   </Route>

@@ -1,0 +1,156 @@
+/* react-big-calendar restyled with the app's brand tokens (index.css @theme),
+   so the calendar reads as part of PhysioTrac rather than a third-party widget. */
+
+.schedule-calendar .rbc-calendar {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+}
+
+.schedule-calendar .rbc-header,
+.schedule-calendar .rbc-time-header-content,
+.schedule-calendar .rbc-time-content,
+.schedule-calendar .rbc-time-view,
+.schedule-calendar .rbc-month-view,
+.schedule-calendar .rbc-month-row + .rbc-month-row,
+.schedule-calendar .rbc-day-bg + .rbc-day-bg,
+.schedule-calendar .rbc-time-content > * + * > *,
+.schedule-calendar .rbc-timeslot-group,
+.schedule-calendar .rbc-day-slot .rbc-time-slot,
+.schedule-calendar .rbc-time-header.rbc-overflowing {
+  border-color: var(--color-border);
+}
+
+.schedule-calendar .rbc-time-view,
+.schedule-calendar .rbc-month-view {
+  border: 0;
+}
+
+.schedule-calendar .rbc-day-slot .rbc-time-slot {
+  border-top-color: color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+/* ~44px per half hour, so a 30-minute visit has room for two readable lines. */
+.schedule-calendar .rbc-timeslot-group {
+  min-height: 88px;
+}
+
+.schedule-calendar .rbc-header {
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-subtle);
+  background: var(--color-surface-muted);
+}
+
+/* Day view: provider column headers carry their own name/hours/count. */
+.schedule-calendar .rbc-row-resource .rbc-header {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  background: var(--color-surface);
+}
+
+.schedule-calendar .rbc-label,
+.schedule-calendar .rbc-time-gutter {
+  font-size: 0.75rem;
+  color: var(--color-text-subtle);
+}
+
+.schedule-calendar .rbc-today {
+  background: color-mix(in srgb, var(--color-primary-light) 35%, transparent);
+}
+
+.schedule-calendar .rbc-current-time-indicator {
+  background: var(--color-danger);
+  height: 2px;
+}
+
+.schedule-calendar .rbc-off-range-bg {
+  background: var(--color-surface-muted);
+}
+
+.schedule-calendar .rbc-date-cell {
+  padding: 4px 6px;
+  font-size: 0.8rem;
+}
+
+.schedule-calendar .rbc-show-more {
+  color: var(--color-primary-deep);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Outside a provider's working hours. */
+.schedule-calendar .slot-off-hours {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--color-surface-muted),
+    var(--color-surface-muted) 6px,
+    color-mix(in srgb, var(--color-border) 45%, var(--color-surface-muted)) 6px,
+    color-mix(in srgb, var(--color-border) 45%, var(--color-surface-muted)) 12px
+  );
+}
+
+/* Lunch / time off / closures (background events). */
+.schedule-calendar .rbc-background-event.schedule-block {
+  background: color-mix(in srgb, var(--color-border) 70%, transparent);
+  border: 1px dashed var(--color-text-subtle);
+  color: var(--color-text-muted);
+  opacity: 1;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+}
+
+/* Appointment cards: a tinted body with a strong left edge per status
+   (overridden by the appointment type's own color when it has one). */
+.schedule-calendar .rbc-event {
+  border: 0;
+  border-left: 4px solid var(--appt-accent);
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: var(--appt-bg);
+  color: var(--color-text);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+.schedule-calendar .rbc-event.rbc-selected,
+.schedule-calendar .rbc-event:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.schedule-calendar .rbc-event-label {
+  display: none; /* the card renders its own time */
+}
+
+.schedule-calendar .rbc-month-view .rbc-event {
+  padding: 1px 4px;
+}
+
+.appt-scheduled { --appt-accent: var(--color-info); --appt-bg: var(--color-info-light); }
+.appt-confirmed { --appt-accent: var(--color-primary); --appt-bg: var(--color-primary-light); }
+.appt-checked-in { --appt-accent: var(--color-warning); --appt-bg: var(--color-warning-light); }
+.appt-in-progress { --appt-accent: var(--color-primary-deep); --appt-bg: color-mix(in srgb, var(--color-primary) 30%, white); }
+.appt-completed { --appt-accent: var(--color-success); --appt-bg: var(--color-success-light); }
+.appt-cancelled,
+.appt-no-show { --appt-accent: var(--color-danger); --appt-bg: var(--color-surface-muted); }
+
+.schedule-calendar .appt-cancelled,
+.schedule-calendar .appt-no-show {
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+.appt-tag {
+  margin-left: 4px;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgb(255 255 255 / 0.7);
+  color: var(--color-primary-deep);
+  text-decoration: none;
+}

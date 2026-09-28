@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -45,11 +46,23 @@ export function AppLayout() {
     showToast("You were signed out after a period of inactivity.");
   });
 
+  // Below md the sidebar becomes a slide-over drawer behind a menu button,
+  // so phone-width pages get the full screen instead of 240px less.
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const visibleNavItems = navItems.filter((item) => !item.allowed || (user && item.allowed.has(user.role)));
 
   return (
     <div className="flex min-h-screen bg-surface-muted">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface">
+      {menuOpen && (
+        <div className="fixed inset-0 z-30 bg-slate-900/40 md:hidden" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+      )}
+      <aside
+        id="app-sidebar"
+        className={`${
+          menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"
+        } w-60 shrink-0 flex-col border-r border-border bg-surface md:static md:flex md:shadow-none`}
+      >
         <div className="flex items-center gap-2 border-b border-border px-4 py-4">
           <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-white">
             P
@@ -58,7 +71,7 @@ export function AppLayout() {
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {visibleNavItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} onClick={() => setMenuOpen(false)}>
               {item.label}
             </NavLink>
           ))}
@@ -73,9 +86,19 @@ export function AppLayout() {
           </button>
         </div>
       </aside>
-      <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border bg-surface px-8 py-3">
-          <div className="text-sm font-medium text-text">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-3 md:px-8">
+          <button
+            type="button"
+            className="btn-secondary md:hidden"
+            aria-label="Open menu"
+            aria-controls="app-sidebar"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+          >
+            ☰ Menu
+          </button>
+          <div className="min-w-0 flex-1 truncate text-sm font-medium text-text">
             {organizationQuery.isLoading ? "Loading organization…" : (organizationQuery.data?.name ?? "—")}
           </div>
           {/* A patient-portal login has no reason to switch clinic
@@ -100,7 +123,7 @@ export function AppLayout() {
             )}
           </RequireRole>
         </header>
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />
         </main>
       </div>
