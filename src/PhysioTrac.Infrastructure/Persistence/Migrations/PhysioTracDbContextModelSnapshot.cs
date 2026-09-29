@@ -515,6 +515,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<bool>("AllowAnyAvailableTherapist")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("AllowDoubleBookOverride")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("AllowNewPatients")
                         .HasColumnType("bit");
 
@@ -550,6 +553,12 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("SlotIntervalMinutes")
                         .HasColumnType("int");
+
+                    b.Property<int>("StaffSlotMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("TherapistsMayReschedule")
+                        .HasColumnType("bit");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
@@ -2996,6 +3005,11 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Credentials")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Discipline")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()

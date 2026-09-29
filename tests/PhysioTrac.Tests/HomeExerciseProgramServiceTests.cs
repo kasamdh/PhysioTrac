@@ -138,12 +138,14 @@ public class HomeExerciseProgramServiceTests
     }
 
     [Fact]
-    public async Task ListForPatient_OtherTherapistsPatient_IsForbidden()
+    public async Task ListForPatient_AnotherTherapistsPatient_IsVisibleToTherapists_ButNotToAnUnassignedAssistant()
     {
         var (_, service, org, patient, _) = NewService();
         var otherTherapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Therapist };
+        var unassignedAssistant = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Assistant };
 
-        await Assert.ThrowsAsync<ForbiddenException>(() => service.ListForPatientAsync(patient.Id, otherTherapist));
+        Assert.Empty(await service.ListForPatientAsync(patient.Id, otherTherapist));
+        await Assert.ThrowsAsync<ForbiddenException>(() => service.ListForPatientAsync(patient.Id, unassignedAssistant));
     }
 
     [Fact]

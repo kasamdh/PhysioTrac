@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useAuth } from "../features/auth/AuthProvider";
-import { hasAnyRole } from "../features/auth/permissions";
+import { canAccess } from "../features/auth/permissions";
 import type { UserRole } from "../features/auth/types";
 
 /** Renders `children` only when the signed-in user's role is in `allowed`.
@@ -10,6 +10,6 @@ import type { UserRole } from "../features/auth/types";
  * which is enforced server-side on every request regardless. */
 export function RequireRole({ allowed, children }: { allowed: ReadonlySet<UserRole>; children: ReactNode }) {
   const { user } = useAuth();
-  if (!hasAnyRole(user?.role, allowed)) return null;
+  if (!canAccess(user, allowed)) return null;
   return <>{children}</>;
 }

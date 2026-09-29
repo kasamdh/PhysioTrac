@@ -46,6 +46,9 @@ public static class DemoDataSeeder
 
         if (await db.Organizations.AnyAsync(o => o.Slug == SourceMotionSlug, ct))
         {
+            // Already seeded -- but the calendar demo data is newer than the
+            // rest, so backfill it (a no-op once present).
+            await DemoSchedulingSeeder.SeedAsync(db, userManager, seedOptions.DemoPassword, ct);
             return;
         }
 
@@ -56,6 +59,7 @@ public static class DemoDataSeeder
         await SeedConsentAndIntakeTemplatesAsync(db, superAdmin.Id, ct);
         await SeedSourceMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
         await SeedTotalMotionAsync(db, userManager, seedOptions.DemoPassword, ct);
+        await DemoSchedulingSeeder.SeedAsync(db, userManager, seedOptions.DemoPassword, ct);
     }
 
     /// <summary>Shared, org-independent ICD-10-CM reference data -- see
@@ -265,6 +269,7 @@ public static class DemoDataSeeder
             LastName = therapist.LastName,
             Specialty = "Orthopedic Physical Therapy",
             Credentials = "PT, DPT",
+            Discipline = ProviderDiscipline.PT,
         };
         provider.Locations.Add(fuquayVarina);
         provider.Locations.Add(raleigh);
@@ -758,6 +763,7 @@ public static class DemoDataSeeder
             LastName = therapist.LastName,
             Specialty = "Sports Physical Therapy",
             Credentials = "PT, DPT",
+            Discipline = ProviderDiscipline.PT,
         };
         provider.Locations.Add(austin);
         db.Providers.Add(provider);

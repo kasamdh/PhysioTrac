@@ -21,4 +21,18 @@ public class BookingConfiguration : BaseEntity
     /// <summary>How many hours before an appointment a patient may still
     /// cancel or reschedule it online via the portal.</summary>
     public int PatientChangeCutoffHours { get; set; } = 24;
+
+    // ---- Staff calendar policy (the fields above are public/portal booking) ----
+
+    /// <summary>Row height of the staff Day/Week calendar: 15 or 30.</summary>
+    public int StaffSlotMinutes { get; set; } = 30;
+
+    /// <summary>Whether an Admin/Director may knowingly double-book a
+    /// provider (with a recorded reason). Off by default.</summary>
+    public bool AllowDoubleBookOverride { get; set; }
+
+    /// <summary>Whether Therapist/Assistant logins may reschedule or move
+    /// appointments themselves, rather than only front-desk/admin roles.
+    /// On by default to preserve existing behavior.</summary>
+    public bool TherapistsMayReschedule { get; set; } = true;
 }

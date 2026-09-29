@@ -135,14 +135,61 @@ public class PatientSearchAndLifecycleTests
     public async Task Delete_ByUnauthorizedRole_Returns403_AndLeavesThePatientAlone()
     {
         var (db, org, _, alpha, _) = await SeedAsync();
-        var therapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Therapist };
-        var controller = NewController(db, therapist);
+        var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
+        var controller = NewController(db, biller);
 
         var result = Assert.IsType<ObjectResult>(await controller.Delete(alpha.Id));
         Assert.Equal(403, result.StatusCode);
 
         var unchanged = await db.Patients.FindAsync(alpha.Id);
         Assert.False(unchanged!.IsDeleted);
+    }
+
+    private static UpdatePatientRequest RenameTo(string firstName) =>
+        new(firstName, "Anderson", null, null, null, null, null, null, null, null, null, PatientStatus.Active);
+
+    [Fact]
+    public async Task Update_BySchedulingRole_Succeeds()
+    {
+        var (db, org, _, alpha, _) = await SeedAsync();
+        var scheduler = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Scheduler };
+        var controller = NewController(db, scheduler);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.Update(alpha.Id, RenameTo("Alicia")));
+        var dto = Assert.IsType<PatientDetailDto>(result.Value);
+        Assert.Equal("Alicia", dto.FirstName);
+    }
+
+    [Theory]
+    [InlineData(UserRole.Biller)]
+    [InlineData(UserRole.Compliance)]
+    public async Task Update_ByNonSchedulingStaffRole_Returns403_AndLeavesThePatientAlone(UserRole role)
+    {
+        var (db, org, _, alpha, _) = await SeedAsync();
+        var user = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = role };
+        var controller = NewController(db, user);
+
+        var result = Assert.IsType<ObjectResult>(await controller.Update(alpha.Id, RenameTo("Changed")));
+        Assert.Equal(403, result.StatusCode);
+
+        var unchanged = await db.Patients.FindAsync(alpha.Id);
+        Assert.Equal("Alpha", unchanged!.FirstName);
+    }
+
+    [Fact]
+    public async Task Update_ByPatientPortalAccount_OnTheirOwnChart_Returns403()
+    {
+        var (db, org, _, alpha, _) = await SeedAsync();
+        var portalUser = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Patient };
+        alpha.PortalUserId = portalUser.UserId;
+        await db.SaveChangesAsync();
+        var controller = NewController(db, portalUser);
+
+        var result = Assert.IsType<ObjectResult>(await controller.Update(alpha.Id, RenameTo("Changed")));
+        Assert.Equal(403, result.StatusCode);
+
+        var unchanged = await db.Patients.FindAsync(alpha.Id);
+        Assert.Equal("Alpha", unchanged!.FirstName);
     }
 
     [Fact]

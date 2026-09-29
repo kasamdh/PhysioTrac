@@ -17,7 +17,9 @@ namespace PhysioTrac.Infrastructure.Services;
 /// <summary>Direct port of `care/note_management.py`.</summary>
 public class ClinicalNoteService : IClinicalNoteService
 {
-    private static readonly HashSet<UserRole> FinalizingRoles = new() { UserRole.Admin, UserRole.Director };
+    /// <summary>Admin/Director may view, edit, sign, and co-sign any note --
+    /// and, while role-based access control is off, so may every staff role.</summary>
+    private static readonly IReadOnlySet<UserRole> FinalizingRoles = new RoleSet([UserRole.Admin, UserRole.Director]);
 
     private readonly PhysioTracDbContext _db;
     private readonly ITenantAccessService _tenantAccess;
@@ -502,7 +504,7 @@ public class ClinicalNoteService : IClinicalNoteService
         if (note.AppointmentId is not Guid appointmentId) return;
         var appointment = await _db.Appointments.FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
         if (appointment is null) return;
-        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn)) return;
+        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn or AppointmentStatus.InProgress)) return;
 
         appointment.Status = AppointmentStatus.Completed;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;

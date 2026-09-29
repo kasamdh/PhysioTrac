@@ -37,6 +37,21 @@ public enum AppointmentStatus
     Completed,
     Cancelled,
     NoShow,
+
+    /// <summary>The visit has started (CheckedIn -> InProgress via "Start
+    /// visit"); Completed follows. Appended last so existing values keep
+    /// their positions -- the column stores the name, not the number.</summary>
+    InProgress,
+}
+
+/// <summary>Which scheduling scope-of-practice rules apply to a provider.
+/// Deliberately separate from the free-text Provider.Credentials (e.g.
+/// "PT, DPT"), which is display-only and can't be reliably parsed.</summary>
+public enum ProviderDiscipline
+{
+    Other,
+    PT,
+    PTA,
 }
 
 public enum BookingSource

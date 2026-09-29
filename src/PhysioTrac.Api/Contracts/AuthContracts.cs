@@ -13,7 +13,8 @@ public record MeResponse(
     UserRole Role,
     Guid? OrganizationId,
     bool IsPlatformSuperAdmin,
-    bool MustChangePassword);
+    bool MustChangePassword,
+    bool AccessControlEnabled);
 
 public record UserSessionResponse(
     Guid Id,

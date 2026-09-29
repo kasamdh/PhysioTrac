@@ -46,7 +46,7 @@ public class AppointmentServiceTests
     {
         var (db, service, org, patient) = NewService();
         var actor = Scheduler(org.Id);
-        var therapistId = Guid.NewGuid();
+        var therapistId = TestTherapists.Add(db, org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
         var first = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null, null,
@@ -56,7 +56,7 @@ public class AppointmentServiceTests
         var overlapping = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null, null,
             AppointmentKind.FollowUp, start.AddMinutes(15), start.AddMinutes(45), false, null);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public class AppointmentServiceTests
     {
         var (db, service, org, patient) = NewService();
         var actor = Scheduler(org.Id);
-        var therapistId = Guid.NewGuid();
+        var therapistId = TestTherapists.Add(db, org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
         var first = new CreateAppointmentRequest(patient.Id, therapistId, null, null, null, null,
@@ -81,24 +81,24 @@ public class AppointmentServiceTests
     [Fact]
     public async Task Create_EndBeforeStart_Throws()
     {
-        var (_, service, org, patient) = NewService();
+        var (db, service, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
 
-        var request = new CreateAppointmentRequest(patient.Id, Guid.NewGuid(), null, null, null, null,
+        var request = new CreateAppointmentRequest(patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null,
             AppointmentKind.FollowUp, start, start.AddMinutes(-10), false, null);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(request, actor));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CreateAsync(request, actor));
     }
 
     [Fact]
     public async Task Cancel_ScheduledAppointment_Succeeds()
     {
-        var (_, service, org, patient) = NewService();
+        var (db, service, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
         var created = await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
+            patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
 
         var cancelled = await service.CancelAsync(created.Id, actor);
 
@@ -108,14 +108,14 @@ public class AppointmentServiceTests
     [Fact]
     public async Task Cancel_AlreadyCancelledAppointment_Throws()
     {
-        var (_, service, org, patient) = NewService();
+        var (db, service, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
         var created = await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
+            patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
         await service.CancelAsync(created.Id, actor);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CancelAsync(created.Id, actor));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CancelAsync(created.Id, actor));
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class AppointmentServiceTests
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
         var created = await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
+            patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null, AppointmentKind.FollowUp, start, start.AddMinutes(30), false, null), actor);
         var otherOrg = new Organization { Name = "Client B", Slug = "client-b", ClientNumber = 1001 };
         db.Organizations.Add(otherOrg);
         await db.SaveChangesAsync();
@@ -135,12 +135,14 @@ public class AppointmentServiceTests
     }
 
     [Fact]
-    public async Task ListForRange_TherapistRole_OnlySeesOwnAppointments()
+    public async Task ListForRange_TherapistRole_SeesTheWholeOrganizationsSchedule()
     {
+        // PTs and PTAs have the same schedule view as admins (clinic
+        // decision): a therapist sees colleagues' appointments too.
         var (db, service, org, patient) = NewService();
         var scheduler = Scheduler(org.Id);
-        var therapistAId = Guid.NewGuid();
-        var therapistBId = Guid.NewGuid();
+        var therapistAId = TestTherapists.Add(db, org.Id);
+        var therapistBId = TestTherapists.Add(db, org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
 
         await service.CreateAsync(new CreateAppointmentRequest(
@@ -151,7 +153,6 @@ public class AppointmentServiceTests
         var therapistA = new TestCurrentUser { UserId = therapistAId, OrganizationId = org.Id, Role = UserRole.Therapist };
         var visible = await service.ListForRangeAsync(therapistA, start.AddDays(-1), start.AddDays(2));
 
-        Assert.Single(visible);
-        Assert.Equal(therapistAId, visible[0].TherapistId);
+        Assert.Equal([therapistAId, therapistBId], visible.Select(a => a.TherapistId));
     }
 }

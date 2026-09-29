@@ -47,6 +47,7 @@ public class AppointmentsController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (SchedulingConflictException ex) { return SchedulingConflict(ex); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
@@ -63,6 +64,24 @@ public class AppointmentsController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (SchedulingConflictException ex) { return SchedulingConflict(ex); }
+        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Dry run of reschedule for the calendar's drag-and-drop
+    /// confirmation -- always 200 with IsValid/Violations for a rule problem
+    /// (so the UI can show them), 403/404/409 only for permission, tenant,
+    /// or appointment-state problems. Saves nothing; the real PATCH
+    /// .../reschedule re-runs every check.</summary>
+    [HttpPost("{id:guid}/validate-move")]
+    public async Task<IActionResult> ValidateMove(Guid id, [FromBody] RescheduleAppointmentRequest request)
+    {
+        try
+        {
+            return Ok(await _appointments.ValidateRescheduleAsync(id, request, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
@@ -71,6 +90,9 @@ public class AppointmentsController : ControllerBase
 
     [HttpPatch("{id:guid}/check-in")]
     public async Task<IActionResult> CheckIn(Guid id) => await TryTransition(() => _appointments.CheckInAsync(id, _currentUser, HttpContext.RequestAborted));
+
+    [HttpPatch("{id:guid}/start-visit")]
+    public async Task<IActionResult> StartVisit(Guid id) => await TryTransition(() => _appointments.StartVisitAsync(id, _currentUser, HttpContext.RequestAborted));
 
     [HttpPatch("{id:guid}/complete")]
     public async Task<IActionResult> Complete(Guid id) => await TryTransition(() => _appointments.CompleteAsync(id, _currentUser, HttpContext.RequestAborted));
@@ -104,6 +126,20 @@ public class AppointmentsController : ControllerBase
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Dry run of POST series: each generated date and the rules it
+    /// would break, so the UI can show "10 can be booked, 2 conflict".</summary>
+    [HttpPost("series/preview")]
+    public async Task<IActionResult> PreviewSeries([FromBody] CreateAppointmentSeriesRequest request)
+    {
+        try
+        {
+            return Ok(await _appointments.PreviewSeriesAsync(request, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { detail = ex.Message }); }
     }
 
     [HttpGet("series/{seriesId:guid}")]
@@ -144,6 +180,11 @@ public class AppointmentsController : ControllerBase
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
+
+    /// <summary>409 with the structured rule list, so the calendar can show
+    /// each violation and offer Override only when CanOverride is true.</summary>
+    private ConflictObjectResult SchedulingConflict(SchedulingConflictException ex) =>
+        Conflict(new { detail = ex.Message, violations = ex.Violations, canOverride = ex.CanOverride });
 
     private static AppointmentDto ToDto(Appointment a) => new(
         a.Id, a.PatientId, a.TherapistId, a.ProviderId, a.Kind, a.Status,

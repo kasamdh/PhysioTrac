@@ -39,4 +39,7 @@ export interface CurrentUser {
   organizationId: string | null;
   isPlatformSuperAdmin: boolean;
   mustChangePassword: boolean;
+  /** False while role-based access control is switched off on the server
+   * (development builds): every staff role then sees every module. */
+  accessControlEnabled?: boolean;
 }

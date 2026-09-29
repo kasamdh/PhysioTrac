@@ -3,12 +3,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5080
 export class ApiError extends Error {
   readonly status: number;
   readonly code?: string;
+  /** The full error body, for callers that need more than `detail` (e.g.
+   * a scheduling conflict's structured `violations` list). */
+  readonly payload?: unknown;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, payload?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.payload = payload;
   }
 }
 
@@ -87,7 +91,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       payload?.detail ??
       (Array.isArray(payload?.errors) ? payload.errors.join(", ") : null) ??
       response.statusText;
-    throw new ApiError(detail, response.status, payload?.code);
+    throw new ApiError(detail, response.status, payload?.code, payload);
   }
 
   return payload as T;

@@ -4,8 +4,11 @@
 @using Microsoft.EntityFrameworkCore
 @using PhysioTrac.Application.Tenancy
 @using PhysioTrac.Domain.Entities
+@using PhysioTrac.Domain.Enums
+@using PhysioTrac.Infrastructure.Persistence
 @inject ICurrentUser CurrentUser
 @inject ITenantAccessService TenantAccess
+@inject PhysioTracDbContext Db
 @inject NavigationManager Navigation
 
 <PageTitle>Patients — PhysioTrac</PageTitle>
@@ -20,54 +23,232 @@ else if (_patients is null)
 {
     <p class="text-text-muted">Loading…</p>
 }
-else if (_patients.Count == 0)
-{
-    <p class="text-text-muted">No patients found for your caseload.</p>
-}
 else
 {
-    <div class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-        <table class="w-full text-sm">
-            <thead>
-                <tr class="border-b border-border bg-surface-muted text-left text-xs uppercase tracking-wide text-text-subtle">
-                    <th class="px-4 py-3 font-medium">MRN</th>
-                    <th class="px-4 py-3 font-medium">Name</th>
-                    <th class="px-4 py-3 font-medium">Date of birth</th>
-                    <th class="px-4 py-3 font-medium">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var patient in _patients)
-                {
-                    <tr @onclick="() => GoToPatient(patient.Id)" class="cursor-pointer border-b border-border last:border-0 hover:bg-surface-muted">
-                        <td class="px-4 py-3 text-text-muted">@patient.MedicalRecordNumber</td>
-                        <td class="px-4 py-3 font-medium text-text">@patient.FullName</td>
-                        <td class="px-4 py-3 text-text-muted">@patient.DateOfBirth.ToString("yyyy-MM-dd")</td>
-                        <td class="px-4 py-3"><StatusPill Text="@patient.Status.ToString()" /></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+        @if (CanManage)
+        {
+            <button class="btn-primary" @onclick="ToggleForm">@(_showForm ? "Cancel" : "New patient")</button>
+        }
+        <input placeholder="Search name or MRN" @bind="_search" @bind:event="oninput" class="field-input mt-0 w-auto" />
+        @if (CanManage)
+        {
+            <label class="flex items-center gap-2 text-sm text-text-muted">
+                <input type="checkbox" checked="@_showArchived" @onchange="ToggleArchived" /> Show archived
+            </label>
+        }
     </div>
+
+    @if (_showForm)
+    {
+        <div class="card mb-4 max-w-md">
+            <h2 class="section-title">New patient</h2>
+            @if (_formError is not null)
+            {
+                <p class="alert-error mb-3">@_formError</p>
+            }
+            <label class="field-label">First name <input @bind="_firstName" class="field-input" /></label>
+            <label class="field-label">Last name <input @bind="_lastName" class="field-input" /></label>
+            <label class="field-label">Date of birth <input type="date" @bind="_dateOfBirth" class="field-input" /></label>
+            <label class="field-label">Phone <input @bind="_phone" class="field-input" /></label>
+            <label class="field-label">Email <input type="email" @bind="_email" class="field-input" /></label>
+            <label class="field-label">Address <input @bind="_address" class="field-input" /></label>
+            <label class="field-label">Emergency contact <input @bind="_emergencyContact" class="field-input" /></label>
+            <label class="field-label">Preferred language <input @bind="_preferredLanguage" class="field-input" /></label>
+            <button class="btn-primary" @onclick="CreatePatient">Save</button>
+        </div>
+    }
+
+    @if (VisiblePatients.Count == 0)
+    {
+        <p class="text-text-muted">@(_showArchived ? "No archived patients." : "No patients found for your caseload.")</p>
+    }
+    else
+    {
+        <div class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-border bg-surface-muted text-left text-xs uppercase tracking-wide text-text-subtle">
+                        <th class="px-4 py-3 font-medium">MRN</th>
+                        <th class="px-4 py-3 font-medium">Name</th>
+                        <th class="px-4 py-3 font-medium">Date of birth</th>
+                        <th class="px-4 py-3 font-medium">Status</th>
+                        @if (_showArchived)
+                        {
+                            <th class="px-4 py-3 font-medium"></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var patient in VisiblePatients)
+                    {
+                        @if (_showArchived)
+                        {
+                            <tr class="border-b border-border last:border-0">
+                                <td class="px-4 py-3 text-text-muted">@patient.MedicalRecordNumber</td>
+                                <td class="px-4 py-3 font-medium text-text">@patient.FullName</td>
+                                <td class="px-4 py-3 text-text-muted">@patient.DateOfBirth.ToString("yyyy-MM-dd")</td>
+                                <td class="px-4 py-3"><StatusPill Text="Archived" /></td>
+                                <td class="px-4 py-3"><button class="btn-secondary" @onclick="() => RestorePatient(patient.Id)">Restore</button></td>
+                            </tr>
+                        }
+                        else
+                        {
+                            <tr @onclick="() => GoToPatient(patient.Id)" class="cursor-pointer border-b border-border last:border-0 hover:bg-surface-muted">
+                                <td class="px-4 py-3 text-text-muted">@patient.MedicalRecordNumber</td>
+                                <td class="px-4 py-3 font-medium text-text">@patient.FullName</td>
+                                <td class="px-4 py-3 text-text-muted">@patient.DateOfBirth.ToString("yyyy-MM-dd")</td>
+                                <td class="px-4 py-3"><StatusPill Text="@patient.Status.ToString()" /></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }
 
 @code {
     private List<Patient>? _patients;
     private string? _error;
+    private string? _formError;
+    private string _search = string.Empty;
+    private bool _showForm;
+    private bool _showArchived;
 
-    protected override async Task OnInitializedAsync()
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private DateOnly? _dateOfBirth;
+    private string? _phone;
+    private string? _email;
+    private string? _address;
+    private string? _emergencyContact;
+    private string? _preferredLanguage;
+
+    /// <summary>Same gate as POST/PUT/DELETE /api/v1/patients.</summary>
+    private bool CanManage => RoleSets.Scheduling.Contains(CurrentUser.Role);
+
+    private List<Patient> VisiblePatients => string.IsNullOrWhiteSpace(_search)
+        ? _patients!
+        : _patients!.Where(p =>
+            p.FullName.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ||
+            p.MedicalRecordNumber.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
     {
         try
         {
-            _patients = await TenantAccess.PatientsFor(CurrentUser)
-                .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
-                .ToListAsync();
+            if (_showArchived)
+            {
+                // PatientsFor excludes soft-deleted rows by design, so archived
+                // charts are read org-scoped by hand -- the same approach the
+                // API's Restore endpoint takes.
+                TenantAccess.RequireRole(CurrentUser, RoleSets.Scheduling);
+                var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+                _patients = await Db.Patients
+                    .Where(p => p.OrganizationId == organization.Id && p.DeletedAt != null)
+                    .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
+                    .ToListAsync();
+            }
+            else
+            {
+                _patients = await TenantAccess.PatientsFor(CurrentUser)
+                    .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
+                    .ToListAsync();
+            }
         }
         catch (PhysioTrac.Application.Common.ForbiddenException ex)
         {
             _error = ex.Message;
         }
     }
+
+    private void ToggleForm()
+    {
+        _showForm = !_showForm;
+        _formError = null;
+    }
+
+    private async Task ToggleArchived(ChangeEventArgs e)
+    {
+        _showArchived = e.Value is true;
+        _showForm = false;
+        await LoadAsync();
+    }
+
+    private async Task CreatePatient()
+    {
+        _formError = null;
+        Guid organizationId;
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Scheduling);
+            organizationId = (await TenantAccess.OrganizationRequiredAsync(CurrentUser)).Id;
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _formError = ex.Message;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))
+        {
+            _formError = "First and last name are required.";
+            return;
+        }
+        if (_dateOfBirth is null || _dateOfBirth > DateOnly.FromDateTime(DateTime.Today))
+        {
+            _formError = "A valid date of birth is required.";
+            return;
+        }
+
+        var patient = new Patient
+        {
+            OrganizationId = organizationId,
+            FirstName = _firstName.Trim(),
+            LastName = _lastName.Trim(),
+            DateOfBirth = _dateOfBirth.Value,
+            Phone = Clean(_phone),
+            Email = Clean(_email),
+            Address = Clean(_address),
+            EmergencyContact = Clean(_emergencyContact),
+            PreferredLanguage = Clean(_preferredLanguage),
+            // A clinician who registers a patient becomes their assigned
+            // therapist -- and an Assistant (still caseload-scoped) would
+            // otherwise lose sight of the chart the moment it was saved.
+            AssignedTherapistId = CurrentUser.Role is UserRole.Therapist or UserRole.Assistant ? CurrentUser.UserId : null,
+        };
+        Db.Patients.Add(patient);
+        await Db.SaveChangesAsync();
+
+        Navigation.NavigateTo($"/patients/{patient.Id}");
+    }
+
+    private async Task RestorePatient(Guid patientId)
+    {
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.Scheduling);
+            var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+            var patient = await Db.Patients.FirstOrDefaultAsync(p => p.Id == patientId && p.OrganizationId == organization.Id);
+            if (patient is null) return;
+
+            patient.DeletedAt = null;
+            patient.DeletedById = null;
+            patient.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _error = ex.Message;
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void GoToPatient(Guid patientId) => Navigation.NavigateTo($"/patients/{patientId}");
 }

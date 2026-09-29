@@ -142,11 +142,16 @@ public class PatientsController : ControllerBase
         }
     }
 
+    /// <summary>Restricted to Scheduling the same as Create/Delete --
+    /// RequirePatientAccessAsync alone would let any role that can merely
+    /// *see* the chart (Biller, Compliance, or a Patient-role portal account
+    /// on their own record) rewrite its demographics and status.</summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePatientRequest request)
     {
         try
         {
+            _tenantAccess.RequireRole(_currentUser, RoleSets.Scheduling);
             var patient = await _tenantAccess.RequirePatientAccessAsync(
                 _currentUser, id,
                 route: HttpContext.Request.Path,
