@@ -15,7 +15,7 @@ import { MoveAppointmentDialog } from "./components/MoveAppointmentDialog";
 import { NewAppointmentDialog, type NewAppointmentDefaults } from "./components/NewAppointmentDialog";
 import { RescheduleDialog } from "./components/RescheduleDialog";
 import { MonthEvent, makeMonthDateHeader } from "./components/MonthCell";
-import { ProviderColumnHeader, type ProviderResource } from "./components/ProviderColumnHeader";
+import { makeProviderColumnHeader, type ProviderResource } from "./components/ProviderColumnHeader";
 import { ProviderDailySummary } from "./components/ProviderDailySummary";
 import { ScheduleToolbar } from "./components/ScheduleToolbar";
 import { ListView } from "./components/ListView";
@@ -271,10 +271,10 @@ export function SchedulePage() {
   const components = useMemo(
     () => ({
       event: makeAppointmentCard(view !== "day" && !filters.providerId),
-      resourceHeader: ProviderColumnHeader,
+      resourceHeader: makeProviderColumnHeader(filters.providerId, (providerId) => onFiltersChange({ providerId })),
       month: { event: MonthEvent, dateHeader: makeMonthDateHeader(countsByDay) },
     }),
-    [view, filters.providerId, countsByDay],
+    [view, filters.providerId, countsByDay, onFiltersChange],
   );
 
   const eventPropGetter = useCallback(
@@ -318,6 +318,7 @@ export function SchedulePage() {
 
   const activeQuery = view === "day" ? dayQuery : view === "year" ? countsQuery : view === "list" ? listQuery : rangeQuery;
   const isCalendar = view === "day" || view === "week" || view === "month";
+  const selectedProvider = filters.providerId ? settings.providers.find((p) => p.id === filters.providerId) : undefined;
 
   // Drag-and-drop and resize: Day and Week only (a Month cell has no time
   // to drop onto), only for users the Api lets reschedule, and only for
@@ -405,6 +406,18 @@ export function SchedulePage() {
           setNewAppointment({ date: dateKey, providerId: filters.providerId || undefined, locationId: filters.locationId || undefined })
         }
       />
+
+      {selectedProvider && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md bg-primary-light/60 px-3 py-2 text-sm text-text" role="status">
+          <span>
+            Showing <strong>{selectedProvider.name}</strong>
+            {selectedProvider.credentials ? `, ${selectedProvider.credentials}` : ""} only — switch Day, Week, Month, Year, or List to see their schedule over time.
+          </span>
+          <button type="button" className="btn-secondary px-2 py-0.5 text-xs" onClick={() => onFiltersChange({ providerId: "" })}>
+            ✕ Show all providers
+          </button>
+        </div>
+      )}
 
       {activeQuery.isError && <p className="alert-error">Could not load appointments: {activeQuery.error.message}</p>}
 
