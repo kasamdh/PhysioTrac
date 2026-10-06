@@ -6,6 +6,8 @@ public record LoginRequest(string Username, string Password);
 
 public record ActivateInvitationRequest(string Token, string Password);
 
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
 public record MeResponse(
     Guid Id,
     string Username,
@@ -14,7 +16,10 @@ public record MeResponse(
     Guid? OrganizationId,
     bool IsPlatformSuperAdmin,
     bool MustChangePassword,
-    bool AccessControlEnabled);
+    bool AccessControlEnabled,
+    string FirstName,
+    string LastName,
+    DateTimeOffset? LastLoginAt);
 
 public record UserSessionResponse(
     Guid Id,

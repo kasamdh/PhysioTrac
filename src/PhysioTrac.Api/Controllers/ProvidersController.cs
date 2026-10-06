@@ -136,5 +136,5 @@ public class ProvidersController : ControllerBase
 
     private static ProviderDto ToDto(Provider p) => new(
         p.Id, p.FirstName, p.LastName, p.FullName, p.Specialty, p.Credentials, p.NpiNumber,
-        p.IsActive, p.OnlineBookingEnabled, p.Locations.Select(l => l.Id).ToList());
+        p.IsActive, p.OnlineBookingEnabled, p.Locations.Select(l => l.Id).ToList(), p.Discipline, p.UserId is not null);
 }

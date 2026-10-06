@@ -230,4 +230,48 @@ public class PatientSearchAndLifecycleTests
         Assert.Single(timeline.Documents);
         Assert.Empty(timeline.Appointments);
     }
+
+    [Fact]
+    public async Task Create_TrimsNames_AndSavesThePatient()
+    {
+        var (db, org, admin, _, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+
+        var result = Assert.IsType<CreatedAtActionResult>(await controller.Create(
+            new CreatePatientRequest("  Nora ", " Quill  ", new DateOnly(1988, 4, 2), "919-555-0199", null, null, null, null, null, null, null, null)));
+
+        var dto = Assert.IsType<PatientDto>(result.Value);
+        Assert.Equal("Nora", dto.FirstName);
+        Assert.Equal("Quill", dto.LastName);
+        Assert.Equal(org.Id, (await db.Patients.SingleAsync(p => p.Id == dto.Id)).OrganizationId);
+    }
+
+    [Theory]
+    [InlineData("", "Quill", 1988)]
+    [InlineData("Nora", "  ", 1988)]
+    [InlineData("Nora", "Quill", 1850)]
+    public async Task Create_RejectsMissingNamesOrImplausibleBirthYear(string first, string last, int birthYear)
+    {
+        var (db, _, admin, _, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+
+        var result = await controller.Create(
+            new CreatePatientRequest(first, last, new DateOnly(birthYear, 1, 1), null, null, null, null, null, null, null, null, null));
+
+        Assert.IsType<UnprocessableEntityObjectResult>(result);
+        Assert.Equal(2, await db.Patients.CountAsync()); // only the seeded two
+    }
+
+    [Fact]
+    public async Task Create_RejectsFutureDateOfBirth()
+    {
+        var (db, _, admin, _, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+
+        var result = await controller.Create(
+            new CreatePatientRequest("Nora", "Quill", tomorrow, null, null, null, null, null, null, null, null, null));
+
+        Assert.IsType<UnprocessableEntityObjectResult>(result);
+    }
 }

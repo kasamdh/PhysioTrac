@@ -106,7 +106,7 @@ public class AuthController : ControllerBase
 
         await AuditAuthEventAsync(user, "auth.login.success", ip, HttpContext.RequestAborted);
 
-        return Ok(ToMeResponse(user));
+        return Ok(await ToMeResponseAsync(user, session.SessionKey));
     }
 
     [HttpPost("logout")]
@@ -139,13 +139,63 @@ public class AuthController : ControllerBase
             ? _audit.RecordAuditEventAsync(user.Id, action, nameof(ApplicationUser), user.Id, organizationId, ipAddress: ipAddress, ct: ct)
             : _audit.RecordPlatformAuditEventAsync(user.Id, action, nameof(ApplicationUser), user.Id, ipAddress: ipAddress, ct: ct);
 
+    /// <summary>Signed-in user changes their own password. Re-issues the
+    /// auth cookie with the same session key afterwards: the password change
+    /// rotates the security stamp, which would otherwise end this session at
+    /// the next stamp validation.</summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null) return Unauthorized();
+
+        if (string.IsNullOrEmpty(request.CurrentPassword) || string.IsNullOrEmpty(request.NewPassword))
+        {
+            return BadRequest(new { detail = "Current and new passwords are required." });
+        }
+        if (request.CurrentPassword == request.NewPassword)
+        {
+            return UnprocessableEntity(new { detail = "The new password must be different from the current one." });
+        }
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            var wrongCurrent = result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.PasswordMismatch));
+            return UnprocessableEntity(new
+            {
+                detail = wrongCurrent ? "The current password is incorrect." : "The new password doesn't meet the password rules.",
+                errors = wrongCurrent ? Array.Empty<string>() : result.Errors.Select(e => e.Description).ToArray(),
+            });
+        }
+
+        if (user.MustChangePassword)
+        {
+            user.MustChangePassword = false;
+            await _userManager.UpdateAsync(user);
+        }
+
+        var sessionKey = User.FindFirst(AppClaimTypes.SessionKey)?.Value;
+        if (!string.IsNullOrEmpty(sessionKey))
+        {
+            await _signInManager.SignInWithClaimsAsync(user, isPersistent: false, additionalClaims: new[]
+            {
+                new Claim(AppClaimTypes.SessionKey, sessionKey),
+            });
+        }
+
+        await AuditAuthEventAsync(user, "auth.password.changed", HttpContext.Connection.RemoteIpAddress?.ToString(), HttpContext.RequestAborted);
+        return NoContent();
+    }
+
     [HttpGet("me")]
     [Authorize]
     public async Task<IActionResult> Me()
     {
         var user = await _userManager.GetUserAsync(User);
         if (user is null) return Unauthorized();
-        return Ok(ToMeResponse(user));
+        return Ok(await ToMeResponseAsync(user, User.FindFirst(AppClaimTypes.SessionKey)?.Value));
     }
 
     /// <summary>Issues an antiforgery token pair the SPA re-sends as
@@ -214,10 +264,27 @@ public class AuthController : ControllerBase
             return StatusCode(410, new { detail = "This invitation is expired or has already been used." });
         }
 
+        // Deactivated (Suspended) after being invited: the link must not
+        // bring the account back.
+        if (user.Status == UserStatus.Suspended)
+        {
+            return StatusCode(403, new { detail = "This account has been deactivated. Please contact your administrator." });
+        }
+
         var addPasswordResult = await _userManager.AddPasswordAsync(user, request.Password);
         if (!addPasswordResult.Succeeded)
         {
             return UnprocessableEntity(new { errors = addPasswordResult.Errors.Select(e => e.Description) });
+        }
+
+        // Staff invited through UsersController start Inactive (no password
+        // yet); setting the first password is what makes them Active --
+        // otherwise every later login would be refused.
+        if (user.Status == UserStatus.Inactive)
+        {
+            user.Status = UserStatus.Active;
+            user.StatusChangedAt = DateTimeOffset.UtcNow;
+            await _userManager.UpdateAsync(user);
         }
 
         invitation.UsedAt = DateTimeOffset.UtcNow;
@@ -231,7 +298,7 @@ public class AuthController : ControllerBase
             new Claim(AppClaimTypes.SessionKey, session.SessionKey),
         });
 
-        return Ok(ToMeResponse(user));
+        return Ok(await ToMeResponseAsync(user, session.SessionKey));
     }
 
     private Task<PhysioTrac.Domain.Entities.ClientInvitation?> FindInvitationAsync(string token)
@@ -240,7 +307,19 @@ public class AuthController : ControllerBase
         return _db.ClientInvitations.Include(i => i.Organization).FirstOrDefaultAsync(i => i.TokenHash == tokenHash);
     }
 
-    private static MeResponse ToMeResponse(ApplicationUser user) => new(
-        user.Id, user.UserName ?? string.Empty, user.Email, user.Role,
-        user.OrganizationId, user.IsPlatformSuperAdmin, user.MustChangePassword, AccessControl.Enabled);
+    /// <summary>"Last login" is the start of the user's most recent session
+    /// other than the current one -- i.e. the login before this one.</summary>
+    private async Task<MeResponse> ToMeResponseAsync(ApplicationUser user, string? currentSessionKey)
+    {
+        var lastLoginAt = await _db.UserSessions
+            .Where(s => s.UserId == user.Id && s.SessionKey != currentSessionKey)
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => (DateTimeOffset?)s.CreatedAt)
+            .FirstOrDefaultAsync(HttpContext.RequestAborted);
+
+        return new MeResponse(
+            user.Id, user.UserName ?? string.Empty, user.Email, user.Role,
+            user.OrganizationId, user.IsPlatformSuperAdmin, user.MustChangePassword, AccessControl.Enabled,
+            user.FirstName, user.LastName, lastLoginAt);
+    }
 }

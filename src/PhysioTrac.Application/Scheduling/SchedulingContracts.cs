@@ -4,7 +4,8 @@ namespace PhysioTrac.Application.Scheduling;
 
 public record ProviderDto(
     Guid Id, string FirstName, string LastName, string FullName, string? Specialty, string? Credentials,
-    string? NpiNumber, bool IsActive, bool OnlineBookingEnabled, IReadOnlyList<Guid> LocationIds);
+    string? NpiNumber, bool IsActive, bool OnlineBookingEnabled, IReadOnlyList<Guid> LocationIds,
+    ProviderDiscipline Discipline, bool HasLogin);
 
 public record CreateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, Guid? UserId, IReadOnlyList<Guid>? LocationIds);
 
