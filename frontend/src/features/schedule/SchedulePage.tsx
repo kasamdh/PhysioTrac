@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { Calendar, dayjsLocalizer, type SlotPropGetter, type View } from "react-big-calendar";
@@ -20,7 +20,8 @@ import { ProviderDailySummary } from "./components/ProviderDailySummary";
 import { ScheduleToolbar } from "./components/ScheduleToolbar";
 import { ListView } from "./components/ListView";
 import { YearView } from "./components/YearView";
-import { isReschedulable, statusEventClass } from "./status";
+import { VisitTypeLegend } from "./components/VisitTypeLegend";
+import { appointmentColors, isReschedulable, isVoided, statusEventClass } from "./status";
 import { useToast } from "../../components/Toast";
 import {
   addDays, atTime, formatTime, fromDateKey, startOfWeek, toDateKey, todayKey, toWallClock, wallClockToIso,
@@ -282,7 +283,13 @@ export function SchedulePage() {
       "appointment" in event
         ? {
             className: statusEventClass[event.appointment.status],
-            style: event.appointment.appointmentTypeColor ? { borderLeftColor: event.appointment.appointmentTypeColor } : undefined,
+            // Tint by visit type; cancelled / no-show keep their grey status look.
+            style: isVoided(event.appointment.status)
+              ? undefined
+              : (() => {
+                  const c = appointmentColors(event.appointment);
+                  return { "--appt-accent": c.accent, "--appt-bg": c.bg } as CSSProperties;
+                })(),
           }
         : { className: "schedule-block" },
     [],
@@ -406,6 +413,8 @@ export function SchedulePage() {
           setNewAppointment({ date: dateKey, providerId: filters.providerId || undefined, locationId: filters.locationId || undefined })
         }
       />
+
+      {view !== "year" && <VisitTypeLegend />}
 
       {selectedProvider && (
         <div className="flex flex-wrap items-center gap-2 rounded-md bg-primary-light/60 px-3 py-2 text-sm text-text" role="status">

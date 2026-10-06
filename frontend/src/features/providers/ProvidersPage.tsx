@@ -136,19 +136,19 @@ export function ProvidersPage() {
                       ]}
                     />
                   </td>
-                  <td>
+                  <td data-label="Name">
                     <Link to={`/schedule/hours?provider=${p.id}`} className="table-link">
                       {p.fullName}
                     </Link>
                   </td>
-                  <td>{DisciplineLabels[p.discipline]}</td>
-                  <td>{p.credentials}</td>
-                  <td>{p.specialty}</td>
-                  <td>{p.npiNumber}</td>
-                  <td>{p.locationIds.map((id) => locationName.get(id)).filter(Boolean).join(", ") || "—"}</td>
-                  <td>{p.hasLogin ? "Yes" : "No"}</td>
-                  <td>{p.onlineBookingEnabled ? "Yes" : "No"}</td>
-                  <td>{p.isActive ? "Active" : "Inactive"}</td>
+                  <td data-label="Discipline">{DisciplineLabels[p.discipline]}</td>
+                  <td data-label="Credentials">{p.credentials}</td>
+                  <td data-label="Specialty">{p.specialty}</td>
+                  <td data-label="NPI">{p.npiNumber}</td>
+                  <td data-label="Locations">{p.locationIds.map((id) => locationName.get(id)).filter(Boolean).join(", ") || "—"}</td>
+                  <td data-label="Login">{p.hasLogin ? "Yes" : "No"}</td>
+                  <td data-label="Online booking">{p.onlineBookingEnabled ? "Yes" : "No"}</td>
+                  <td data-label="Status">{p.isActive ? "Active" : "Inactive"}</td>
                 </tr>
               ))}
             </tbody>

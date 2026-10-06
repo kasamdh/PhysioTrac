@@ -133,7 +133,7 @@ export function WeeklyHoursEditor({ schedule }: Props) {
                 {editable && (
                   <button
                     type="button"
-                    className="text-sm font-medium text-primary hover:text-primary-deep"
+                    className="touch-target text-sm font-medium text-primary hover:text-primary-deep"
                     onClick={() => {
                       const last = dayRows[dayRows.length - 1];
                       change([

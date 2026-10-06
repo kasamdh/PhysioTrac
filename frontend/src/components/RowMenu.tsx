@@ -50,7 +50,7 @@ export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] 
   };
 
   const itemClass = (danger?: boolean) =>
-    `block w-full px-4 py-2.5 text-left text-[15px] whitespace-nowrap hover:bg-primary-light focus:bg-primary-light focus:outline-none disabled:opacity-50 ${
+    `block w-full px-4 py-2.5 text-left text-sm whitespace-nowrap hover:bg-primary-light focus:bg-primary-light focus:outline-none disabled:opacity-50 ${
       danger ? "text-danger" : "text-[#333]"
     }`;
 

@@ -80,8 +80,10 @@ body {
   .list-wrap {
     @apply overflow-x-auto border border-grid bg-white;
   }
+  /* All list text is one size -- 14px, measured from the reference
+     screens -- including dates, statuses and buttons inside cells. */
   .data-table {
-    @apply w-full border-collapse text-[15px] text-[#333];
+    @apply w-full border-collapse text-sm text-[#333];
   }
   .data-table thead tr {
     @apply bg-white text-left;
@@ -116,20 +118,74 @@ body {
     @apply inline-flex flex-wrap;
   }
   .seg-btn {
-    @apply -ml-px border border-[#c4c4c4] bg-gradient-to-b from-white to-[#e9e9e9] px-4 py-2 text-[15px] whitespace-nowrap text-[#333] first:ml-0 first:rounded-l last:rounded-r hover:to-[#dcdcdc] focus:relative focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40;
+    @apply -ml-px border border-[#c4c4c4] bg-gradient-to-b from-white to-[#e9e9e9] px-4 py-2 text-sm whitespace-nowrap text-[#333] first:ml-0 first:rounded-l last:rounded-r hover:to-[#dcdcdc] focus:relative focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40;
   }
   .seg-btn[aria-pressed="true"],
   .seg-btn[aria-selected="true"] {
     @apply relative border-primary-deep bg-none bg-primary text-white;
   }
   .toolbar-label {
-    @apply flex items-center gap-2.5 text-[15px] font-bold text-[#333];
+    @apply flex items-center gap-2.5 text-sm font-bold text-[#333];
   }
   .toolbar-select {
-    @apply h-10 rounded border border-[#c4c4c4] bg-white px-3 text-[15px] font-normal text-[#333] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30;
+    @apply h-10 rounded border border-[#c4c4c4] bg-white px-3 text-sm font-normal text-[#333] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30;
   }
   .btn-refresh {
-    @apply rounded border border-[#c4c4c4] bg-gradient-to-b from-white to-[#e9e9e9] px-4 py-2 text-[15px] text-[#333] hover:to-[#dcdcdc] disabled:opacity-60;
+    @apply rounded border border-[#c4c4c4] bg-gradient-to-b from-white to-[#e9e9e9] px-4 py-2 text-sm text-[#333] hover:to-[#dcdcdc] disabled:opacity-60;
+  }
+  /* Phones (< 640px): each list row becomes a labelled card (labels come
+     from each cell's data-label), the ☰ menu sits top-right; quick-filter
+     buttons stay one swipeable row; toolbar fields go full width. */
+  @media (max-width: 639px) {
+    .data-table thead {
+      display: none;
+    }
+    .data-table,
+    .data-table tbody,
+    .data-table tr {
+      display: block;
+    }
+    .data-table tr {
+      position: relative;
+      @apply border-b border-grid px-4 py-3;
+    }
+    .data-table td {
+      display: flex;
+      gap: 0.75rem;
+      overflow-wrap: anywhere; /* long emails/MRNs wrap inside the card */
+      @apply border-0 px-0 py-1;
+    }
+    .data-table td > * {
+      min-width: 0;
+    }
+    .data-table td[data-label]::before {
+      content: attr(data-label);
+      flex: 0 0 8.5rem;
+      @apply font-bold text-[#555];
+    }
+    .data-table td.cell-menu {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+      width: auto;
+      padding: 0;
+    }
+    /* Leave room on the first line for the menu button. */
+    .data-table td.cell-menu + td {
+      padding-right: 3.5rem;
+    }
+    .seg-group {
+      @apply max-w-full flex-nowrap overflow-x-auto;
+    }
+    .list-toolbar > * {
+      @apply w-full;
+    }
+    .list-toolbar .toolbar-label > :is(input, select) {
+      flex: 1;
+    }
+    .list-toolbar > .ml-auto {
+      margin-left: 0;
+    }
   }
   .modal-overlay {
     @apply fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4;
@@ -139,5 +195,57 @@ body {
   }
   .toast {
     @apply rounded-md border border-border bg-surface px-4 py-3 text-sm text-text shadow-lg;
+  }
+}
+
+/* Outside any @layer on purpose: unlayered rules beat Tailwind's utilities
+   layer, so a stray text-xs inside a list cell (dates, status pills,
+   buttons) still renders at the one list size. */
+.data-table td *,
+.data-table th * {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+
+/* Touch devices (phones, iPads, tablets). Unlayered so it wins over the
+   utility classes above it:
+   - iOS Safari zooms the whole page when a field under 16px is focused,
+     so form controls are 16px there;
+   - buttons are at least 44px tall (Apple's minimum touch target). */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .data-table td select {
+    font-size: 16px;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .btn-refresh,
+  .seg-btn,
+  header button,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select {
+    min-height: 44px;
+  }
+  header button {
+    min-width: 44px;
+  }
+  /* Header tabs and small text-style buttons (e.g. "+ Add hours"). */
+  header nav a {
+    display: flex; /* block-level, so the phone menu stays one link per row */
+    align-items: center;
+    min-height: 44px;
+  }
+  .touch-target {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* Linked names in list rows: a taller hit area without changing layout. */
+  .data-table .table-link {
+    display: inline-block;
+    padding-block: 12px;
+    margin-block: -12px;
   }
 }

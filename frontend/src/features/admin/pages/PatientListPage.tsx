@@ -115,7 +115,7 @@ export function PatientListPage({
   const dateRangeInvalid = !!filters.appointmentFrom && !!filters.appointmentTo && filters.appointmentFrom > filters.appointmentTo;
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div>
       <AdminPageHeader
         title={title}
         back={back}
@@ -298,7 +298,7 @@ export function PatientListPage({
                       ]}
                     />
                   </td>
-                  <td>
+                  <td data-label="MRN">
                     <Link
                       className="table-link"
                       to={`/schedule?view=list&listRange=month&location=all&patient=${encodeURIComponent(p.medicalRecordNumber)}`}
@@ -306,15 +306,15 @@ export function PatientListPage({
                       {p.medicalRecordNumber}
                     </Link>
                   </td>
-                  <td>{p.fullName}</td>
-                  <td>
+                  <td data-label="Name">{p.fullName}</td>
+                  <td data-label="Date of birth">
                     {formatDate(p.dateOfBirth)} <span className="text-text-muted">({p.age})</span>
                   </td>
-                  <td>{p.phone}</td>
-                  <td>{p.primaryLocationName ?? "—"}</td>
-                  <td>{STATUS_LABELS[p.status]}</td>
-                  <td>{formatDateTime(p.lastVisitAt)}</td>
-                  <td>{formatDateTime(p.nextAppointmentAt)}</td>
+                  <td data-label="Phone">{p.phone}</td>
+                  <td data-label="Primary location">{p.primaryLocationName ?? "—"}</td>
+                  <td data-label="Status">{STATUS_LABELS[p.status]}</td>
+                  <td data-label="Last visit">{formatDateTime(p.lastVisitAt)}</td>
+                  <td data-label="Next appointment">{formatDateTime(p.nextAppointmentAt)}</td>
                 </tr>
               ))}
             </tbody>

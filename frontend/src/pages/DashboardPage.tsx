@@ -17,7 +17,9 @@ export function DashboardPage() {
   const locations = organizationQuery.data?.locations;
   const { selectedId, selectLocation } = useSelectedLocation(locations);
 
-  const tiles = appModules.filter((m) => m.tile && (!m.allowed || canAccess(user, m.allowed)));
+  const tiles = appModules
+    .filter((m) => m.tile && (!m.allowed || canAccess(user, m.allowed)))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   return (
     <div className="flex flex-col items-center py-8 md:py-16">
@@ -39,9 +41,12 @@ export function DashboardPage() {
         </select>
       )}
 
-      <div className="mt-12 grid grid-cols-1 gap-x-16 gap-y-12 sm:grid-cols-2">
+      {/* Equal-width buttons, icon above label, wrapped and centered: three
+          per row on wide screens (max-width), two on phones; a short last
+          row stays centered too. */}
+      <div className="mt-12 flex max-w-[51rem] flex-wrap justify-center gap-x-6 gap-y-10 sm:gap-x-12">
         {tiles.map((m) => (
-          <Link key={m.to} to={m.to} className="group flex items-center gap-4">
+          <Link key={m.to} to={m.to} className="group flex w-40 flex-col items-center gap-3 text-center sm:w-60">
             <span
               className={`relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br ${m.tileGradient} text-white shadow-[3px_4px_8px_rgba(0,0,0,0.35)] transition group-hover:scale-105 md:h-28 md:w-28`}
             >
@@ -49,7 +54,7 @@ export function DashboardPage() {
               <span className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/45 to-white/0" aria-hidden="true" />
               <span className="relative h-14 w-14 drop-shadow-md md:h-16 md:w-16 [&>svg]:h-full [&>svg]:w-full">{m.icon}</span>
             </span>
-            <span className="text-2xl font-bold text-[#1565b8] group-hover:underline md:text-[28px]">{m.label}</span>
+            <span className="text-xl font-bold text-[#1565b8] group-hover:underline sm:text-2xl">{m.label}</span>
           </Link>
         ))}
       </div>

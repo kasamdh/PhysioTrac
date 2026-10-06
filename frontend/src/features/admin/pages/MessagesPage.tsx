@@ -34,7 +34,7 @@ export function MessagesPage() {
   const openName = openThread?.patientName ?? newPatientName;
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       <AdminPageHeader
         title="Messages"
         actions={

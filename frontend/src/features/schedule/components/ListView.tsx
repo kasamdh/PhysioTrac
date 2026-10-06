@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../../components/Toast";
 import { transitionAppointment, type AppointmentAction } from "../api";
-import { isReschedulable, statusBadgeClass } from "../status";
+import { appointmentColors, isReschedulable, statusBadgeClass } from "../status";
 import { formatTime, toWallClock } from "../time";
 import { AppointmentStatus, AppointmentStatusLabels, type PagedScheduleAppointments, type ScheduleAppointment } from "../types";
 
@@ -136,7 +136,16 @@ export function ListView({ data, isLoading, timezone, canManage, canReschedule, 
                     {a.providerName ?? "Unassigned"}
                     {a.providerCredentials && <span className="text-text-muted">, {a.providerCredentials}</span>}
                   </td>
-                  <td>{a.appointmentTypeName ?? "—"}</td>
+                  <td>
+                    <span className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ background: appointmentColors(a).accent }}
+                      />
+                      {a.appointmentTypeName ?? "—"}
+                    </span>
+                  </td>
                   <td>{a.locationName ?? "—"}</td>
                   <td className="whitespace-nowrap">{a.durationMinutes} min</td>
                   <td>{badge(a)}</td>

@@ -65,7 +65,7 @@ export function UsersAdminPage() {
     .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       <AdminPageHeader
         title="Users"
         actions={
@@ -190,13 +190,13 @@ export function UsersAdminPage() {
                         />
                       )}
                     </td>
-                    <td>
+                    <td data-label="Name">
                       {u.firstName} {u.lastName}
                       {isMe && <span className="ml-1 text-xs text-text-muted">(you)</span>}
                     </td>
-                    <td>{u.userName}</td>
-                    <td className="text-text-muted">{u.email}</td>
-                    <td>
+                    <td data-label="User ID">{u.userName}</td>
+                    <td data-label="Email" className="text-text-muted">{u.email}</td>
+                    <td data-label="Role">
                       <select
                         aria-label={`Role for ${u.firstName} ${u.lastName}`}
                         className="field-input w-auto py-1"
@@ -212,7 +212,7 @@ export function UsersAdminPage() {
                         ))}
                       </select>
                     </td>
-                    <td>{u.status === UserStatus.Inactive ? "Invited" : UserStatusLabels[u.status]}</td>
+                    <td data-label="Status">{u.status === UserStatus.Inactive ? "Invited" : UserStatusLabels[u.status]}</td>
                   </tr>
                 );
               })}

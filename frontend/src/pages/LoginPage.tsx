@@ -44,15 +44,16 @@ export function LoginPage() {
         <HeaderLogo />
       </header>
 
-      <div className="flex flex-1 flex-col md:flex-row">
-        {/* Hero -- hidden on phones so the sign-in panel is the first thing seen. */}
-        <section className="hidden flex-1 flex-col items-center justify-center gap-4 md:flex">
+      <div className="flex flex-1 flex-col lg:flex-row">
+        {/* Hero -- only beside the sign-in panel from 1024px up; phones and
+            portrait iPads get the sign-in panel alone. */}
+        <section className="hidden flex-1 flex-col items-center justify-center gap-4 lg:flex">
           <BrandMark className="h-40 w-40" />
           <BrandWordmark className="text-7xl font-bold text-primary-deep lg:text-8xl" />
           <p className="text-sm tracking-wide text-text-muted">Source Motion Physical Therapy</p>
         </section>
 
-        <section className="flex w-full flex-col items-center border-border px-4 py-10 md:w-[34%] md:min-w-[380px] md:justify-center md:border-l md:py-8">
+        <section className="flex w-full flex-col items-center border-border px-4 py-10 lg:w-[34%] lg:min-w-[400px] lg:justify-center lg:border-l lg:py-8">
           <h1 className="mb-3 text-center">
             <BrandWordmark className="text-6xl font-bold text-brand-accent" />
           </h1>

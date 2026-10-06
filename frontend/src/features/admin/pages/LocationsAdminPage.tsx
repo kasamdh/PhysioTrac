@@ -82,7 +82,7 @@ export function LocationsAdminPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       <AdminPageHeader
         title="Locations"
         actions={
@@ -165,21 +165,25 @@ export function LocationsAdminPage() {
                       ]}
                     />
                   </td>
-                  <td>
+                  <td data-label="Name">
                     <button type="button" className="table-link text-left" onClick={() => setEditing(l)}>
                       {l.name}
                     </button>
                   </td>
-                  <td className="text-text-muted">
-                    {[l.addressLine1, l.addressLine2].filter(Boolean).join(", ")}
-                    {(l.city || l.state) && (
-                      <span className="block">{[l.city, [l.state, l.zipCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")}</span>
-                    )}
+                  <td data-label="Address" className="text-text-muted">
+                    <div>
+                      {[l.addressLine1, l.addressLine2].filter(Boolean).join(", ")}
+                      {(l.city || l.state) && (
+                        <span className="block">
+                          {[l.city, [l.state, l.zipCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")}
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td>{l.phone}</td>
-                  <td>{timeZoneLabel(l.timezone)}</td>
-                  <td>{l.npiNumber}</td>
-                  <td>{l.isActive ? "Active" : "Inactive"}</td>
+                  <td data-label="Phone">{l.phone}</td>
+                  <td data-label="Time zone">{timeZoneLabel(l.timezone)}</td>
+                  <td data-label="NPI">{l.npiNumber}</td>
+                  <td data-label="Status">{l.isActive ? "Active" : "Inactive"}</td>
                 </tr>
               ))}
             </tbody>
