@@ -23,7 +23,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const meQuery = useQuery({
     queryKey: ME_QUERY_KEY,
     queryFn: fetchCurrentUser,
-    retry: false,
+    // 401 = not signed in, never retried. 429 = rate-limited, not signed
+    // out: wait and retry instead of bouncing the user to /login.
+    retry: (failures, error) => error instanceof ApiError && error.status === 429 && failures < 3,
+    retryDelay: 3000,
     // A 401 here just means "not logged in" -- not a fetch failure worth
     // surfacing as an error state to the rest of the app.
     throwOnError: false,

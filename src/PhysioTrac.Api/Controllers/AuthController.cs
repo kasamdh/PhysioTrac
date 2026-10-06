@@ -16,9 +16,13 @@ using PhysioTrac.Infrastructure.Persistence;
 
 namespace PhysioTrac.Api.Controllers;
 
+/// <remarks>The strict Auth rate limit is on the password-guessing actions
+/// only (login, invitation activation, change password). /me, /csrf and
+/// logout run on every page load and are covered by the global limiter alone
+/// -- under the strict one, a clinic sharing one public IP was bounced to the
+/// login screen after ~10 page loads a minute across all its staff.</remarks>
 [ApiController]
 [Route("api/v1/auth")]
-[EnableRateLimiting(RateLimitPolicies.Auth)]
 public class AuthController : ControllerBase
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -48,6 +52,7 @@ public class AuthController : ControllerBase
         new UnauthorizedObjectResult(new { detail = "Invalid username or password." });
 
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -144,6 +149,7 @@ public class AuthController : ControllerBase
     /// rotates the security stamp, which would otherwise end this session at
     /// the next stamp validation.</summary>
     [HttpPost("change-password")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
@@ -212,6 +218,7 @@ public class AuthController : ControllerBase
     /// <summary>Preview of a pending client-admin invitation, before the
     /// caller sets a password — read-only, no auth required.</summary>
     [HttpGet("activate-invitation")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [AllowAnonymous]
     public async Task<IActionResult> GetInvitation([FromQuery] string token)
     {
@@ -234,6 +241,7 @@ public class AuthController : ControllerBase
     /// real password (it was created with none — <c>set_unusable_password()</c>
     /// in the original), and signs the new administrator in immediately.</summary>
     [HttpPost("activate-invitation")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [AllowAnonymous]
     public async Task<IActionResult> ActivateInvitation([FromBody] ActivateInvitationRequest request)
     {
