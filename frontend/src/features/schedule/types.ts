@@ -302,9 +302,9 @@ export interface QuickPatientRequest {
   dateOfBirth: string;
   phone: string | null;
   email: string | null;
-  address: null;
-  emergencyContact: null;
-  preferredLanguage: null;
+  address: string | null;
+  emergencyContact: string | null;
+  preferredLanguage: string | null;
   assignedTherapistId: string | null;
   primaryLocationId: string | null;
   primaryCareProviderId: null;

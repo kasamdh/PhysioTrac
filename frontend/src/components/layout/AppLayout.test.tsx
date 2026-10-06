@@ -63,7 +63,7 @@ describe("AppLayout role-based navigation", () => {
   it("shows every nav item to an Admin", () => {
     renderAppLayout(UserRole.Admin);
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Patients" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Schedule" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Providers" })).toBeInTheDocument();
@@ -73,17 +73,17 @@ describe("AppLayout role-based navigation", () => {
   it("hides Patients/Providers/Billing from a Scheduler, who isn't in RoleSets.Clinical or RoleSets.Billing", () => {
     renderAppLayout(UserRole.Scheduler);
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Schedule" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Patients" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Providers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
   });
 
-  it("shows only Dashboard to a Patient-portal login", () => {
+  it("shows only Home to a Patient-portal login", () => {
     renderAppLayout(UserRole.Patient);
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Patients" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Schedule" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Providers" })).not.toBeInTheDocument();
@@ -96,5 +96,31 @@ describe("AppLayout role-based navigation", () => {
     expect(screen.getByRole("link", { name: "Billing" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Patients" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Schedule" })).not.toBeInTheDocument();
+  });
+
+  it("welcomes the user by name with their last login", () => {
+    mockedUseAuth.mockReturnValue({
+      user: { ...userWithRole(UserRole.Admin), firstName: "Kasam", lastName: "Dhakal", lastLoginAt: "2026-09-05T18:52:00Z" },
+      isLoading: false,
+      loginError: null,
+      isLoggingIn: false,
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={["/"]}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<div />} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByText(/Welcome Kasam Dhakal, last login at/)[0]).toBeInTheDocument();
   });
 });

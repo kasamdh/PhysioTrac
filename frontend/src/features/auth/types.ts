@@ -42,4 +42,8 @@ export interface CurrentUser {
   /** False while role-based access control is switched off on the server
    * (development builds): every staff role then sees every module. */
   accessControlEnabled?: boolean;
+  firstName?: string;
+  lastName?: string;
+  /** Start of the session before this one (ISO string); null on a first login. */
+  lastLoginAt?: string | null;
 }

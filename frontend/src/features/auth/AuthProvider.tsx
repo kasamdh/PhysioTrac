@@ -4,7 +4,7 @@ import { ApiError } from "../../lib/apiClient";
 import { fetchCurrentUser, login, logout, type LoginRequest } from "./api";
 import type { CurrentUser } from "./types";
 
-const ME_QUERY_KEY = ["auth", "me"] as const;
+export const ME_QUERY_KEY = ["auth", "me"] as const;
 
 interface AuthContextValue {
   user: CurrentUser | null;

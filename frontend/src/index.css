@@ -1,12 +1,16 @@
 @import "tailwindcss";
 
-/* Same brand tokens as src/PhysioTrac.Web/Styles/app.tailwind.css, so this
-   SPA, the Blazor staff UI, and PhysioTrac360 all read as one product
-   family rather than three different color systems. */
+/* Navy + magenta enterprise theme: navy gradient header bar, gray login
+   panel, magenta wordmark. */
 @theme {
-  --color-primary: #0d9488;
-  --color-primary-deep: #0f766e;
-  --color-primary-light: #ccfbf1;
+  --color-primary: #13507f;
+  --color-primary-deep: #0c3d66;
+  --color-primary-light: #dbe8f3;
+
+  --color-brand-accent: #a3127c;
+  --color-header-from: #1d5f91;
+  --color-header-to: #0c3d66;
+  --color-panel: #a3a9b0;
 
   --color-surface: #ffffff;
   --color-surface-muted: #f8fafc;
@@ -25,7 +29,11 @@
   --color-info: #2563eb;
   --color-info-light: #dbeafe;
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
+  --color-link: #2a6eb0;
+  --color-row-alt: #f4f4f4;
+  --color-grid: #dcdcdc;
+  --font-brand: Georgia, "Times New Roman", serif;
 }
 
 body {
@@ -35,11 +43,25 @@ body {
 }
 
 @layer components {
+  .app-header-bar {
+    background: linear-gradient(to bottom, var(--color-header-from), var(--color-header-to));
+  }
+  /* Large blue gradient command button (Administration hub). */
+  .admin-button {
+    @apply flex min-h-16 items-center justify-center rounded border border-[#1d4f80] bg-gradient-to-b from-[#3a80c2] to-[#265a8e] px-4 py-3 text-center text-xl font-bold text-white shadow-[0_2px_4px_rgba(0,0,0,0.25)] transition hover:brightness-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#3a80c2]/40;
+  }
+  .login-input {
+    @apply w-full rounded-sm border border-slate-300 bg-white px-4 py-2.5 text-base text-text placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40;
+  }
+  .brand-wordmark {
+    font-family: var(--font-brand);
+    letter-spacing: -0.01em;
+  }
   .card {
     @apply rounded-xl border border-border bg-surface p-5 shadow-sm;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-deep disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-gradient-to-b from-header-from to-header-to px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-secondary {
     @apply inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-muted transition hover:border-primary hover:text-primary;
@@ -53,20 +75,61 @@ body {
   .alert-error {
     @apply rounded-md bg-danger-light px-3 py-2 text-sm text-danger;
   }
+  /* Lists: striped rows with full cell borders and roomy rows, every
+     list page uses this. */
+  .list-wrap {
+    @apply overflow-x-auto border border-grid bg-white;
+  }
   .data-table {
-    @apply w-full text-sm;
+    @apply w-full border-collapse text-[15px] text-[#333];
   }
   .data-table thead tr {
-    @apply border-b border-border bg-surface-muted text-left text-xs uppercase tracking-wide text-text-subtle;
+    @apply bg-white text-left;
   }
   .data-table th {
-    @apply px-4 py-3 font-medium;
+    @apply border-x border-b-2 border-grid px-3 py-2.5 font-bold whitespace-nowrap first:border-l-0 last:border-r-0;
   }
   .data-table td {
-    @apply px-4 py-3;
+    @apply border border-grid px-3 py-3.5 align-top first:border-l-0 last:border-r-0;
   }
-  .data-table tbody tr {
-    @apply border-b border-border last:border-0;
+  .data-table tbody tr:nth-child(even) {
+    @apply bg-row-alt;
+  }
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  /* Cell holding the row's ☰ menu: narrow, no padding drift. */
+  .data-table td.cell-menu,
+  .data-table th.cell-menu {
+    @apply w-14 px-2 py-2.5;
+  }
+  .table-link {
+    @apply text-link hover:underline;
+  }
+
+  /* Toolbar above a list: joined quick-filter buttons, bold inline labels,
+     dropdowns and a Refresh button. */
+  .list-toolbar {
+    @apply mb-3 flex flex-wrap items-center gap-x-5 gap-y-3;
+  }
+  .seg-group {
+    @apply inline-flex flex-wrap;
+  }
+  .seg-btn {
+    @apply -ml-px border border-[#c4c4c4] bg-gradient-to-b from-white to-[#e9e9e9] px-4 py-2 text-[15px] whitespace-nowrap text-[#333] first:ml-0 first:rounded-l last:rounded-r hover:to-[#dcdcdc] focus:relative focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40;
+  }
+  .seg-btn[aria-pressed="true"],
+  .seg-btn[aria-selected="true"] {
+    @apply relative border-primary-deep bg-none bg-primary text-white;
+  }
+  .toolbar-label {
+    @apply flex items-center gap-2.5 text-[15px] font-bold text-[#333];
+  }
+  .toolbar-select {
+    @apply h-10 rounded border border-[#c4c4c4] bg-white px-3 text-[15px] font-normal text-[#333] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30;
+  }
+  .btn-refresh {
+    @apply rounded border border-[#c4c4c4] bg-gradient-to-b from-white to-[#e9e9e9] px-4 py-2 text-[15px] text-[#333] hover:to-[#dcdcdc] disabled:opacity-60;
   }
   .modal-overlay {
     @apply fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4;

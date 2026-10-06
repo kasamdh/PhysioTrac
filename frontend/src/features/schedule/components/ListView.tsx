@@ -126,8 +126,12 @@ export function ListView({ data, isLoading, timezone, canManage, canReschedule, 
                     <div className="font-medium text-text">{w.time}</div>
                     <div className="text-xs text-text-muted">{w.date}</div>
                   </td>
-                  <td className="font-medium text-text">{a.patientName}</td>
-                  <td className="whitespace-nowrap text-text-muted">{a.medicalRecordNumber}</td>
+                  <td>
+                    <button type="button" className="table-link text-left" onClick={() => onSelect(a)}>
+                      {a.patientName}
+                    </button>
+                  </td>
+                  <td className="whitespace-nowrap">{a.medicalRecordNumber}</td>
                   <td>
                     {a.providerName ?? "Unassigned"}
                     {a.providerCredentials && <span className="text-text-muted">, {a.providerCredentials}</span>}

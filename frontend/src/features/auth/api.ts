@@ -20,3 +20,9 @@ export async function logout(): Promise<void> {
 export function fetchCurrentUser(): Promise<CurrentUser> {
   return apiRequest<CurrentUser>("/api/v1/auth/me");
 }
+
+/** Consumes an invitation token, sets the account's first password, and
+ * signs the new user in (the response is the same shape as /auth/me). */
+export function activateInvitation(token: string, password: string): Promise<CurrentUser> {
+  return apiRequest<CurrentUser>("/api/v1/auth/activate-invitation", { method: "POST", body: { token, password } });
+}

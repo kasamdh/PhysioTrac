@@ -58,26 +58,26 @@ export function ScheduleToolbar(props: Props) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-secondary" onClick={props.onToday}>
+        <button type="button" className="btn-refresh" onClick={props.onToday}>
           Today
         </button>
-        <div className="flex">
-          <button type="button" className="btn-secondary rounded-r-none" onClick={() => props.onStep(-1)} aria-label="Previous">
+        <div className="seg-group">
+          <button type="button" className="seg-btn" onClick={() => props.onStep(-1)} aria-label="Previous">
             ‹ Previous
           </button>
-          <button type="button" className="btn-secondary -ml-px rounded-l-none" onClick={() => props.onStep(1)} aria-label="Next">
+          <button type="button" className="seg-btn" onClick={() => props.onStep(1)} aria-label="Next">
             Next ›
           </button>
         </div>
         <input
           type="date"
           aria-label="Go to date"
-          className="field-input w-auto py-1.5"
+          className="toolbar-select"
           value={dateKey}
           onChange={(e) => e.target.value && props.onDateChange(e.target.value)}
         />
         <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-text sm:text-lg">{title}</h2>
-        <div role="tablist" aria-label="Calendar view" className="flex rounded-md border border-border bg-surface p-0.5">
+        <div role="tablist" aria-label="Calendar view" className="seg-group">
           {views.map((v) => (
             <button
               key={v.id}
@@ -85,9 +85,7 @@ export function ScheduleToolbar(props: Props) {
               role="tab"
               aria-selected={view === v.id}
               onClick={() => props.onViewChange(v.id)}
-              className={`rounded px-3 py-1 text-sm font-medium transition ${
-                view === v.id ? "bg-primary text-white" : "text-text-muted hover:text-primary"
-              }`}
+              className="seg-btn"
             >
               {v.label}
             </button>
@@ -96,7 +94,7 @@ export function ScheduleToolbar(props: Props) {
         {view === "list" && (
           <select
             aria-label="List covers"
-            className="field-input w-auto py-1.5"
+            className="toolbar-select"
             value={props.listRange}
             onChange={(e) => props.onListRangeChange(e.target.value as ListRange)}
           >
@@ -107,7 +105,7 @@ export function ScheduleToolbar(props: Props) {
         )}
         <Link
           to={filters.providerId ? `/schedule/hours?provider=${filters.providerId}` : "/schedule/hours"}
-          className="btn-secondary"
+          className="btn-refresh"
         >
           Provider hours
         </Link>
@@ -124,7 +122,7 @@ export function ScheduleToolbar(props: Props) {
       <div className={`${filtersOpen ? "grid" : "hidden"} grid-cols-1 gap-2 sm:grid-cols-2 md:grid md:grid-cols-5`}>
         <select
           aria-label="Location"
-          className="field-input py-1.5"
+          className="toolbar-select w-full"
           value={filters.locationId}
           onChange={(e) => onFiltersChange({ locationId: e.target.value, providerId: "" })}
         >
@@ -137,7 +135,7 @@ export function ScheduleToolbar(props: Props) {
         </select>
         <select
           aria-label="Provider"
-          className="field-input py-1.5"
+          className="toolbar-select w-full"
           value={filters.providerId}
           onChange={(e) => onFiltersChange({ providerId: e.target.value })}
         >
@@ -151,7 +149,7 @@ export function ScheduleToolbar(props: Props) {
         </select>
         <select
           aria-label="Appointment status"
-          className="field-input py-1.5"
+          className="toolbar-select w-full"
           value={filters.status}
           onChange={(e) => onFiltersChange({ status: e.target.value })}
         >
@@ -164,7 +162,7 @@ export function ScheduleToolbar(props: Props) {
         </select>
         <select
           aria-label="Appointment type"
-          className="field-input py-1.5"
+          className="toolbar-select w-full"
           value={filters.appointmentTypeId}
           onChange={(e) => onFiltersChange({ appointmentTypeId: e.target.value })}
         >
@@ -179,7 +177,7 @@ export function ScheduleToolbar(props: Props) {
           type="search"
           aria-label="Search patient"
           placeholder="Search patient name or MRN"
-          className="field-input py-1.5"
+          className="toolbar-select w-full"
           value={patientText}
           onChange={(e) => setPatientText(e.target.value)}
         />

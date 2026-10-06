@@ -7,6 +7,16 @@ export const RoleSets = {
   Clinical: new Set<UserRole>([UserRole.Admin, UserRole.Director, UserRole.Therapist, UserRole.Assistant, UserRole.Compliance]),
   Scheduling: new Set<UserRole>([UserRole.Admin, UserRole.Director, UserRole.Therapist, UserRole.Assistant, UserRole.Scheduler]),
   Billing: new Set<UserRole>([UserRole.Admin, UserRole.Biller, UserRole.Director]),
+  DocumentManagement: new Set<UserRole>([
+    UserRole.Admin,
+    UserRole.Director,
+    UserRole.Therapist,
+    UserRole.Assistant,
+    UserRole.Compliance,
+    UserRole.Scheduler,
+    UserRole.Biller,
+  ]),
+  OrganizationAdministration: new Set<UserRole>([UserRole.Admin, UserRole.Director]),
 } as const;
 
 export function hasAnyRole(role: UserRole | undefined, allowed: ReadonlySet<UserRole>): boolean {

@@ -11,6 +11,14 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { SchedulePage } from "./features/schedule/SchedulePage";
 import { ProviderHoursPage } from "./features/schedule/ProviderHoursPage";
+import { AdminHomePage } from "./features/admin/pages/AdminHomePage";
+import { LocationsAdminPage } from "./features/admin/pages/LocationsAdminPage";
+import { UsersAdminPage } from "./features/admin/pages/UsersAdminPage";
+import { MessagesPage } from "./features/admin/pages/MessagesPage";
+import { PatientListPage } from "./features/admin/pages/PatientListPage";
+import { ChangePasswordPage } from "./features/admin/pages/ChangePasswordPage";
+import { ActivateAccountPage } from "./features/admin/pages/ActivateAccountPage";
+import { ProvidersPage } from "./features/providers/ProvidersPage";
 
 export default function App() {
   return (
@@ -21,14 +29,22 @@ export default function App() {
             <AuthProvider>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                {/* One-time link from Administration › Users (InviteAsync's activation URL). */}
+                <Route path="/:orgSlug/activate" element={<ActivateAccountPage />} />
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<DashboardPage />} />
-                    <Route path="/patients" element={<PlaceholderPage title="Patients" />} />
+                    <Route path="/patients" element={<PatientListPage title="Patients" back={null} allowAdd />} />
                     <Route path="/schedule" element={<SchedulePage />} />
                     <Route path="/schedule/hours" element={<ProviderHoursPage />} />
-                    <Route path="/providers" element={<PlaceholderPage title="Providers" />} />
+                    <Route path="/providers" element={<ProvidersPage />} />
                     <Route path="/billing" element={<PlaceholderPage title="Billing" />} />
+                    <Route path="/admin" element={<AdminHomePage />} />
+                    <Route path="/admin/change-password" element={<ChangePasswordPage />} />
+                    <Route path="/admin/messages" element={<MessagesPage />} />
+                    <Route path="/admin/users" element={<UsersAdminPage />} />
+                    <Route path="/admin/locations" element={<LocationsAdminPage />} />
+                    <Route path="/admin/patients" element={<PatientListPage />} />
                   </Route>
                 </Route>
               </Routes>

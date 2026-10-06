@@ -42,10 +42,10 @@ describe("LoginPage", () => {
     });
 
     renderLoginPage();
-    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^login$/i }));
 
-    expect(await screen.findByText(/username is required/i)).toBeInTheDocument();
-    expect(await screen.findByText(/password is required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/login user id is required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/login password is required/i)).toBeInTheDocument();
     expect(signIn).not.toHaveBeenCalled();
   });
 
@@ -61,9 +61,9 @@ describe("LoginPage", () => {
     });
 
     renderLoginPage();
-    await userEvent.type(screen.getByLabelText(/username/i), "admin");
-    await userEvent.type(screen.getByLabelText(/password/i), "DemoPass123!");
-    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await userEvent.type(screen.getByLabelText(/login user id/i), "admin");
+    await userEvent.type(screen.getByLabelText(/login password/i), "DemoPass123!");
+    await userEvent.click(screen.getByRole("button", { name: /^login$/i }));
 
     await waitFor(() => expect(signIn).toHaveBeenCalledWith({ username: "admin", password: "DemoPass123!" }));
   });
@@ -80,5 +80,15 @@ describe("LoginPage", () => {
 
     renderLoginPage();
     expect(screen.getByText("Invalid username or password.")).toBeInTheDocument();
+  });
+
+  it("toggles password visibility with the eye button", async () => {
+    renderLoginPage();
+    const input = screen.getByLabelText(/login password/i);
+    expect(input).toHaveAttribute("type", "password");
+    await userEvent.click(screen.getByRole("button", { name: /show password/i }));
+    expect(input).toHaveAttribute("type", "text");
+    await userEvent.click(screen.getByRole("button", { name: /hide password/i }));
+    expect(input).toHaveAttribute("type", "password");
   });
 });
