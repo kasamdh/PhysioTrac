@@ -83,10 +83,23 @@ public class ClinicalNote : BaseEntity
     public Guid? CosignedById { get; set; }
     public DateTimeOffset? CosignedAt { get; set; }
 
+    /// <summary>Set on a formal amendment: the signed note it corrects. The
+    /// amendment is a complete new note (copied from the original, then
+    /// edited and signed on its own); signing it moves the original to
+    /// <see cref="NoteStatus.Amended"/>, which keeps the original's content
+    /// and signature exactly as they were.</summary>
+    public Guid? AmendsNoteId { get; set; }
+    public ClinicalNote? AmendsNote { get; set; }
+
+    /// <summary>Why the signed note had to be amended -- required.</summary>
+    public string? AmendmentReason { get; set; }
+
     public ICollection<NoteAddendum> Addenda { get; set; } = new List<NoteAddendum>();
     public ICollection<NoteIntervention> InterventionItems { get; set; } = new List<NoteIntervention>();
 
-    public bool IsSigned => Status is NoteStatus.Signed or NoteStatus.Locked;
+    /// <summary>Signed at some point and therefore immutable -- an Amended
+    /// note was signed and later superseded by its signed amendment.</summary>
+    public bool IsSigned => Status is NoteStatus.Signed or NoteStatus.Locked or NoteStatus.Amended;
 
     /// <summary>Locked additionally blocks new addenda -- see NoteStatus.Locked's own doc comment.</summary>
     public bool IsLocked => Status == NoteStatus.Locked;

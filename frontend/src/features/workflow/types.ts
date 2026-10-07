@@ -22,6 +22,14 @@ export const needsPlanOfCare = (t: NoteType) =>
 export const NoteStatus = { Draft: 0, ReviewRequired: 1, Signed: 2, Amended: 3, Locked: 4 } as const;
 export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
 
+export const NoteStatusLabels: Record<number, string> = {
+  0: "Draft",
+  1: "Awaiting cosign",
+  2: "Signed",
+  3: "Amended",
+  4: "Signed · locked",
+};
+
 // Matches PhysioTrac.Api.Controllers.WorkflowProviderDto.
 export interface WorkflowProvider {
   id: string;

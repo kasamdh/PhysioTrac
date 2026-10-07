@@ -97,4 +97,23 @@ public interface IClinicalNoteService
 
     /// <summary>Total timed minutes and the organization's 8-minute-rule units.</summary>
     Task<InterventionSummaryDto> SummarizeInterventionsAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>A formal amendment may be started on a Signed (not Locked)
+    /// note by whoever could sign it.</summary>
+    bool CanAmendNote(ICurrentUser user, ClinicalNote note);
+
+    /// <summary>Starts (or returns the already-open) formal amendment of a
+    /// signed note: a new draft copied from it -- narrative, structured
+    /// findings and interventions -- carrying the reason. Signing that draft
+    /// supersedes the original (Status Amended); the original never changes.</summary>
+    Task<ClinicalNote> CreateAmendmentAsync(Guid noteId, CreateAmendmentRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Actions, people, addenda and amendment links for one note.</summary>
+    Task<NoteRecordDto> GetNoteRecordAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Version history with the saver's name on each version.</summary>
+    Task<IReadOnlyList<ClinicalNoteVersionDto>> GetVersionHistoryViewAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The current user's documentation work queues.</summary>
+    Task<NoteQueuesDto> GetNoteQueuesAsync(ICurrentUser actor, CancellationToken ct = default);
 }

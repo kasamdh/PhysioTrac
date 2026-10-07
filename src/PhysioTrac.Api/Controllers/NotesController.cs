@@ -131,6 +131,7 @@ public class NotesController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/certify-poc")]
@@ -151,8 +152,7 @@ public class NotesController : ControllerBase
     {
         try
         {
-            var versions = await _notes.GetVersionHistoryAsync(id, _currentUser, HttpContext.RequestAborted);
-            return Ok(versions.Select(v => new ClinicalNoteVersionDto(v.Id, v.NoteId, v.VersionNumber, v.ContentJson, v.SavedById, v.IsSignedVersion, v.CreatedAt)));
+            return Ok(await _notes.GetVersionHistoryViewAsync(id, _currentUser, HttpContext.RequestAborted));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
@@ -183,7 +183,46 @@ public class NotesController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Starts (or continues) a formal amendment of a signed note;
+    /// returns the amendment draft to edit and sign.</summary>
+    [HttpPost("{id:guid}/amend")]
+    public async Task<IActionResult> Amend(Guid id, [FromBody] CreateAmendmentRequest request)
+    {
+        try
+        {
+            var amendment = await _notes.CreateAmendmentAsync(id, request, _currentUser, HttpContext.RequestAborted);
+            return Ok(ToDto(amendment));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>What the current user may do with the note, plus its author,
+    /// cosigner, addenda and amendment link.</summary>
+    [HttpGet("{id:guid}/record")]
+    public async Task<IActionResult> Record(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetNoteRecordAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The current user's unsigned notes and notes awaiting their cosignature.</summary>
+    [HttpGet("queues")]
+    public async Task<IActionResult> Queues()
+    {
+        try
+        {
+            return Ok(await _notes.GetNoteQueuesAsync(_currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpGet("{id:guid}/interventions")]
@@ -255,7 +294,7 @@ public class NotesController : ControllerBase
         n.PlanOfCareCertifiedDate, n.PlanOfCareCertifyingProviderId,
         n.SignatureName, n.SignatureCredentials, n.SignedAt, n.SignatureIpAddress, n.SignatureHash,
         n.CosignRequired, n.CosignedById, n.CosignedAt,
-        n.SubjectiveDetailsJson, n.ObjectiveMeasurementsJson);
+        n.SubjectiveDetailsJson, n.ObjectiveMeasurementsJson, n.AmendsNoteId, n.AmendmentReason);
 
     private static InterventionDto ToInterventionDto(NoteIntervention i) => new(
         i.Id, i.NoteId, i.Description, i.BodyRegion, i.Category, i.Minutes, i.Units, i.IsTimed, i.Order, i.PatientResponse);

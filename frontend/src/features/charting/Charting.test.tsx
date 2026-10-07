@@ -26,6 +26,12 @@ vi.mock("./api", () => ({
   fetchOutcomes: vi.fn(),
   recordOutcome: vi.fn(),
   signChartNote: vi.fn(),
+  fetchNoteRecord: vi.fn(),
+  fetchNoteVersions: vi.fn(),
+  cosignChartNote: vi.fn(),
+  addAddendum: vi.fn(),
+  amendNote: vi.fn(),
+  lockNote: vi.fn(),
 }));
 vi.mock("../admin/api", () => ({ fetchPatientDetail: vi.fn() }));
 vi.mock("../auth/AuthProvider", () => ({ useAuth: vi.fn() }));
@@ -100,6 +106,21 @@ function setup(
   });
   vi.mocked(api.fetchGoals).mockResolvedValue([]);
   vi.mocked(api.fetchOutcomes).mockResolvedValue([]);
+  vi.mocked(api.fetchNoteRecord).mockResolvedValue({
+    actions: {
+      canEdit: true,
+      canSign: true,
+      canCosign: false,
+      canAddAddendum: false,
+      canAmend: false,
+      canLock: false,
+    },
+    authorName: "Jamie Chen",
+    cosignedByName: null,
+    addenda: [],
+    amendmentNoteId: null,
+    amendmentStatus: null,
+  });
   vi.mocked(fetchPatientDetail).mockResolvedValue({
     id: "p1",
     medicalRecordNumber: "SM-1",

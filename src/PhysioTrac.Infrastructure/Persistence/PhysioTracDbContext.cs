@@ -351,6 +351,10 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey<ClinicalNote>(n => n.AppointmentId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(n => n.PlanOfCareCertifyingProvider).WithMany()
                 .HasForeignKey(n => n.PlanOfCareCertifyingProviderId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(n => n.AmendsNoteId);
+            e.HasOne(n => n.AmendsNote).WithMany()
+                .HasForeignKey(n => n.AmendsNoteId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(n => n.AmendmentReason).HasMaxLength(1000);
         });
 
         builder.Entity<NoteAddendum>(e =>
@@ -736,9 +740,9 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         {
             if (entry.State != EntityState.Modified) continue;
             var originalStatus = (Domain.Enums.NoteStatus)entry.OriginalValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
-            if (originalStatus is not (Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked)) continue;
+            if (originalStatus is not (Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked or Domain.Enums.NoteStatus.Amended)) continue;
 
-            // Two legitimate writes to an already-Signed/Locked row:
+            // Three legitimate writes to an already-signed row:
             // 1. Locking it (ClinicalNoteService.LockNoteAsync) -- touches
             //    only Status/UpdatedAt and only moves Signed -> Locked.
             // 2. Certifying its plan of care (CertifyPlanOfCareAsync) --
@@ -747,11 +751,15 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             //    physician certification often happens days after the
             //    therapist's own signature; this is administrative
             //    metadata ABOUT the note, never the clinical narrative.
+            // 3. Superseding it with its signed amendment
+            //    (ClinicalNoteService.SignNoteAsync) -- touches only
+            //    Status/UpdatedAt and only moves Signed -> Amended.
             // Anything else -- any other field touched, or Status moving
-            // anywhere other than Signed -> Locked -- is exactly the
+            // anywhere other than Signed -> Locked/Amended -- is exactly the
             // "signed notes are immutable" violation this guards against.
             var newStatus = (Domain.Enums.NoteStatus)entry.CurrentValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
-            var isLockTransition = originalStatus == Domain.Enums.NoteStatus.Signed && newStatus == Domain.Enums.NoteStatus.Locked;
+            var isLockTransition = originalStatus == Domain.Enums.NoteStatus.Signed &&
+                newStatus is Domain.Enums.NoteStatus.Locked or Domain.Enums.NoteStatus.Amended;
             var modifiedNames = entry.Properties.Where(p => p.IsModified).Select(p => p.Metadata.Name).ToHashSet();
 
             var isLockWrite = isLockTransition &&

@@ -375,6 +375,8 @@ export const pageHelp: Record<string, PageHelp> = {
             </Term>
             <Term name="Note column">Not started, Draft, Signed, or Awaiting cosign (a PTA note waiting for a PT’s cosignature; the visit completes once it is cosigned).</Term>
             <Term name="Patient documentation">In the ☰ menu: everything documented for that patient, across all visits.</Term>
+            <Term name="Your unfinished notes">Shown above the list when you have drafts from earlier visits, open amendments, or notes waiting for a cosign. Open one to finish it.</Term>
+            <Term name="Waiting for your cosign">Assistants’ notes awaiting your cosignature.</Term>
           </>
         ),
       },
@@ -443,6 +445,20 @@ export const pageHelp: Record<string, PageHelp> = {
             <Term name="Before signing">Lists anything still required (for example Objective, Plan, or the plan of care on evaluations).</Term>
             <Term name="Sign note">Tick the attestation and re-enter your password. Signing locks the note and completes the visit.</Term>
             <Note>Only therapists, assistants and administrators can sign. A PTA’s note waits for a PT’s cosignature.</Note>
+          </>
+        ),
+      },
+      {
+        id: "after-signing",
+        title: "After signing",
+        body: (
+          <>
+            <Term name="Cosign note">For a PTA’s note awaiting your cosignature: review it, re-enter your password and cosign. The visit then completes.</Term>
+            <Term name="+ Add addendum">Adds a dated late entry or clarification under the signed note, with a reason. The signed note itself doesn’t change.</Term>
+            <Term name="Amend note">Corrects the signed note: enter the reason, and you get a copy of the note to edit and sign. Once the amendment is signed it replaces the original, which stays viewable marked “Amended”.</Term>
+            <Term name="Lock note">Administrators and directors: closes the note to further addenda and amendments (for example when billing has closed).</Term>
+            <Term name="Print / PDF">Opens the note as a printable document with the signature block; choose “Save as PDF” in the print dialog for a PDF.</Term>
+            <Term name="Version history">Every saved version of the note, including each autosave and the signed version, with who saved it and when.</Term>
           </>
         ),
       },

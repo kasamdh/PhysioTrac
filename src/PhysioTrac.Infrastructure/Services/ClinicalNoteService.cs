@@ -39,8 +39,14 @@ public class ClinicalNoteService : IClinicalNoteService
         _signatureVerifier = signatureVerifier;
     }
 
+    /// <summary>Admin/director, the author, and the clinical team (therapists
+    /// and assistants in the same organization -- LoadNoteInOrgAsync already
+    /// scopes every note to the caller's organization). A supervising PT
+    /// must be able to read a PTA's note to cosign it, and a covering
+    /// clinician needs prior notes to treat the patient.</summary>
     public bool CanViewNote(ICurrentUser user, ClinicalNote note) =>
-        FinalizingRoles.Contains(user.Role) || note.TherapistId == user.UserId;
+        FinalizingRoles.Contains(user.Role) || note.TherapistId == user.UserId ||
+        user.Role is UserRole.Therapist or UserRole.Assistant;
 
     public bool CanEditNote(ICurrentUser user, ClinicalNote note)
     {
@@ -71,6 +77,9 @@ public class ClinicalNoteService : IClinicalNoteService
 
     public bool CanLockNote(ICurrentUser user, ClinicalNote note) =>
         note.Status == NoteStatus.Signed && FinalizingRoles.Contains(user.Role);
+
+    public bool CanAmendNote(ICurrentUser user, ClinicalNote note) =>
+        note.Status == NoteStatus.Signed && CanFinalizeNote(user, note);
 
     private static bool CanSignNotes(UserRole role) => role is UserRole.Admin or UserRole.Director or UserRole.Therapist;
 
@@ -192,6 +201,8 @@ public class ClinicalNoteService : IClinicalNoteService
                 string.Join(", ", blockers.Select(b => b.Code)));
         }
 
+        var amendedOriginal = await LoadAmendedOriginalAsync(note, ct);
+
         var signer = await _db.Users.FirstOrDefaultAsync(u => u.Id == actor.UserId, ct);
         note.SignatureName = DisplayName(signer, actor.UserId);
         note.SignatureCredentials = signer?.Credential;
@@ -205,6 +216,13 @@ public class ClinicalNoteService : IClinicalNoteService
         // the exact content -- including the signature metadata itself --
         // that becomes immutable from this point on.
         note.SignatureHash = ComputeContentHash(note);
+        // Same SaveChanges as the signature: the original is superseded
+        // exactly when (and only if) its amendment becomes signed.
+        if (amendedOriginal is not null && note.Status == NoteStatus.Signed)
+        {
+            amendedOriginal.Status = NoteStatus.Amended;
+            amendedOriginal.UpdatedAt = DateTimeOffset.UtcNow;
+        }
 
         await SaveWithVersionSnapshotAsync(note, actor.UserId, isSignedVersion: true, ct);
 
@@ -215,6 +233,7 @@ public class ClinicalNoteService : IClinicalNoteService
 
         if (note.Status == NoteStatus.Signed)
         {
+            await AuditAmendmentAsync(note, amendedOriginal, actor, organization, ct);
             await CompleteLinkedAppointmentAsync(note, ct);
         }
         return note;
@@ -358,16 +377,23 @@ public class ClinicalNoteService : IClinicalNoteService
             throw new InvalidOperationException("Only a note awaiting cosign can be cosigned.");
         }
         await VerifySignerAsync(note, actor, password, "cosign", ct);
+        var amendedOriginal = await LoadAmendedOriginalAsync(note, ct);
 
         note.CosignedById = actor.UserId;
         note.CosignedAt = DateTimeOffset.UtcNow;
         note.Status = NoteStatus.Signed;
         note.UpdatedAt = DateTimeOffset.UtcNow;
+        if (amendedOriginal is not null)
+        {
+            amendedOriginal.Status = NoteStatus.Amended;
+            amendedOriginal.UpdatedAt = DateTimeOffset.UtcNow;
+        }
         await _db.SaveChangesAsync(ct);
 
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
         await _audit.RecordAuditEventAsync(actor.UserId, "note.cosigned", nameof(ClinicalNote), note.Id, organization.Id,
             patientId: note.PatientId, metadata: new { noteType = note.NoteType.ToString() }, ct: ct);
+        await AuditAmendmentAsync(note, amendedOriginal, actor, organization, ct);
 
         await CompleteLinkedAppointmentAsync(note, ct);
         return note;
@@ -385,7 +411,13 @@ public class ClinicalNoteService : IClinicalNoteService
             throw new InvalidOperationException("An addendum can only be created for a signed note.");
         }
 
-        var addendum = new NoteAddendum { NoteId = note.Id, AuthorId = actor.UserId, Reason = request.Reason, Body = request.Body };
+        var reason = request.Reason?.Trim() ?? "";
+        var body = request.Body?.Trim() ?? "";
+        if (reason.Length == 0) throw new InvalidOperationException("Enter the reason for the addendum.");
+        if (body.Length == 0) throw new InvalidOperationException("Enter the addendum text.");
+        if (reason.Length > 500 || body.Length > 4000) throw new InvalidOperationException("The addendum is too long.");
+
+        var addendum = new NoteAddendum { NoteId = note.Id, AuthorId = actor.UserId, Reason = reason, Body = body };
         _db.NoteAddenda.Add(addendum);
         await _db.SaveChangesAsync(ct);
 
@@ -500,6 +532,183 @@ public class ClinicalNoteService : IClinicalNoteService
         return await _db.NoteInterventions.Where(i => i.NoteId == note.Id).OrderBy(i => i.Order).ThenBy(i => i.CreatedAt).ToListAsync(ct);
     }
 
+    public async Task<ClinicalNote> CreateAmendmentAsync(Guid noteId, CreateAmendmentRequest request, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var original = await LoadNoteInOrgAsync(noteId, actor, ct);
+        if (!CanFinalizeNote(actor, original))
+        {
+            throw new ForbiddenException("You are not permitted to amend this note.");
+        }
+        if (original.Status != NoteStatus.Signed)
+        {
+            throw new InvalidOperationException(original.Status switch
+            {
+                NoteStatus.Locked => "This note is locked and can no longer be amended.",
+                NoteStatus.Amended => "This note has already been amended. Amend its amendment instead.",
+                _ => "Only a signed note can be amended.",
+            });
+        }
+
+        // One open amendment at a time: reopening "Amend" continues it.
+        var open = await _db.ClinicalNotes.FirstOrDefaultAsync(n => n.AmendsNoteId == original.Id &&
+            (n.Status == NoteStatus.Draft || n.Status == NoteStatus.ReviewRequired), ct);
+        if (open is not null) return open;
+
+        var reason = request.Reason?.Trim() ?? "";
+        if (reason.Length == 0) throw new InvalidOperationException("Enter the reason for the amendment.");
+        if (reason.Length > 1000) throw new InvalidOperationException("The reason is too long.");
+
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        var amendment = new ClinicalNote
+        {
+            PatientId = original.PatientId,
+            TherapistId = actor.UserId,
+            // The original keeps the visit link (unique per appointment); the
+            // amendment points at the original instead.
+            AppointmentId = null,
+            AmendsNoteId = original.Id,
+            AmendmentReason = reason,
+            NoteType = original.NoteType,
+            Status = NoteStatus.Draft,
+            ServiceDate = original.ServiceDate,
+            DiagnosisSnapshot = original.DiagnosisSnapshot,
+            PrecautionsSnapshot = original.PrecautionsSnapshot,
+            Subjective = original.Subjective,
+            Objective = original.Objective,
+            Interventions = original.Interventions,
+            Assessment = original.Assessment,
+            Plan = original.Plan,
+            SubjectiveDetailsJson = original.SubjectiveDetailsJson,
+            ObjectiveMeasurementsJson = original.ObjectiveMeasurementsJson,
+            DischargeDetailsJson = original.DischargeDetailsJson,
+            HomeVisitDetailsJson = original.HomeVisitDetailsJson,
+            PlanOfCareStart = original.PlanOfCareStart,
+            PlanOfCareEnd = original.PlanOfCareEnd,
+            FrequencyPerWeek = original.FrequencyPerWeek,
+            DurationWeeks = original.DurationWeeks,
+            ReassessmentDue = original.ReassessmentDue,
+            CosignRequired = organization.PtaCosignRequired && actor.Role == UserRole.Assistant,
+        };
+        _db.ClinicalNotes.Add(amendment);
+        var interventions = await _db.NoteInterventions.Where(i => i.NoteId == original.Id).ToListAsync(ct);
+        foreach (var i in interventions)
+        {
+            _db.NoteInterventions.Add(new NoteIntervention
+            {
+                NoteId = amendment.Id,
+                Description = i.Description,
+                BodyRegion = i.BodyRegion,
+                Category = i.Category,
+                Minutes = i.Minutes,
+                Units = i.Units,
+                IsTimed = i.IsTimed,
+                Order = i.Order,
+                PatientResponse = i.PatientResponse,
+            });
+        }
+        await SaveWithVersionSnapshotAsync(amendment, actor.UserId, isSignedVersion: false, ct);
+
+        await _audit.RecordAuditEventAsync(actor.UserId, "note.amendment_started", nameof(ClinicalNote), amendment.Id, organization.Id,
+            patientId: original.PatientId, metadata: new { amendsNoteId = original.Id }, ct: ct);
+        return amendment;
+    }
+
+    public async Task<NoteRecordDto> GetNoteRecordAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var note = await GetAsync(noteId, actor, ct);
+        var amendment = await _db.ClinicalNotes.Where(n => n.AmendsNoteId == note.Id)
+            .OrderByDescending(n => n.CreatedAt).Select(n => new { n.Id, n.Status }).FirstOrDefaultAsync(ct);
+
+        var addenda = note.Addenda.OrderBy(a => a.CreatedAt).ToList();
+        var names = await NamesAsync(
+            addenda.Select(a => a.AuthorId).Append(note.TherapistId).Concat(note.CosignedById is Guid c ? [c] : []), ct);
+
+        var actions = new NoteActionsDto(
+            CanEdit: CanEditNote(actor, note) && note.Status == NoteStatus.Draft,
+            CanSign: note.Status == NoteStatus.Draft && CanFinalizeNote(actor, note),
+            CanCosign: note.Status == NoteStatus.ReviewRequired && CanCosignNote(actor, note),
+            CanAddAddendum: CanCreateAddendum(actor, note),
+            CanAmend: CanAmendNote(actor, note),
+            CanLock: CanLockNote(actor, note));
+
+        return new NoteRecordDto(
+            actions,
+            names.GetValueOrDefault(note.TherapistId, ""),
+            note.CosignedById is Guid cosigner ? names.GetValueOrDefault(cosigner) : null,
+            addenda.Select(a => new NoteAddendumDto(a.Id, a.NoteId, a.AuthorId, a.Reason, a.Body, a.CreatedAt,
+                names.GetValueOrDefault(a.AuthorId))).ToList(),
+            amendment?.Id,
+            amendment?.Status);
+    }
+
+    public async Task<IReadOnlyList<ClinicalNoteVersionDto>> GetVersionHistoryViewAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var versions = await GetVersionHistoryAsync(noteId, actor, ct);
+        var names = await NamesAsync(versions.Select(v => v.SavedById), ct);
+        return versions.Select(v => new ClinicalNoteVersionDto(v.Id, v.NoteId, v.VersionNumber, v.ContentJson, v.SavedById,
+            v.IsSignedVersion, v.CreatedAt, names.GetValueOrDefault(v.SavedById))).ToList();
+    }
+
+    public async Task<NoteQueuesDto> GetNoteQueuesAsync(ICurrentUser actor, CancellationToken ct = default)
+    {
+        // Organization-wide on purpose: a note you wrote, or one awaiting your
+        // cosignature, needs you whatever your current caseload is.
+        var patients = _tenantAccess.PatientsFor(actor, clinical: false);
+        var mine = await (
+            from n in _db.ClinicalNotes
+            join p in patients on n.PatientId equals p.Id
+            where n.TherapistId == actor.UserId && (n.Status == NoteStatus.Draft || n.Status == NoteStatus.ReviewRequired)
+            select new { n.Id, n.PatientId, p.FirstName, p.LastName, p.MedicalRecordNumber, n.NoteType, n.Status, n.ServiceDate, n.TherapistId, n.AmendsNoteId })
+            .Take(200).ToListAsync(ct);
+
+        var mayCosign = FinalizingRoles.Contains(actor.Role) || actor.Role == UserRole.Therapist;
+        var toCosign = !mayCosign ? [] : await (
+            from n in _db.ClinicalNotes
+            join p in patients on n.PatientId equals p.Id
+            where n.Status == NoteStatus.ReviewRequired && n.TherapistId != actor.UserId
+            select new { n.Id, n.PatientId, p.FirstName, p.LastName, p.MedicalRecordNumber, n.NoteType, n.Status, n.ServiceDate, n.TherapistId, n.AmendsNoteId })
+            .Take(200).ToListAsync(ct);
+
+        var names = await NamesAsync(mine.Concat(toCosign).Select(n => n.TherapistId), ct);
+        NoteQueueItemDto Row(Guid id, Guid patientId, string first, string last, string mrn, NoteType type, NoteStatus status,
+            DateOnly date, Guid author, Guid? amends) =>
+            new(id, patientId, $"{first} {last}".Trim(), mrn, type, status, date, names.GetValueOrDefault(author, ""), amends is not null);
+
+        return new NoteQueuesDto(
+            mine.OrderBy(n => n.ServiceDate).Select(n => Row(n.Id, n.PatientId, n.FirstName, n.LastName, n.MedicalRecordNumber,
+                n.NoteType, n.Status, n.ServiceDate, n.TherapistId, n.AmendsNoteId)).ToList(),
+            toCosign.OrderBy(n => n.ServiceDate).Select(n => Row(n.Id, n.PatientId, n.FirstName, n.LastName, n.MedicalRecordNumber,
+                n.NoteType, n.Status, n.ServiceDate, n.TherapistId, n.AmendsNoteId)).ToList());
+    }
+
+    /// <summary>The original a signing amendment supersedes -- which must
+    /// still be Signed (it may have been locked meanwhile).</summary>
+    private async Task<ClinicalNote?> LoadAmendedOriginalAsync(ClinicalNote note, CancellationToken ct)
+    {
+        if (note.AmendsNoteId is not Guid originalId) return null;
+        var original = await _db.ClinicalNotes.FirstOrDefaultAsync(n => n.Id == originalId, ct)
+            ?? throw new InvalidOperationException("The note being amended no longer exists.");
+        if (original.Status != NoteStatus.Signed)
+        {
+            throw new InvalidOperationException("The original note was locked or already amended, so this amendment can't be signed.");
+        }
+        return original;
+    }
+
+    private async Task AuditAmendmentAsync(ClinicalNote note, ClinicalNote? original, ICurrentUser actor, Organization organization, CancellationToken ct)
+    {
+        if (original is null) return;
+        await _audit.RecordAuditEventAsync(actor.UserId, "note.amended", nameof(ClinicalNote), original.Id, organization.Id,
+            patientId: note.PatientId, metadata: new { amendmentNoteId = note.Id }, ct: ct);
+    }
+
+    private async Task<Dictionary<Guid, string>> NamesAsync(IEnumerable<Guid> userIds, CancellationToken ct)
+    {
+        var ids = userIds.Distinct().ToList();
+        var users = await _db.Users.Where(u => ids.Contains(u.Id)).ToListAsync(ct);
+        return users.ToDictionary(u => u.Id, u => DisplayName(u, u.Id));
+    }
+
     private async Task<ClinicalNote> LoadNoteInOrgAsync(Guid noteId, ICurrentUser actor, CancellationToken ct)
     {
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
@@ -534,7 +743,8 @@ public class ClinicalNoteService : IClinicalNoteService
             note.Id, note.PatientId, note.TherapistId, note.NoteType, note.ServiceDate,
             note.Subjective, note.Objective, note.Interventions, note.Assessment, note.Plan,
             note.DiagnosisSnapshot, note.PrecautionsSnapshot,
-            note.SignatureName, note.SignatureCredentials, note.SignedAt, note.SignatureIpAddress);
+            note.SignatureName, note.SignatureCredentials, note.SignedAt, note.SignatureIpAddress,
+            note.SubjectiveDetailsJson, note.ObjectiveMeasurementsJson, note.AmendsNoteId, note.AmendmentReason);
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
@@ -563,6 +773,9 @@ public class ClinicalNoteService : IClinicalNoteService
             note.DurationWeeks,
             note.ReassessmentDue,
             note.Status,
+            note.SubjectiveDetailsJson,
+            note.ObjectiveMeasurementsJson,
+            note.AmendmentReason,
         };
         _db.ClinicalNoteVersions.Add(new ClinicalNoteVersion
         {

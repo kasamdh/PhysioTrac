@@ -10,7 +10,8 @@ public record ClinicalNoteDto(
     DateOnly? PlanOfCareCertifiedDate, Guid? PlanOfCareCertifyingProviderId,
     string? SignatureName, string? SignatureCredentials, DateTimeOffset? SignedAt, string? SignatureIpAddress, string? SignatureHash,
     bool CosignRequired, Guid? CosignedById, DateTimeOffset? CosignedAt,
-    string SubjectiveDetailsJson = "{}", string ObjectiveMeasurementsJson = "{}");
+    string SubjectiveDetailsJson = "{}", string ObjectiveMeasurementsJson = "{}",
+    Guid? AmendsNoteId = null, string? AmendmentReason = null);
 
 public record CertifyPlanOfCareRequest(DateOnly CertifiedDate, Guid CertifyingProviderId);
 
@@ -34,7 +35,7 @@ public record PullForwardDiagnosisDto(Guid DiagnosisCodeId, string Code, string 
 /// can be true at once; neither being configured means this is always false.</summary>
 public record ProgressNoteStatusDto(bool IsDue, bool DueByDayCount, bool DueByVisitCount, int VisitsSinceLastProgressNote, DateOnly? ReassessmentDue);
 
-public record ClinicalNoteVersionDto(Guid Id, Guid NoteId, int VersionNumber, string ContentJson, Guid SavedById, bool IsSignedVersion, DateTimeOffset CreatedAt);
+public record ClinicalNoteVersionDto(Guid Id, Guid NoteId, int VersionNumber, string ContentJson, Guid SavedById, bool IsSignedVersion, DateTimeOffset CreatedAt, string? SavedByName = null);
 
 public record CreateNoteRequest(
     Guid PatientId, NoteType NoteType, DateOnly ServiceDate, Guid? AppointmentId,
@@ -48,7 +49,32 @@ public record UpdateNoteRequest(
     DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue,
     string? SubjectiveDetailsJson = null, string? ObjectiveMeasurementsJson = null);
 
-public record NoteAddendumDto(Guid Id, Guid NoteId, Guid AuthorId, string Reason, string Body, DateTimeOffset CreatedAt);
+public record NoteAddendumDto(Guid Id, Guid NoteId, Guid AuthorId, string Reason, string Body, DateTimeOffset CreatedAt, string? AuthorName = null);
+
+public record CreateAmendmentRequest(string Reason);
+
+/// <summary>What the current user may do with this note right now -- the
+/// service's own rules, so the UI never re-derives them.</summary>
+public record NoteActionsDto(bool CanEdit, bool CanSign, bool CanCosign, bool CanAddAddendum, bool CanAmend, bool CanLock);
+
+/// <summary>The note's legal record around its content: who wrote and
+/// cosigned it, its addenda, and its amendment links.</summary>
+public record NoteRecordDto(
+    NoteActionsDto Actions,
+    string AuthorName,
+    string? CosignedByName,
+    IReadOnlyList<NoteAddendumDto> Addenda,
+    Guid? AmendmentNoteId,
+    NoteStatus? AmendmentStatus);
+
+/// <summary>One row in a documentation work queue.</summary>
+public record NoteQueueItemDto(
+    Guid NoteId, Guid PatientId, string PatientName, string MedicalRecordNumber,
+    NoteType NoteType, NoteStatus Status, DateOnly ServiceDate, string AuthorName, bool IsAmendment);
+
+/// <summary>Notes needing the current user's attention: their own unsigned
+/// notes, and other clinicians' notes awaiting their cosignature.</summary>
+public record NoteQueuesDto(IReadOnlyList<NoteQueueItemDto> MyUnsignedNotes, IReadOnlyList<NoteQueueItemDto> AwaitingMyCosign);
 
 public record CreateAddendumRequest(string Reason, string Body);
 

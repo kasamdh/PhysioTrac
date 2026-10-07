@@ -10,7 +10,8 @@ import { transitionAppointment, type AppointmentAction } from "../schedule/api";
 import { appointmentColors } from "../schedule/status";
 import { AppointmentStatus, AppointmentStatusLabels } from "../schedule/types";
 import { createVisitNote, fetchWorkflowToday } from "./api";
-import { NoteStatus, type WorkflowAppointment } from "./types";
+import { NoteQueuesPanel } from "./NoteQueuesPanel";
+import { NoteStatus, NoteStatusLabels, type WorkflowAppointment } from "./types";
 
 type StatusFilter = "all" | "todo" | "checked-in" | "in-progress" | "completed" | "missed";
 const inFilter: Record<StatusFilter, (s: AppointmentStatus) => boolean> = {
@@ -37,9 +38,7 @@ function nextStep(s: AppointmentStatus): { action: AppointmentAction; label: str
 
 function noteLabel(a: WorkflowAppointment): string {
   if (a.noteStatus === null) return "Not started";
-  if (a.noteStatus === NoteStatus.Draft) return "Draft";
-  if (a.noteStatus === NoteStatus.ReviewRequired) return "Awaiting cosign";
-  return "Signed";
+  return NoteStatusLabels[a.noteStatus] ?? "Signed";
 }
 
 const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -116,6 +115,8 @@ export function WorkflowPage() {
         <h1 className="text-2xl font-bold text-[#1565b8]">Workflow</h1>
         <span className="text-lg text-[#333]">Today — {dateLabel}</span>
       </div>
+
+      {data && <NoteQueuesPanel today={data.date} />}
 
       <div className="list-toolbar">
         {data && !data.ownDayOnly && (

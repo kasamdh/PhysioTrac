@@ -251,7 +251,9 @@ export function InterventionsPanel({
 
       {items.isLoading && <p className="text-text-muted">Loading…</p>}
       {items.data && items.data.length === 0 && (
-        <p className="text-text-muted">No interventions recorded yet.</p>
+        <p className="text-text-muted">
+          {readOnly ? "None recorded." : "No interventions recorded yet."}
+        </p>
       )}
       {items.data && items.data.length > 0 && (
         <div className="list-wrap">

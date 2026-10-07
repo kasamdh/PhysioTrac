@@ -114,7 +114,10 @@ export function MeasurementTables({
         )}
 
       {/* ROM */}
-      <section aria-labelledby="rom-title">
+      <section
+        aria-labelledby="rom-title"
+        hidden={readOnly && value.rom.length === 0}
+      >
         <h3 id="rom-title" className="mb-2 text-xl font-bold text-[#333]">
           Range of motion
         </h3>
@@ -313,7 +316,10 @@ export function MeasurementTables({
       </section>
 
       {/* MMT */}
-      <section aria-labelledby="mmt-title">
+      <section
+        aria-labelledby="mmt-title"
+        hidden={readOnly && value.mmt.length === 0}
+      >
         <h3 id="mmt-title" className="mb-2 text-xl font-bold text-[#333]">
           Strength (MMT)
         </h3>
@@ -457,7 +463,10 @@ export function MeasurementTables({
       </section>
 
       {/* Special tests */}
-      <section aria-labelledby="tests-title">
+      <section
+        aria-labelledby="tests-title"
+        hidden={readOnly && value.specialTests.length === 0}
+      >
         <h3 id="tests-title" className="mb-2 text-xl font-bold text-[#333]">
           Special tests
         </h3>

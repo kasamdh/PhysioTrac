@@ -22,6 +22,7 @@ vi.mock("../charting/api", () => ({
   addIntervention: vi.fn(),
   updateIntervention: vi.fn(),
   deleteIntervention: vi.fn(),
+  fetchNoteRecord: vi.fn(),
 }));
 
 const note = (
@@ -121,6 +122,31 @@ function setup() {
       patientResponse: "Tolerated well",
     },
   ]);
+  vi.mocked(chartApi.fetchNoteRecord).mockResolvedValue({
+    actions: {
+      canEdit: false,
+      canSign: false,
+      canCosign: false,
+      canAddAddendum: true,
+      canAmend: true,
+      canLock: false,
+    },
+    authorName: "Jamie Chen",
+    cosignedByName: null,
+    amendmentNoteId: null,
+    amendmentStatus: null,
+    addenda: [
+      {
+        id: "ad1",
+        noteId: "n2",
+        authorId: "u1",
+        reason: "Late entry",
+        body: "Called patient re HEP.",
+        createdAt: "2026-10-07T18:00:00Z",
+        authorName: "Jamie Chen",
+      },
+    ],
+  });
   vi.mocked(chartApi.fetchInterventionSummary).mockResolvedValue({
     timedMinutes: 12,
     untimedCount: 0,
@@ -176,6 +202,9 @@ describe("PatientDocumentationPage", () => {
     expect(await screen.findByText("Bridges 3x10")).toBeInTheDocument();
     expect(screen.getByText("Tolerated well")).toBeInTheDocument();
     expect(screen.getByText("Gait steady")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Called patient re HEP."),
+    ).toBeInTheDocument();
     expect(
       screen.getAllByRole("link", { name: "Open note" })[0],
     ).toHaveAttribute("href", "/chart/n2");

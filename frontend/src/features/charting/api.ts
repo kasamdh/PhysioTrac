@@ -1,6 +1,10 @@
 import { apiRequest } from "../../lib/apiClient";
 import type {
   ChartNote,
+  NoteAddendum,
+  NoteQueues,
+  NoteRecord,
+  NoteVersion,
   ComplianceFinding,
   Goal,
   Intervention,
@@ -88,3 +92,36 @@ export const signChartNote = (id: string, password: string) =>
     method: "POST",
     body: { attestationConfirmed: true, password },
   });
+
+/** Who wrote/cosigned the note, its addenda and amendment link, and what
+ * the current user may do with it (the service's own rules). */
+export const fetchNoteRecord = (id: string) =>
+  apiRequest<NoteRecord>(`/api/v1/notes/${id}/record`);
+
+export const cosignChartNote = (id: string, password: string) =>
+  apiRequest<ChartNote>(`/api/v1/notes/${id}/cosign`, {
+    method: "POST",
+    body: { password },
+  });
+
+export const addAddendum = (id: string, reason: string, body: string) =>
+  apiRequest<NoteAddendum>(`/api/v1/notes/${id}/addenda`, {
+    method: "POST",
+    body: { reason, body },
+  });
+
+/** Starts (or continues) a formal amendment; returns the amendment draft. */
+export const amendNote = (id: string, reason: string) =>
+  apiRequest<ChartNote>(`/api/v1/notes/${id}/amend`, {
+    method: "POST",
+    body: { reason },
+  });
+
+export const lockNote = (id: string) =>
+  apiRequest<ChartNote>(`/api/v1/notes/${id}/lock`, { method: "POST" });
+
+export const fetchNoteVersions = (id: string) =>
+  apiRequest<NoteVersion[]>(`/api/v1/notes/${id}/versions`);
+
+export const fetchNoteQueues = () =>
+  apiRequest<NoteQueues>("/api/v1/notes/queues");

@@ -16,6 +16,9 @@ const navigateSpy = vi.fn();
 vi.mock("react-router-dom", async (orig) => ({ ...(await orig<typeof import("react-router-dom")>()), useNavigate: () => navigateSpy }));
 vi.mock("../schedule/api", () => ({ transitionAppointment: vi.fn() }));
 vi.mock("../auth/AuthProvider", () => ({ useAuth: vi.fn() }));
+vi.mock("../charting/api", () => ({
+  fetchNoteQueues: vi.fn().mockResolvedValue({ myUnsignedNotes: [], awaitingMyCosign: [] }),
+}));
 
 const appt = (over: Partial<WorkflowAppointment>): WorkflowAppointment => ({
   appointmentId: "a1",

@@ -5,8 +5,6 @@ import { apiRequest } from "../../lib/apiClient";
 import { fetchPatientDetail } from "../admin/api";
 import { fetchOutcomes, fetchPullForward } from "../charting/api";
 import { GoalsPanel } from "../charting/components/GoalsPanel";
-import { InterventionsPanel } from "../charting/components/InterventionsPanel";
-import { MeasurementTables } from "../charting/components/MeasurementTables";
 import { describeChange } from "../charting/presets";
 import {
   OUTCOME_MEASURES,
@@ -14,7 +12,13 @@ import {
   parseSubjective,
 } from "../charting/presets";
 import type { ChartNote } from "../charting/types";
-import { NoteStatus, NoteTypeLabels } from "../workflow/types";
+import {
+  NoteStatus,
+  NoteStatusLabels,
+  NoteTypeLabels,
+} from "../workflow/types";
+import { fetchNoteRecord } from "../charting/api";
+import { NoteBody } from "./NoteBody";
 
 interface ProgressNoteStatus {
   isDue: boolean;
@@ -35,14 +39,6 @@ const formatDate = (iso: string) => {
   const [y, m, d] = iso.split("-");
   return `${m}/${d}/${y}`;
 };
-const statusLabel = (s: number) =>
-  s === NoteStatus.Draft
-    ? "Draft"
-    : s === NoteStatus.ReviewRequired
-      ? "Awaiting cosign"
-      : s === NoteStatus.Locked
-        ? "Locked"
-        : "Signed";
 const isSigned = (s: number) =>
   s === NoteStatus.Signed || s === NoteStatus.Locked;
 
@@ -333,8 +329,13 @@ function NoteItem({ note }: { note: ChartNote }) {
             note.status === NoteStatus.Draft ? "text-warning" : "text-[#333]"
           }
         >
-          {statusLabel(note.status)}
+          {NoteStatusLabels[note.status] ?? "Signed"}
         </span>
+        {note.amendsNoteId && (
+          <span className="rounded-full bg-warning-light px-2 text-[#333]">
+            Amendment
+          </span>
+        )}
         {note.signatureName && (
           <span className="text-text-muted">by {note.signatureName}</span>
         )}
@@ -346,43 +347,31 @@ function NoteItem({ note }: { note: ChartNote }) {
           {note.status === NoteStatus.Draft ? "Continue charting" : "Open note"}
         </Link>
       </div>
-      {open && (
-        <div className="space-y-4 border-t border-border p-3">
-          <Field label="Subjective" value={note.subjective} />
-          {(subj.painNow !== null || subj.painLocation) && (
-            <p className="text-[#333]">
-              Pain now {subj.painNow ?? "—"}/10 · best {subj.painBest ?? "—"} ·
-              worst {subj.painWorst ?? "—"}
-              {subj.painLocation ? ` · ${subj.painLocation}` : ""}
-            </p>
-          )}
-          {measured > 0 && (
-            <MeasurementTables
-              value={obj}
-              previous={null}
-              readOnly
-              onChange={() => {}}
-            />
-          )}
-          <Field label="Objective" value={note.objective} />
-          <div>
-            <p className="mb-1 font-bold text-[#333]">Interventions</p>
-            <InterventionsPanel noteId={note.id} readOnly />
-          </div>
-          <Field label="Assessment" value={note.assessment} />
-          <Field label="Plan" value={note.plan} />
-        </div>
-      )}
+      {open && <NoteDetails note={note} />}
     </li>
   );
 }
 
-function Field({ label, value }: { label: string; value: string | null }) {
-  if (!value) return null;
+/** The expanded note: its full content plus addenda and amendment link. */
+function NoteDetails({ note }: { note: ChartNote }) {
+  const record = useQuery({
+    queryKey: ["chart", "record", note.id],
+    queryFn: () => fetchNoteRecord(note.id),
+  });
   return (
-    <div>
-      <p className="font-bold text-[#333]">{label}</p>
-      <p className="whitespace-pre-wrap text-[#333]">{value}</p>
+    <div className="space-y-4 border-t border-border p-3">
+      {note.status === NoteStatus.Amended && record.data?.amendmentNoteId && (
+        <p className="rounded-md border border-warning bg-warning-light px-3 py-2 text-[#333]">
+          Amended — kept unchanged for the record.{" "}
+          <Link
+            to={`/chart/${record.data.amendmentNoteId}`}
+            className="font-bold text-primary hover:underline"
+          >
+            Open the amendment
+          </Link>
+        </p>
+      )}
+      <NoteBody note={note} addenda={record.data?.addenda ?? []} />
     </div>
   );
 }

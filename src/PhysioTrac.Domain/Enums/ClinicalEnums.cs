@@ -22,8 +22,9 @@ public enum NoteType
 /// <summary>Locked is a further, manual step past Signed -- Signed already
 /// blocks direct edits (see EnforceSignedNoteImmutability) and still allows
 /// an addendum; Locked additionally blocks new addenda too (e.g. once a
-/// billing cycle closes on the note). Amended is defined but not yet wired
-/// to any transition -- pre-existing, unrelated to this phase's changes.</summary>
+/// billing cycle closes on the note). Amended: a signed note superseded by
+/// its signed formal amendment (ClinicalNote.AmendsNoteId) -- content and
+/// signature unchanged, still part of the legal record.</summary>
 public enum NoteStatus
 {
     Draft,

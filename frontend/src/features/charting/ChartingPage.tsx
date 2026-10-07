@@ -5,10 +5,16 @@ import { useToast } from "../../components/Toast";
 import { fetchPatientDetail } from "../admin/api";
 import { useAuth } from "../auth/AuthProvider";
 import { canSignClinicalNotes } from "../auth/permissions";
-import { NoteStatus, NoteTypeLabels, needsPlanOfCare } from "../workflow/types";
+import {
+  NoteStatus,
+  NoteStatusLabels,
+  NoteTypeLabels,
+  needsPlanOfCare,
+} from "../workflow/types";
 import {
   fetchChartNote,
   fetchCompliance,
+  fetchNoteRecord,
   fetchPullForward,
   saveChartNote,
   signChartNote,
@@ -17,6 +23,7 @@ import {
 import { GoalsPanel } from "./components/GoalsPanel";
 import { InterventionsPanel } from "./components/InterventionsPanel";
 import { MeasurementTables } from "./components/MeasurementTables";
+import { NoteRecordPanel } from "./components/NoteRecordPanel";
 import { OutcomesPanel } from "./components/OutcomesPanel";
 import { PainScale } from "./components/PainScale";
 import { parseObjective, parseSubjective } from "./presets";
@@ -71,6 +78,10 @@ function ChartEditor({ note }: { note: ChartNote }) {
   const compliance = useQuery({
     queryKey: ["chart", "compliance", note.id],
     queryFn: () => fetchCompliance(note.id),
+  });
+  const record = useQuery({
+    queryKey: ["chart", "record", note.id],
+    queryFn: () => fetchNoteRecord(note.id),
   });
 
   const [narrative, setNarrative] = useState({
@@ -150,7 +161,8 @@ function ChartEditor({ note }: { note: ChartNote }) {
   }, [dirty, readOnly]);
 
   // ---- signing ------------------------------------------------------------
-  const maySign = canSignClinicalNotes(user);
+  const maySign =
+    canSignClinicalNotes(user) && (record.data?.actions.canSign ?? true);
   const [attested, setAttested] = useState(false);
   const [password, setPassword] = useState("");
   const blockers = (compliance.data ?? []).filter((f) => f.finalizationBlocker);
@@ -219,8 +231,8 @@ function ChartEditor({ note }: { note: ChartNote }) {
             </>
           )}
           <h1 className="mt-1 text-2xl font-bold text-[#1565b8]">
-            {NoteTypeLabels[note.noteType] ?? "Visit note"} —{" "}
-            {p?.fullName ?? "…"}
+            {NoteTypeLabels[note.noteType] ?? "Visit note"}
+            {note.amendsNoteId ? " (amendment)" : ""} — {p?.fullName ?? "…"}
           </h1>
           <p className="text-text-muted">
             {p &&
@@ -238,7 +250,32 @@ function ChartEditor({ note }: { note: ChartNote }) {
         />
       </div>
 
-      {(p?.precautions || pullForward.data?.activeDiagnoses.length) && (
+      {note.amendsNoteId && (
+        <p className="mb-4 rounded-md border border-warning bg-warning-light px-3 py-2 text-[#333]">
+          <strong>Amendment</strong> of the signed note for this visit
+          {note.amendmentReason ? ` — ${note.amendmentReason}` : ""}.{" "}
+          <Link
+            to={`/chart/${note.amendsNoteId}`}
+            className="font-bold text-primary hover:underline"
+          >
+            View the original note
+          </Link>
+        </p>
+      )}
+      {note.status === NoteStatus.Amended && record.data?.amendmentNoteId && (
+        <p className="mb-4 rounded-md border border-warning bg-warning-light px-3 py-2 text-[#333]">
+          This note has been <strong>amended</strong>; it is kept unchanged for
+          the record.{" "}
+          <Link
+            to={`/chart/${record.data.amendmentNoteId}`}
+            className="font-bold text-primary hover:underline"
+          >
+            Open the amendment
+          </Link>
+        </p>
+      )}
+
+      {(!!p?.precautions || !!pullForward.data?.activeDiagnoses.length) && (
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
           {p?.precautions && (
             <p className="rounded-md border border-danger bg-danger-light px-3 py-2 text-danger">
@@ -433,16 +470,7 @@ function ChartEditor({ note }: { note: ChartNote }) {
 
         <Card id="sign" title="Sign">
           {readOnly ? (
-            <p className="rounded-md bg-success-light px-3 py-2 text-success">
-              {note.status === NoteStatus.ReviewRequired
-                ? "Signed — waiting for a supervising PT’s cosign"
-                : "Signed"}
-              {note.signatureName ? ` by ${note.signatureName}` : ""}
-              {note.signedAt
-                ? ` on ${new Date(note.signedAt).toLocaleString("en-US")}`
-                : ""}
-              . Signed notes can’t be changed.
-            </p>
+            <NoteRecordPanel note={note} record={record.data} />
           ) : !maySign ? (
             <p className="text-text-muted">
               Your work saves automatically as a draft; a therapist or assistant
@@ -505,8 +533,9 @@ function ChartEditor({ note }: { note: ChartNote }) {
                 {sign.isPending ? "Signing…" : "Sign note"}
               </button>
               <p className="text-text-muted">
-                Signing locks the note and completes the visit. Corrections
-                after signing are made with an addendum.
+                {note.amendsNoteId
+                  ? "Signing this amendment replaces the original note in the record; the original stays viewable, marked Amended."
+                  : "Signing locks the note and completes the visit. Corrections after signing are made with an addendum or an amendment."}
               </p>
             </div>
           )}
@@ -560,9 +589,7 @@ function SaveState({
   if (readOnly)
     return (
       <span className="rounded-full bg-success-light px-3 py-1 text-success">
-        {note.status === NoteStatus.ReviewRequired
-          ? "Awaiting cosign"
-          : "Signed"}
+        {NoteStatusLabels[note.status] ?? "Signed"}
       </span>
     );
   if (error)

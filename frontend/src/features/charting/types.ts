@@ -61,10 +61,76 @@ export interface ChartNote {
   frequencyPerWeek: number | null;
   durationWeeks: number | null;
   signatureName: string | null;
+  signatureCredentials?: string | null;
   signedAt: string | null;
   cosignRequired: boolean;
+  cosignedAt?: string | null;
   subjectiveDetailsJson: string;
   objectiveMeasurementsJson: string;
+  /** Set on a formal amendment: the signed note it corrects. */
+  amendsNoteId?: string | null;
+  amendmentReason?: string | null;
+}
+
+// Matches PhysioTrac.Application.Clinical.NoteActionsDto.
+export interface NoteActions {
+  canEdit: boolean;
+  canSign: boolean;
+  canCosign: boolean;
+  canAddAddendum: boolean;
+  canAmend: boolean;
+  canLock: boolean;
+}
+
+// Matches PhysioTrac.Application.Clinical.NoteAddendumDto.
+export interface NoteAddendum {
+  id: string;
+  noteId: string;
+  authorId: string;
+  reason: string;
+  body: string;
+  createdAt: string;
+  authorName: string | null;
+}
+
+// Matches PhysioTrac.Application.Clinical.NoteRecordDto.
+export interface NoteRecord {
+  actions: NoteActions;
+  authorName: string;
+  cosignedByName: string | null;
+  addenda: NoteAddendum[];
+  amendmentNoteId: string | null;
+  amendmentStatus: NoteStatus | null;
+}
+
+// Matches PhysioTrac.Application.Clinical.ClinicalNoteVersionDto.
+export interface NoteVersion {
+  id: string;
+  versionNumber: number;
+  contentJson: string;
+  savedById: string;
+  savedByName: string | null;
+  isSignedVersion: boolean;
+  createdAt: string;
+}
+
+// Matches PhysioTrac.Application.Clinical.NoteQueueItemDto.
+export interface NoteQueueItem {
+  noteId: string;
+  patientId: string;
+  patientName: string;
+  medicalRecordNumber: string;
+  noteType: NoteType;
+  status: NoteStatus;
+  serviceDate: string;
+  authorName: string;
+  isAmendment: boolean;
+}
+
+// Matches PhysioTrac.Application.Clinical.NoteQueuesDto.
+export interface NoteQueues {
+  myUnsignedNotes: NoteQueueItem[];
+  awaitingMyCosign: NoteQueueItem[];
 }
 
 // Mirrors PhysioTrac.Domain.Enums.InterventionCategory.

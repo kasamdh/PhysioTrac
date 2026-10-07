@@ -22,6 +22,7 @@ import { ProvidersPage } from "./features/providers/ProvidersPage";
 import { WorkflowPage } from "./features/workflow/WorkflowPage";
 import { LogsPage } from "./features/logs/LogsPage";
 import { ChartingPage } from "./features/charting/ChartingPage";
+import { NotePrintPage } from "./features/charting/NotePrintPage";
 import { PatientDocumentationPage } from "./features/documentation/PatientDocumentationPage";
 
 export default function App() {
@@ -36,6 +37,8 @@ export default function App() {
                 {/* One-time link from Administration › Users (InviteAsync's activation URL). */}
                 <Route path="/:orgSlug/activate" element={<ActivateAccountPage />} />
                 <Route element={<ProtectedRoute />}>
+                  {/* A printable document: no app header or navigation. */}
+                  <Route path="/notes/:noteId/print" element={<NotePrintPage />} />
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/patients" element={<PatientListPage title="Patients" back={null} />} />
