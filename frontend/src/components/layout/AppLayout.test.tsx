@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppLayout } from "./AppLayout";
@@ -7,10 +8,13 @@ import { ToastProvider } from "../Toast";
 import { UserRole } from "../../features/auth/types";
 import type { CurrentUser } from "../../features/auth/types";
 import { fetchCurrentOrganization } from "../../features/organizations/api";
+import { recordPageView } from "../../features/logs/api";
 
 vi.mock("../../features/auth/AuthProvider", () => ({
   useAuth: vi.fn(),
 }));
+
+vi.mock("../../features/logs/api", () => ({ recordPageView: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock("../../features/organizations/api", () => ({
   fetchCurrentOrganization: vi.fn(),
@@ -122,5 +126,18 @@ describe("AppLayout role-based navigation", () => {
     );
 
     expect(screen.getAllByText(/Welcome Kasam Dhakal, last login at/)[0]).toBeInTheDocument();
+  });
+
+  it("opens help for the current page from the ? button", async () => {
+    renderAppLayout(UserRole.Admin);
+    await userEvent.click(screen.getByRole("button", { name: "Help for this page" }));
+    expect(screen.getByRole("dialog", { name: "Home Help" })).toBeInTheDocument();
+  });
+
+  it("records the screen opened (path only) once", () => {
+    vi.mocked(recordPageView).mockClear();
+    renderAppLayout(UserRole.Admin);
+    expect(recordPageView).toHaveBeenCalledTimes(1);
+    expect(recordPageView).toHaveBeenCalledWith("/");
   });
 });

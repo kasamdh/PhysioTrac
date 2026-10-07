@@ -17,7 +17,17 @@ export const RoleSets = {
     UserRole.Biller,
   ]),
   OrganizationAdministration: new Set<UserRole>([UserRole.Admin, UserRole.Director]),
+  AuditLogReview: new Set<UserRole>([UserRole.Admin, UserRole.Director, UserRole.Compliance]),
 } as const;
+
+/** Roles allowed to sign clinical notes. Deliberately NOT subject to the
+ * access-control switch: the server always enforces this for signatures
+ * (ClinicalNoteService), so the UI mirrors it to avoid offering a Sign button
+ * that would be refused. Assistants sign too (then await a PT's cosign). */
+const CLINICAL_SIGNERS = new Set<UserRole>([UserRole.Admin, UserRole.Director, UserRole.Therapist, UserRole.Assistant]);
+export function canSignClinicalNotes(user: CurrentUser | null | undefined): boolean {
+  return !!user && CLINICAL_SIGNERS.has(user.role);
+}
 
 export function hasAnyRole(role: UserRole | undefined, allowed: ReadonlySet<UserRole>): boolean {
   return role !== undefined && allowed.has(role);

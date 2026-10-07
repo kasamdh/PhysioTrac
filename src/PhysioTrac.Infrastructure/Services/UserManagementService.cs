@@ -164,6 +164,148 @@ public class UserManagementService : IUserManagementService
         return ToDto(user);
     }
 
+    public async Task<StaffUserDto> UpdateAsync(ICurrentUser actor, Guid userId, UpdateUserRequest request, CancellationToken ct = default)
+    {
+        _tenantAccess.RequireRole(actor, RoleSets.OrganizationAdministration);
+        var user = await LoadStaffUserInOrgAsync(actor, userId, ct);
+        var isSelf = user.Id == actor.UserId;
+        var now = DateTimeOffset.UtcNow;
+
+        var userName = request.UserName?.Trim() ?? string.Empty;
+        var firstName = request.FirstName?.Trim() ?? string.Empty;
+        var lastName = request.LastName?.Trim() ?? string.Empty;
+        var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim().ToLowerInvariant();
+        var newPassword = string.IsNullOrEmpty(request.NewPassword) ? null : request.NewPassword;
+
+        if (userName.Length == 0 || firstName.Length == 0 || lastName.Length == 0)
+        {
+            throw new InvalidOperationException("User ID, first name and last name are required.");
+        }
+        if (request.Role == UserRole.SuperAdmin)
+        {
+            throw new InvalidOperationException("SuperAdmin is a platform-level role and can't be assigned to an organization's staff.");
+        }
+        if (request.Status != user.Status && request.Status is not (UserStatus.Active or UserStatus.Suspended or UserStatus.Deleted))
+        {
+            throw new InvalidOperationException("Status can be set to Active, Suspended or Deleted.");
+        }
+        if (isSelf && (request.Role != user.Role || request.Status != user.Status))
+        {
+            throw new InvalidOperationException("You can't change your own status or access level.");
+        }
+        if (await _userManager.FindByNameAsync(userName) is { } sameName && sameName.Id != user.Id)
+        {
+            throw new InvalidOperationException("That user ID is already taken.");
+        }
+        if (email is not null && await _userManager.FindByEmailAsync(email) is { } sameEmail && sameEmail.Id != user.Id)
+        {
+            throw new InvalidOperationException("An account with that email already exists.");
+        }
+
+        var changed = new List<string>();
+        if (user.UserName != userName) { user.UserName = userName; changed.Add("userName"); }
+        if (user.FirstName != firstName) { user.FirstName = firstName; changed.Add("firstName"); }
+        if (user.LastName != lastName) { user.LastName = lastName; changed.Add("lastName"); }
+        if (user.Email != email) { user.Email = email; changed.Add("email"); }
+
+        var previousRole = user.Role;
+        if (user.Role != request.Role) { user.Role = request.Role; changed.Add("role"); }
+
+        var previousStatus = user.Status;
+        var signOutEverywhere = false;
+        if (request.Status != user.Status)
+        {
+            changed.Add("status");
+            user.Status = request.Status;
+            user.StatusChangedAt = now;
+            user.StatusChangedById = actor.UserId;
+            switch (request.Status)
+            {
+                case UserStatus.Active:
+                    user.SuspendedAt = null;
+                    user.SuspendedById = null;
+                    user.SuspensionReason = null;
+                    user.ArchivedAt = null;
+                    user.ArchivedById = null;
+                    user.LockoutEnd = null;
+                    user.AccessFailedCount = 0;
+                    break;
+                case UserStatus.Suspended:
+                    user.SuspendedAt = now;
+                    user.SuspendedById = actor.UserId;
+                    signOutEverywhere = true;
+                    break;
+                case UserStatus.Deleted:
+                    user.ArchivedAt = now;
+                    user.ArchivedById = actor.UserId;
+                    signOutEverywhere = true;
+                    break;
+            }
+        }
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
+        }
+
+        if (newPassword is not null)
+        {
+            if (await _userManager.HasPasswordAsync(user))
+            {
+                var removed = await _userManager.RemovePasswordAsync(user);
+                if (!removed.Succeeded)
+                {
+                    throw new InvalidOperationException(string.Join(" ", removed.Errors.Select(e => e.Description)));
+                }
+            }
+            var added = await _userManager.AddPasswordAsync(user, newPassword);
+            if (!added.Succeeded)
+            {
+                throw new InvalidOperationException(string.Join(" ", added.Errors.Select(e => e.Description)));
+            }
+
+            // Setting the password settles a pending invite: the account is
+            // usable now, and the emailed link must not work any more.
+            if (user.Status == UserStatus.Inactive)
+            {
+                user.Status = UserStatus.Active;
+                user.StatusChangedAt = now;
+                user.StatusChangedById = actor.UserId;
+            }
+            var openInvites = await _db.ClientInvitations.Where(i => i.UserId == user.Id && i.UsedAt == null).ToListAsync(ct);
+            foreach (var invite in openInvites) invite.UsedAt = now;
+            if (!isSelf) user.MustChangePassword = true;
+            await _userManager.UpdateAsync(user);
+            if (!isSelf) signOutEverywhere = true;
+
+            // Never record the password itself.
+            await _audit.RecordAuditEventAsync(
+                actor.UserId, "user.password_reset", nameof(ApplicationUser), user.Id, user.OrganizationId!.Value, ct: ct);
+        }
+
+        if (signOutEverywhere)
+        {
+            var reason = user.Status == UserStatus.Active ? SessionRevokedReason.PasswordReset : SessionRevokedReason.AccountSuspended;
+            await _sessions.RevokeAllForUserAsync(user.Id, reason, ct: ct);
+        }
+
+        if (changed.Count > 0)
+        {
+            await _audit.RecordAuditEventAsync(
+                actor.UserId, "user.updated", nameof(ApplicationUser), user.Id, user.OrganizationId!.Value,
+                metadata: new
+                {
+                    fields = changed,
+                    role = changed.Contains("role") ? new { from = previousRole.ToString(), to = user.Role.ToString() } : null,
+                    status = changed.Contains("status") ? new { from = previousStatus.ToString(), to = user.Status.ToString() } : null,
+                },
+                ct: ct);
+        }
+
+        return ToDto(user);
+    }
+
     private async Task<ApplicationUser> LoadStaffUserInOrgAsync(ICurrentUser actor, Guid userId, CancellationToken ct)
     {
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);

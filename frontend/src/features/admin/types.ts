@@ -56,6 +56,18 @@ export interface InviteUserInput {
   role: UserRole;
 }
 
+// Matches PhysioTrac.Application.Users.UpdateUserRequest.
+export interface UpdateUserInput {
+  userName: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  role: UserRole;
+  status: UserStatus;
+  /** null keeps the current password. */
+  newPassword: string | null;
+}
+
 export interface InviteUserResult {
   user: StaffUser;
   activationUrl: string;
@@ -113,6 +125,48 @@ export interface PatientDirectoryFilters {
   locationId?: string;
   appointmentFrom?: string;
   appointmentTo?: string;
+  /** true lists soft-deleted charts (for Restore) instead of live ones. */
+  deleted?: boolean;
   page?: number;
   pageSize?: number;
+}
+
+// Matches PhysioTrac.Application.Patients.PatientDetailDto.
+export interface PatientDetail {
+  id: string;
+  medicalRecordNumber: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  dateOfBirth: string;
+  age: number;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  emergencyContact: string | null;
+  preferredLanguage: string | null;
+  diagnoses: string | null;
+  precautions: string | null;
+  assignedTherapistId: string | null;
+  primaryLocationId: string | null;
+  primaryCareProviderId: string | null;
+  referringProviderId: string | null;
+  status: PatientStatus;
+}
+
+// Matches PhysioTrac.Application.Patients.UpdatePatientRequest.
+export interface UpdatePatientInput {
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  emergencyContact: string | null;
+  preferredLanguage: string | null;
+  assignedTherapistId: string | null;
+  primaryLocationId: string | null;
+  primaryCareProviderId: string | null;
+  referringProviderId: string | null;
+  status: PatientStatus;
+  dateOfBirth: string | null;
 }

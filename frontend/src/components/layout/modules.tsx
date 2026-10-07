@@ -108,6 +108,32 @@ export const appModules: AppModule[] = [
     ),
   },
   {
+    to: "/workflow",
+    label: "Workflow",
+    end: false,
+    allowed: RoleSets.Scheduling,
+    tile: true,
+    tileGradient: "from-cyan-300 via-sky-600 to-blue-900",
+    icon: (
+      <svg viewBox="0 0 24 24" {...stroke}>
+        <rect x="5" y="4" width="14" height="17" rx="2" />
+        <path d="M9 4.5V3h6v1.5" />
+        <path d="M8.5 10.5l1.5 1.5 3-3M8.5 16l1.5 1.5 3-3M15 11h1.5M15 16.5h1.5" />
+      </svg>
+    ),
+  },
+  {
+    // Not a tile or tab: opened from Workflow / a patient's documentation.
+    // Listed so the header shows "Clinical Charting" as the page name.
+    to: "/chart",
+    label: "Clinical Charting",
+    end: false,
+    allowed: RoleSets.Clinical,
+    tile: false,
+    tileGradient: "",
+    icon: null,
+  },
+  {
     to: "/admin",
     label: "Administration",
     end: false,

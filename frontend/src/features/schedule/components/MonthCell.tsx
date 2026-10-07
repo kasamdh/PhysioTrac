@@ -7,7 +7,7 @@ import type { CalendarBlock, CalendarEvent } from "./AppointmentCard";
 export function MonthEvent({ event }: EventProps<CalendarEvent | CalendarBlock>) {
   if (!("appointment" in event)) return <span>{event.title}</span>;
   return (
-    <span className="block truncate text-[11px] leading-tight">
+    <span className="block truncate text-sm leading-tight">
       <span className="opacity-80">{formatTime(event.start)}</span> <span className="font-semibold">{event.appointment.patientName}</span>
     </span>
   );
@@ -20,7 +20,7 @@ export function makeMonthDateHeader(countsByDay: Map<string, number>) {
     const count = countsByDay.get(toDateKey(date)) ?? 0;
     return (
       <button type="button" onClick={onDrillDown} className="flex w-full items-center justify-between gap-1 text-left hover:text-primary">
-        <span className="text-[11px] font-medium text-primary-deep">{count > 0 ? `${count} appt${count === 1 ? "" : "s"}` : ""}</span>
+        <span className="text-sm font-medium text-primary-deep">{count > 0 ? `${count} appt${count === 1 ? "" : "s"}` : ""}</span>
         <span>{label}</span>
       </button>
     );

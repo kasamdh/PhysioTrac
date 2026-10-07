@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RowMenu } from "../../../components/RowMenu";
 import { SegmentedButtons } from "../../../components/SegmentedButtons";
 import { useToast } from "../../../components/Toast";
 import { AdminPageHeader } from "../AdminPageHeader";
+import { FormRow } from "../FormRow";
 import { createLocation, fetchLocations, setLocationActive, updateLocation } from "../api";
 import type { AdminLocation, LocationInput } from "../types";
 
@@ -113,7 +114,7 @@ export function LocationsAdminPage() {
       </div>
 
       {editing && (
-        <LocationForm
+        <LocationDialog
           key={editing === "new" ? "new" : editing.id}
           existing={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
@@ -194,7 +195,9 @@ export function LocationsAdminPage() {
   );
 }
 
-function LocationForm({
+/** Add / Edit Location dialog: label-left rows, Name marked "Required"
+ * until filled, Cancel / Save and Close (same format as Edit User / Patient). */
+function LocationDialog({
   existing,
   onClose,
   onSaved,
@@ -203,66 +206,112 @@ function LocationForm({
   onClose: () => void;
   onSaved: (location: AdminLocation, isNew: boolean) => void;
 }) {
-  const [form, setForm] = useState<LocationInput>(existing ? toInput(existing) : EMPTY);
+  const titleId = useId();
+  const initial = existing ? toInput(existing) : EMPTY;
+  const [form, setForm] = useState<LocationInput>(initial);
   const save = useMutation({
     mutationFn: () => (existing ? updateLocation(existing.id, toRequest(form)) : createLocation(toRequest(form))),
     onSuccess: (l) => onSaved(l, !existing),
   });
 
-  const field = (key: keyof LocationInput, label: string, props: Record<string, unknown> = {}) => (
-    <label className="field-label">
-      {label}
-      <input
-        className="field-input mt-1"
-        value={form[key] ?? ""}
-        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-        {...props}
-      />
-    </label>
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const nameMissing = !(form.name ?? "").trim();
+  // Checked only when edited, so an existing odd value never blocks saving other fields.
+  const npiChanged = (form.npiNumber ?? "").trim() !== (initial.npiNumber ?? "").trim();
+  const npiInvalid = npiChanged && !!form.npiNumber?.trim() && !/^\d{10}$/.test(form.npiNumber.trim());
+  const dirty = (Object.keys(initial) as (keyof LocationInput)[]).some(
+    (k) => (form[k] ?? "").trim() !== (initial[k] ?? "").trim(),
+  );
+  const canSave = !nameMissing && !npiInvalid && (dirty || !existing) && !save.isPending;
+
+  const field = (key: keyof LocationInput, props: Record<string, unknown> = {}) => (
+    <input
+      id={`loc-${key}`}
+      className="field-input"
+      value={form[key] ?? ""}
+      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+      {...props}
+    />
   );
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    save.mutate();
+    if (canSave) save.mutate();
   };
 
   return (
-    <form onSubmit={onSubmit} className="card mb-5">
-      <h2 className="mb-4 text-lg font-semibold text-text">{existing ? `Edit ${existing.name}` : "Add location"}</h2>
-      {save.isError && <p className="alert-error mb-4">{save.error.message}</p>}
-      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-        {field("name", "Name *", { required: true, autoFocus: true })}
-        {field("phone", "Phone", { type: "tel" })}
-        <label className="field-label">
-          Time zone *
-          <select
-            className="field-input mt-1"
-            value={form.timezone}
-            onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-          >
-            {TIME_ZONES.map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {field("addressLine1", "Address line 1")}
-        {field("addressLine2", "Address line 2")}
-        {field("city", "City")}
-        {field("state", "State", { maxLength: 2, placeholder: "NC" })}
-        {field("zipCode", "ZIP code", { maxLength: 10 })}
-        {field("npiNumber", "NPI", { maxLength: 10, inputMode: "numeric" })}
-        {field("taxId", "Tax ID")}
-      </div>
-      <div className="mt-5 flex justify-end gap-2">
-        <button type="button" className="btn-secondary" onClick={onClose}>
-          Cancel
-        </button>
-        <button type="submit" className="btn-primary" disabled={save.isPending || !form.name.trim()}>
-          {save.isPending ? "Saving…" : existing ? "Save changes" : "Add location"}
-        </button>
-      </div>
-    </form>
+    <div className="modal-overlay" onClick={onClose}>
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onSubmit={onSubmit}
+        onClick={(e) => e.stopPropagation()}
+        noValidate
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
+      >
+        <h2 id={titleId} className="border-b border-border px-6 py-4 text-3xl text-[#333]">
+          {existing ? "Edit Location" : "Add Location"}
+        </h2>
+        <div className="space-y-4 overflow-y-auto px-6 py-5">
+          {save.isError && <p className="alert-error">{save.error.message}</p>}
+          <FormRow label="Location Name" htmlFor="loc-name" missing={nameMissing}>
+            {field("name", { autoFocus: true, autoComplete: "off" })}
+          </FormRow>
+          <FormRow label="Time Zone" htmlFor="loc-timezone">
+            <select
+              id="loc-timezone"
+              className="field-input"
+              value={form.timezone}
+              onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+            >
+              {!TIME_ZONES.some(([id]) => id === form.timezone) && <option value={form.timezone}>{form.timezone}</option>}
+              {TIME_ZONES.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-text-muted">The schedule shows this clinic’s appointments in this time zone.</p>
+          </FormRow>
+          <FormRow label="Phone" htmlFor="loc-phone">
+            {field("phone", { type: "tel" })}
+          </FormRow>
+          <FormRow label="Address" htmlFor="loc-addressLine1">
+            <div className="space-y-2">
+              {field("addressLine1", { placeholder: "Street address", "aria-label": "Address line 1" })}
+              {field("addressLine2", { placeholder: "Suite, unit (optional)", "aria-label": "Address line 2" })}
+            </div>
+          </FormRow>
+          <FormRow label="City / State / ZIP" htmlFor="loc-city">
+            <div className="grid grid-cols-[1fr_5rem_8rem] gap-2">
+              {field("city", { placeholder: "City", "aria-label": "City" })}
+              {field("state", { placeholder: "NC", maxLength: 2, "aria-label": "State" })}
+              {field("zipCode", { placeholder: "ZIP", maxLength: 10, "aria-label": "ZIP code" })}
+            </div>
+          </FormRow>
+          <FormRow label="NPI" htmlFor="loc-npiNumber">
+            {field("npiNumber", { maxLength: 10, inputMode: "numeric" })}
+            {npiInvalid && <p className="mt-1 text-danger">An NPI is 10 digits.</p>}
+          </FormRow>
+          <FormRow label="Tax ID" htmlFor="loc-taxId">
+            {field("taxId")}
+          </FormRow>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+          <button type="button" className="btn-refresh" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-primary" disabled={!canSave}>
+            {save.isPending ? "Saving…" : "Save and Close"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }

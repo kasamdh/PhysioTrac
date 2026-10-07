@@ -48,7 +48,7 @@ export function YearView({ year, counts, todayKey, onPickDate }: Props) {
                 <h3 className="text-sm font-semibold text-text">{first.toLocaleDateString("en-US", { month: "long" })}</h3>
                 <span className="text-xs text-text-muted">{monthTotal > 0 ? `${monthTotal} appts` : "—"}</span>
               </header>
-              <div className="grid grid-cols-7 gap-0.5 text-center text-[11px]">
+              <div className="grid grid-cols-7 gap-0.5 text-center text-sm">
                 {weekdayInitials.map((w, i) => (
                   <span key={i} className="pb-1 font-medium text-text-subtle">{w}</span>
                 ))}
@@ -66,7 +66,7 @@ export function YearView({ year, counts, todayKey, onPickDate }: Props) {
                       title={label}
                       aria-label={label}
                       onClick={() => onPickDate(key)}
-                      className={`aspect-square rounded text-[11px] leading-none transition ${shade(count, max)} ${
+                      className={`aspect-square rounded text-sm leading-none transition ${shade(count, max)} ${
                         key === todayKey ? "ring-2 ring-warning ring-offset-1" : ""
                       }`}
                     >

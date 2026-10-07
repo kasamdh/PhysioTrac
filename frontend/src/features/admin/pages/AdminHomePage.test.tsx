@@ -36,7 +36,7 @@ function renderAs(role: UserRole, accessControlEnabled = true) {
 describe("AdminHomePage", () => {
   it("shows every command to an Admin", () => {
     renderAs(UserRole.Admin);
-    for (const name of ["Change Password", "Messages", "Users", "Locations", "Patient List"]) {
+    for (const name of ["Change Password", "Messages", "Users", "Locations", "Patient List", "Logs"]) {
       expect(screen.getByRole("link", { name })).toBeInTheDocument();
     }
   });
@@ -52,5 +52,15 @@ describe("AdminHomePage", () => {
     renderAs(UserRole.Scheduler, false);
     expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Patient List" })).toBeInTheDocument();
+  });
+
+  it("shows Logs to Compliance but not to a Therapist", () => {
+    renderAs(UserRole.Compliance);
+    expect(screen.getByRole("link", { name: "Logs" })).toBeInTheDocument();
+  });
+
+  it("hides Logs from a Therapist while access control is on", () => {
+    renderAs(UserRole.Therapist);
+    expect(screen.queryByRole("link", { name: "Logs" })).not.toBeInTheDocument();
   });
 });

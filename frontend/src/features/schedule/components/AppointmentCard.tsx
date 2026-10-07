@@ -43,7 +43,7 @@ export function makeAppointmentCard(showProvider: boolean) {
     if (a.durationMinutes <= 30) {
       return (
         <div className="flex h-full flex-col overflow-hidden leading-tight">
-          <span className={`${line} text-[11px]`}>
+          <span className={`${line} text-sm`}>
             {formatTime(event.start)} · {AppointmentStatusLabels[a.status]}
             {showProvider && a.providerName ? ` · ${a.providerName}` : ""}
           </span>
@@ -57,16 +57,16 @@ export function makeAppointmentCard(showProvider: boolean) {
 
     return (
       <div className="flex h-full flex-col gap-0.5 overflow-hidden leading-tight">
-        <span className={`${line} text-[11px] opacity-80`}>
+        <span className={`${line} text-sm opacity-80`}>
           {formatTime(event.start)} – {formatTime(event.end)}
         </span>
         <span className={`${line} text-xs font-semibold`}>{a.patientName}</span>
-        <span className={`${line} text-[11px]`}>
+        <span className={`${line} text-sm`}>
           {a.appointmentTypeName ?? "Appointment"}
           <Tags a={a} />
         </span>
-        {showProvider && a.providerName && <span className={`${line} text-[11px] opacity-80`}>{a.providerName}</span>}
-        <span className={`${line} text-[11px] font-medium`}>{AppointmentStatusLabels[a.status]}</span>
+        {showProvider && a.providerName && <span className={`${line} text-sm opacity-80`}>{a.providerName}</span>}
+        <span className={`${line} text-sm font-medium`}>{AppointmentStatusLabels[a.status]}</span>
       </div>
     );
   };

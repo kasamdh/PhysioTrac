@@ -6,7 +6,8 @@ import { useToast } from "../../../components/Toast";
 import { useAuth } from "../../auth/AuthProvider";
 import { UserRole, UserRoleLabels } from "../../auth/types";
 import { AdminPageHeader } from "../AdminPageHeader";
-import { changeUserRole, fetchUsers, inviteUser, setUserActive } from "../api";
+import { fetchUsers, inviteUser } from "../api";
+import { EditUserDialog } from "../EditUserDialog";
 import { UserStatus, UserStatusLabels, type InviteUserInput, type StaffUser } from "../types";
 
 // Staff roles an organization admin can assign. SuperAdmin is platform-only
@@ -28,29 +29,11 @@ export function UsersAdminPage() {
   const [adding, setAdding] = useState(false);
   const [invited, setInvited] = useState<{ name: string; url: string } | null>(null);
   const [filter, setFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "invited" | "deactivated">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "invited" | "suspended" | "deleted">("all");
+  const [editing, setEditing] = useState<StaffUser | null>(null);
 
   const users = useQuery({ queryKey: ["admin", "users"], queryFn: fetchUsers });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-
-  const roleChange = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: UserRole }) => changeUserRole(id, role),
-    onSuccess: (u) => {
-      showToast(`${u.firstName} ${u.lastName} is now ${UserRoleLabels[u.role]}.`);
-      refresh();
-    },
-    onError: (e: Error) => showToast(e.message),
-  });
-  const activeChange = useMutation({
-    // Suspended = deactivated by an admin; anything else (incl. a pending
-    // invite) can be deactivated.
-    mutationFn: (u: StaffUser) => setUserActive(u.id, u.status === UserStatus.Suspended),
-    onSuccess: (u) => {
-      showToast(`${u.firstName} ${u.lastName} ${u.status === UserStatus.Active ? "reactivated" : "deactivated"}.`);
-      refresh();
-    },
-    onError: (e: Error) => showToast(e.message),
-  });
 
   const term = filter.trim().toLowerCase();
   const rows = (users.data ?? [])
@@ -60,7 +43,8 @@ export function UsersAdminPage() {
         statusFilter === "all" ||
         (statusFilter === "active" && u.status === UserStatus.Active) ||
         (statusFilter === "invited" && u.status === UserStatus.Inactive) ||
-        (statusFilter === "deactivated" && u.status === UserStatus.Suspended),
+        (statusFilter === "suspended" && u.status === UserStatus.Suspended) ||
+        (statusFilter === "deleted" && u.status === UserStatus.Deleted),
     )
     .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
 
@@ -90,17 +74,18 @@ export function UsersAdminPage() {
           value={statusFilter}
           onChange={setStatusFilter}
           options={[
-            { value: "all", label: "All" },
-            { value: "active", label: "Active" },
+            { value: "all", label: "All Users" },
+            { value: "active", label: "Active Users" },
             { value: "invited", label: "Invited" },
-            { value: "deactivated", label: "Deactivated" },
+            { value: "suspended", label: "Suspended Users" },
+            { value: "deleted", label: "Deleted Users" },
           ]}
         />
         <input
           type="search"
           aria-label="Search users"
           className="toolbar-select w-64"
-          placeholder="Search name or email"
+          placeholder="Search User"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -134,6 +119,20 @@ export function UsersAdminPage() {
         </div>
       )}
 
+      {editing && (
+        <EditUserDialog
+          user={editing}
+          isSelf={editing.id === me?.id}
+          assignableRoles={ASSIGNABLE_ROLES}
+          onClose={() => setEditing(null)}
+          onSaved={(u, passwordReset) => {
+            setEditing(null);
+            showToast(`${u.firstName} ${u.lastName} saved.${passwordReset ? " Their password was reset." : ""}`);
+            refresh();
+          }}
+        />
+      )}
+
       {adding && (
         <NewUserForm
           onClose={() => setAdding(false)}
@@ -165,53 +164,24 @@ export function UsersAdminPage() {
             <tbody>
               {rows.map((u) => {
                 const isMe = u.id === me?.id;
-                const suspended = u.status === UserStatus.Suspended;
+                const inactive = u.status === UserStatus.Suspended || u.status === UserStatus.Deleted;
                 return (
-                  <tr key={u.id} className={suspended ? "opacity-60" : ""}>
+                  <tr key={u.id} className={inactive ? "opacity-60" : ""}>
                     <td className="cell-menu">
-                      {!isMe && (
-                        <RowMenu
-                          label={`Actions for ${u.firstName} ${u.lastName}`}
-                          items={[
-                            {
-                              label: suspended ? "Reactivate" : "Deactivate",
-                              danger: !suspended,
-                              disabled: activeChange.isPending,
-                              onSelect: () => {
-                                if (
-                                  !suspended &&
-                                  !window.confirm(`Deactivate ${u.firstName} ${u.lastName}? They'll be signed out everywhere.`)
-                                )
-                                  return;
-                                activeChange.mutate(u);
-                              },
-                            },
-                          ]}
-                        />
-                      )}
+                      <RowMenu
+                        label={`Actions for ${u.firstName} ${u.lastName}`}
+                        items={[{ label: "Edit User", onSelect: () => setEditing(u) }]}
+                      />
                     </td>
                     <td data-label="Name">
-                      {u.firstName} {u.lastName}
+                      <button type="button" className="table-link text-left" onClick={() => setEditing(u)}>
+                        {u.firstName} {u.lastName}
+                      </button>
                       {isMe && <span className="ml-1 text-xs text-text-muted">(you)</span>}
                     </td>
                     <td data-label="User ID">{u.userName}</td>
                     <td data-label="Email" className="text-text-muted">{u.email}</td>
-                    <td data-label="Role">
-                      <select
-                        aria-label={`Role for ${u.firstName} ${u.lastName}`}
-                        className="field-input w-auto py-1"
-                        value={u.role}
-                        disabled={isMe || roleChange.isPending || !ASSIGNABLE_ROLES.includes(u.role)}
-                        onChange={(e) => roleChange.mutate({ id: u.id, role: Number(e.target.value) as UserRole })}
-                      >
-                        {!ASSIGNABLE_ROLES.includes(u.role) && <option value={u.role}>{UserRoleLabels[u.role]}</option>}
-                        {ASSIGNABLE_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {UserRoleLabels[r]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                    <td data-label="Role">{UserRoleLabels[u.role]}</td>
                     <td data-label="Status">{u.status === UserStatus.Inactive ? "Invited" : UserStatusLabels[u.status]}</td>
                   </tr>
                 );

@@ -1,0 +1,694 @@
+import type { ReactNode } from "react";
+
+/** Magenta "Note:" call-out, as in the help screens this mirrors. */
+export function Note({ children }: { children: ReactNode }) {
+  return (
+    <p className="my-2 border-l-4 border-slate-200 pl-3 text-[#a3127c]">
+      <strong>Note</strong>: {children}
+    </p>
+  );
+}
+
+/** A bold term with its explanation indented underneath. */
+export function Term({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <div className="mb-3">
+      <p className="font-bold text-[#333]">{name}</p>
+      <div className="pl-7 text-[#333]">{children}</div>
+    </div>
+  );
+}
+
+export interface HelpSection {
+  id: string;
+  title: string;
+  body: ReactNode;
+}
+
+export interface PageHelp {
+  title: string;
+  intro: ReactNode;
+  sections: HelpSection[];
+}
+
+/** The navy bar at the top of every page -- the same on all of them. */
+export const headerSection: HelpSection = {
+  id: "header",
+  title: "Header",
+  body: (
+    <>
+      <Term name="PhysioTrac logo">The name of the app. Use Home to get back to the main screen.</Term>
+      <Term name="Go Back">Returns to the previous screen.</Term>
+      <Term name="Home, Patients, Schedule, Providers, Billing">
+        Opens that area. The underlined one is where you are now.
+        <Note>On screens narrower than a large desktop these move into the ☰ menu button.</Note>
+      </Term>
+      <Term name="Welcome line">
+        Your name, when you last signed in (the session before this one), and the name of the current page.
+      </Term>
+      <Term name="Logout">Signs you out. The sign-in screen then confirms the time you logged out.</Term>
+      <Term name="Print">Prints the current page.</Term>
+      <Term name="? (Help)">Opens these instructions for the page you are on.</Term>
+      <Note>For your security you are signed out automatically after a period of inactivity, with a warning first.</Note>
+    </>
+  ),
+};
+
+const listsSection: HelpSection = {
+  id: "using-lists",
+  title: "Using lists",
+  body: (
+    <>
+      <Term name="Quick-filter buttons">The joined buttons above a list (for example All / Active). The filled navy one is selected.</Term>
+      <Term name="Search and dropdowns">Narrow the list further. Most filters are kept in the page address, so you can bookmark or share a filtered list.</Term>
+      <Term name="Refresh">Reloads the list with the latest information.</Term>
+      <Term name="☰ (row menu)">The button at the start of each row opens the actions for that row.</Term>
+      <Term name="Blue text">Blue names and numbers are links — click them to open the item.</Term>
+      <Note>On a phone each row is shown as a card, with the field names on the left.</Note>
+    </>
+  ),
+};
+
+const patientColumns = (
+  <Term name="Columns">
+    MRN (medical record number), name, date of birth (age), phone, primary location, status, last visit and next
+    appointment. Cancelled appointments are not counted as visits.
+  </Term>
+);
+
+const patientFilters = (
+  <>
+    <Term name="Today / Yesterday / Last 3 Days / Next 7 Days">
+      Shows patients with an appointment in that period. Use From / To for any other dates.
+    </Term>
+    <Term name="All / Active / Inactive / Discharged">Filters by the patient’s status.</Term>
+    <Term name="Location">
+      With dates chosen: patients with an appointment at that location in those dates. Without dates: patients whose
+      primary clinic it is, or who have any appointment there.
+    </Term>
+    <Term name="Search">Matches first name, last name or MRN.</Term>
+    <Term name="Clear filters">Removes every filter.</Term>
+  </>
+);
+
+export const pageHelp: Record<string, PageHelp> = {
+  home: {
+    title: "Home",
+    intro: (
+      <>
+        <p>The main screen. It shows your organization, the clinic location you are working at, and a button for each area of PhysioTrac you can use.</p>
+        <Note>You only see the buttons your access level allows.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "location",
+        title: "Location",
+        body: (
+          <Term name="Location dropdown">
+            Choose the clinic you are working at. It is remembered on this device and is used as the starting
+            location, for example when adding a patient.
+          </Term>
+        ),
+      },
+      {
+        id: "buttons",
+        title: "Buttons",
+        body: (
+          <>
+            <Term name="Administration">Change your password, messages, users, locations and the patient list (add / edit / delete patients).</Term>
+            <Term name="Billing">Billing (coming soon).</Term>
+            <Term name="Patients">The list of patients, with filters.</Term>
+            <Term name="Provider Hours">Each provider’s working hours, time off and blocked time.</Term>
+            <Term name="Providers">The list of all providers.</Term>
+            <Term name="Schedule">The appointment calendar.</Term>
+            <Term name="Workflow">Today’s appointments for one therapist: check patients in and document visits in one place.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
+  patients: {
+    title: "Patients",
+    intro: (
+      <>
+        <p>The list of patients in your organization, with filters to find who you need.</p>
+        <Note>This list is read-only. Patients are added, edited and deleted in Administration › Patient List.</Note>
+      </>
+    ),
+    sections: [
+      { id: "filters", title: "Filters", body: patientFilters },
+      {
+        id: "list",
+        title: "The list",
+        body: (
+          <>
+            {patientColumns}
+            <Term name="MRN (blue)">Opens that patient’s appointments in the Schedule.</Term>
+            <Term name="☰ menu">View appointments, or Send message to the patient.</Term>
+          </>
+        ),
+      },
+      listsSection,
+    ],
+  },
+
+  "admin-patients": {
+    title: "Patient List",
+    intro: (
+      <>
+        <p>Administration’s patient list: everything on the Patients page, plus adding, editing, deleting and restoring patients.</p>
+        <Note>Deleting a patient hides the chart; it is never erased and can be restored.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "add",
+        title: "Add patient",
+        body: (
+          <>
+            <Term name="+ Add patient">
+              Opens the Add Patient window with all of the patient’s details. Patient name and date of birth are required —
+              they are marked in red with “Required” until filled. Primary location starts as the clinic chosen on Home.
+            </Term>
+            <Term name="Save and Close">Becomes available once the required fields are filled.</Term>
+            <Term name="Possible duplicate">
+              If a patient with the same name and date of birth already exists, it is shown first. Use the existing chart,
+              or choose Add anyway if this really is a different person.
+            </Term>
+            <Note>After saving, a banner shows the new patient’s MRN.</Note>
+          </>
+        ),
+      },
+      {
+        id: "edit",
+        title: "Edit patient",
+        body: (
+          <>
+            <Term name="Open">Click the patient’s name, or choose Edit patient from the ☰ menu.</Term>
+            <Term name="Fields">
+              Name, date of birth, status (Active / Inactive / Discharged), phone, e-mail, address, emergency contact,
+              language, primary location and assigned therapist.
+            </Term>
+            <Term name="Save and Close">Becomes available once you change something.</Term>
+          </>
+        ),
+      },
+      {
+        id: "delete",
+        title: "Delete and restore",
+        body: (
+          <>
+            <Term name="Delete patient">From the ☰ menu. After you confirm, the patient disappears from every list.</Term>
+            <Term name="Deleted">Shows deleted patients. Use Restore patient in the ☰ menu to bring one back.</Term>
+          </>
+        ),
+      },
+      { id: "filters", title: "Filters", body: patientFilters },
+      { id: "list", title: "The list", body: patientColumns },
+      listsSection,
+    ],
+  },
+
+  schedule: {
+    title: "Schedule",
+    intro: (
+      <>
+        <p>The appointment calendar for every provider and location: book, move, check in and complete visits.</p>
+        <Note>Appointments are colored by visit type; the legend above the calendar shows the colors. Cancelled and no-show appointments are grey and crossed out.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "views",
+        title: "Views and dates",
+        body: (
+          <>
+            <Term name="Day">One column per provider (PT / PTA) with their hours and appointment count. Click a provider’s name to see only their schedule.</Term>
+            <Term name="Week / Month / Year">A wider view. Year shows how busy each day is.</Term>
+            <Term name="List">The appointments as a list, for a day, week or month. Phones start in List.</Term>
+            <Term name="Today / ‹ Previous / Next ›">Move through dates, or pick a date in the date box.</Term>
+          </>
+        ),
+      },
+      {
+        id: "filters",
+        title: "Filters",
+        body: <Term name="Location, provider, status, appointment type, search">Narrow what is shown. Search matches patient name or MRN.</Term>,
+      },
+      {
+        id: "book",
+        title: "Booking an appointment",
+        body: (
+          <>
+            <Term name="+ New appointment">Or click an empty time in Day or Week view to start with that time filled in.</Term>
+            <Term name="Patient">Search by name, MRN, phone or date of birth. If they are new, create them right there.</Term>
+            <Term name="Repeat">Book a series (weekly, 2× or 3× a week, or chosen days) until an end date. A preview shows every date first.</Term>
+            <Note>If the time clashes with another booking, the provider’s hours, time off or a closed location, you are told why. Some conflicts can be overridden with a reason.</Note>
+          </>
+        ),
+      },
+      {
+        id: "manage",
+        title: "Changing an appointment",
+        body: (
+          <>
+            <Term name="Click an appointment">Opens its details with the next steps.</Term>
+            <Term name="Status steps">Confirm → Check in → Start visit → Complete. Also No show and Cancel appointment.</Term>
+            <Term name="Reschedule">Pick a new date, time or provider.</Term>
+            <Term name="Drag and drop">In Day and Week view, drag an appointment to move it, or drag its bottom edge to change its length. The move is checked before it is saved.</Term>
+          </>
+        ),
+      },
+      {
+        id: "hours",
+        title: "Provider hours",
+        body: <Term name="Provider hours">Opens working hours and time off for providers (also on Home).</Term>,
+      },
+    ],
+  },
+
+  "provider-hours": {
+    title: "Provider Hours",
+    intro: <p>Each provider’s regular working hours and their time off. The Schedule shades time outside these hours and checks bookings against them.</p>,
+    sections: [
+      { id: "provider", title: "Choosing a provider", body: <Term name="Provider dropdown">Pick whose hours to see or change.</Term> },
+      {
+        id: "weekly",
+        title: "Weekly hours",
+        body: (
+          <>
+            <Term name="Each day">Start and end time at a location. Use + Add hours for a split day (for example two locations).</Term>
+          </>
+        ),
+      },
+      {
+        id: "time-off",
+        title: "Time off, lunch and blocked time",
+        body: (
+          <>
+            <Term name="Add">Enter the dates or times and a reason.</Term>
+            <Term name="Existing appointments">Appointments that fall inside new time off are listed so staff can reschedule them; they are not moved automatically.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
+  providers: {
+    title: "Providers",
+    intro: <p>Every provider (PT, PTA and others) in your organization, with where they work and whether they can sign in.</p>,
+    sections: [
+      {
+        id: "filters",
+        title: "Filters",
+        body: (
+          <>
+            <Term name="All / PT / PTA / Other">Filter by discipline.</Term>
+            <Term name="Active / Inactive / All">Inactive providers are hidden by default.</Term>
+            <Term name="Location and search">Search matches name, NPI or specialty.</Term>
+          </>
+        ),
+      },
+      {
+        id: "list",
+        title: "The list",
+        body: (
+          <>
+            <Term name="Name (blue)">Opens that provider’s working hours and time off.</Term>
+            <Term name="☰ menu">View today’s schedule, or Working hours &amp; time off.</Term>
+            <Term name="Login">Yes when the provider has their own PhysioTrac sign-in (needed to have patients assigned).</Term>
+          </>
+        ),
+      },
+      listsSection,
+    ],
+  },
+
+  workflow: {
+    title: "Workflow",
+    intro: (
+      <>
+        <p>Today’s appointments for one therapist, so you can check patients in, document each visit and complete it without going to other screens.</p>
+        <Note>Only today’s date (in your clinic’s time zone) is shown. The list refreshes itself every minute, so front-desk check-ins appear automatically.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "whose",
+        title: "Whose day",
+        body: (
+          <>
+            <Term name="Therapist">Starts on your own appointments if you have a provider schedule. Choose another therapist, or All therapists, from the dropdown.</Term>
+            <Note>Depending on your access level you may only see your own day.</Note>
+          </>
+        ),
+      },
+      {
+        id: "status",
+        title: "Status buttons",
+        body: (
+          <Term name="All / To check in / Checked in / In progress / Completed / Cancelled & no-show">
+            Show only appointments at that stage. The number on each button is how many there are today.
+          </Term>
+        ),
+      },
+      {
+        id: "steps",
+        title: "Moving a visit along",
+        body: (
+          <>
+            <Term name="Check in">When the patient arrives (from Scheduled or Confirmed).</Term>
+            <Term name="Start visit">When treatment begins (from Checked in).</Term>
+            <Term name="Complete without note">In the ☰ menu, for a visit that is finished but documented elsewhere.</Term>
+          </>
+        ),
+      },
+      {
+        id: "document",
+        title: "Documenting a visit",
+        body: (
+          <>
+            <Term name="Document / Continue note">
+              Opens the visit in Clinical Charting (the full note screen). The first time, the visit’s draft note is created for you.
+            </Term>
+            <Term name="Note column">Not started, Draft, Signed, or Awaiting cosign (a PTA note waiting for a PT’s cosignature; the visit completes once it is cosigned).</Term>
+            <Term name="Patient documentation">In the ☰ menu: everything documented for that patient, across all visits.</Term>
+          </>
+        ),
+      },
+      listsSection,
+    ],
+  },
+
+  charting: {
+    title: "Clinical Charting",
+    intro: (
+      <>
+        <p>The note for one visit: record what the patient reports, your examination findings and measurements, outcome scores, the treatment you gave and how the patient responded, progress on goals, then your assessment and plan — and sign.</p>
+        <Note>Everything saves automatically as you work (“Saving… / Draft · saved 2:41 PM”). Signed notes open read-only.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "subjective",
+        title: "Subjective",
+        body: (
+          <>
+            <Term name="Pain now / best / worst">Tap 0–10. Use Clear to remove a rating.</Term>
+            <Term name="Home exercise program">Whether the patient is doing their exercises.</Term>
+            <Term name="Patient report">Free text: symptoms since the last visit, function, goals.</Term>
+          </>
+        ),
+      },
+      {
+        id: "exam",
+        title: "Examination",
+        body: (
+          <>
+            <Term name="Range of motion">Choose a region and side, then “+ Add … motions” to add the usual motions for it; enter AROM and PROM in degrees. The normal range and last visit’s value are shown beside each.</Term>
+            <Term name="Re-measure last visit’s ROM & strength">Adds the same motions and muscles as last visit with empty values, ready to measure again.</Term>
+            <Term name="Strength (MMT)">Add a muscle or movement, choose the side and the 0–5 grade.</Term>
+            <Term name="Special tests and vitals">Record each test as Positive or Negative; blood pressure, heart rate, SpO₂.</Term>
+            <Term name="Objective findings">Free text. Required before signing.</Term>
+          </>
+        ),
+      },
+      {
+        id: "outcomes",
+        title: "Outcome measures",
+        body: <Term name="Record score">Choose the measure (LEFS, ODI, NDI, QuickDASH, TUG, Berg, PSFS) and enter today’s score. The table shows the change since the previous score and whether that is an improvement for that measure.</Term>,
+      },
+      {
+        id: "interventions",
+        title: "Interventions",
+        body: (
+          <>
+            <Term name="+ Add intervention">Category, what was done, body region, minutes, whether it is a timed service, and the patient’s response. Use the ☰ menu on a row to edit or remove it.</Term>
+            <Term name="Minutes and units">The blue line totals the timed minutes and shows the billable units under your organization’s 8-minute rule.</Term>
+          </>
+        ),
+      },
+      {
+        id: "progress",
+        title: "Goals & progress",
+        body: <Term name="Update progress">Enter today’s value for a goal; the progress bar shows how far the patient is from baseline to target.</Term>,
+      },
+      {
+        id: "sign",
+        title: "Signing",
+        body: (
+          <>
+            <Term name="Before signing">Lists anything still required (for example Objective, Plan, or the plan of care on evaluations).</Term>
+            <Term name="Sign note">Tick the attestation and re-enter your password. Signing locks the note and completes the visit.</Term>
+            <Note>Only therapists, assistants and administrators can sign. A PTA’s note waits for a PT’s cosignature.</Note>
+          </>
+        ),
+      },
+    ],
+  },
+
+  "patient-documentation": {
+    title: "Patient Documentation",
+    intro: <p>Everything documented for one patient: visit notes with their charting, pain and range-of-motion trends, outcome measures, goals, diagnoses and precautions.</p>,
+    sections: [
+      {
+        id: "glance",
+        title: "At a glance",
+        body: <Term name="Progress note">“Due now” when a progress note is due (by number of visits or days since the last one).</Term>,
+      },
+      {
+        id: "trends",
+        title: "Trends",
+        body: <Term name="Pain & range-of-motion trend">Pain and each measured motion across the last six signed visits, oldest to newest.</Term>,
+      },
+      {
+        id: "notes",
+        title: "Visit notes",
+        body: (
+          <>
+            <Term name="▸ Date — note type">Click to expand the full note: pain, measurements, interventions with patient response, and the narrative.</Term>
+            <Term name="Open note / Continue charting">Opens the note in Clinical Charting.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
+  billing: {
+    title: "Billing",
+    intro: <p>Billing is not available in this version yet.</p>,
+    sections: [],
+  },
+
+  admin: {
+    title: "Administration",
+    intro: (
+      <>
+        <p>Settings and records for your organization.</p>
+        <Note>You only see the buttons your access level allows.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "buttons",
+        title: "Buttons",
+        body: (
+          <>
+            <Term name="Change Password">Change your own password.</Term>
+            <Term name="Messages">Secure messages with patients.</Term>
+            <Term name="Users">Add staff, and edit their details, access level, status and password.</Term>
+            <Term name="Locations">Add and edit clinic locations.</Term>
+            <Term name="Patient List">Add, edit, delete and restore patients.</Term>
+            <Term name="Logs">Everything that happened: changes, sign-ins and screens opened, by every user.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
+  logs: {
+    title: "Logs",
+    intro: (
+      <>
+        <p>The activity log for your organization: every change to a record, every sign-in and sign-out (including failed attempts), and every screen each user opened — newest first.</p>
+        <Note>Entries can’t be edited or deleted. Changed fields are listed by name; their values are not stored in the log.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "filters",
+        title: "Filters",
+        body: (
+          <>
+            <Term name="Today / Yesterday / Last 7 Days / Last 30 Days">Quick date ranges. Use From / To for others (up to 93 days at a time).</Term>
+            <Term name="User">Only one person’s activity.</Term>
+            <Term name="Category">Sign-in / sign-out, screens opened, patients, schedule, clinical notes, messages, billing, administration.</Term>
+            <Term name="Search">Matches the activity, user, patient name, MRN or IP address.</Term>
+          </>
+        ),
+      },
+      {
+        id: "entries",
+        title: "Reading an entry",
+        body: (
+          <>
+            <Term name="Activity">What was done, for example “Checked a patient in” or “Updated patient: phone, address”.</Term>
+            <Term name="System">Shown as the user for changes the system made by itself.</Term>
+            <Term name="Show details">Click the activity (or use the ☰ menu) for the full entry, including the record’s ID and the technical details.</Term>
+          </>
+        ),
+      },
+      {
+        id: "export",
+        title: "Export",
+        body: (
+          <>
+            <Term name="Export CSV">Downloads the entries matching your filters (up to 5,000) as a spreadsheet file.</Term>
+            <Note>The export can contain patient names — store and share it as you would any patient information.</Note>
+          </>
+        ),
+      },
+      listsSection,
+    ],
+  },
+
+  users: {
+    title: "Users",
+    intro: <p>Staff accounts for your organization.</p>,
+    sections: [
+      {
+        id: "filters",
+        title: "Filters",
+        body: (
+          <>
+            <Term name="All Users / Active Users / Invited / Suspended Users / Deleted Users">Filter by account status.</Term>
+            <Term name="Search User">Matches name, user ID or e-mail.</Term>
+          </>
+        ),
+      },
+      {
+        id: "add",
+        title: "Adding a user",
+        body: (
+          <>
+            <Term name="+ New user">Enter name, e-mail and role. The account is created without a password.</Term>
+            <Term name="Activation link">Copy the one-time link shown and send it to the new user; they set their own password with it. Until then they are listed as Invited.</Term>
+            <Note>E-mail sending is not connected yet, so the link has to be sent by you.</Note>
+          </>
+        ),
+      },
+      {
+        id: "edit",
+        title: "Edit User",
+        body: (
+          <>
+            <Term name="Open">Click the user’s name, or choose Edit User from the ☰ menu.</Term>
+            <Term name="User ID">What they type to sign in. Must be unique.</Term>
+            <Term name="New Password">Leave blank to keep their password. Setting one signs them out everywhere; give them the new password yourself.</Term>
+            <Term name="Status">Active can sign in. Suspended and Deleted cannot, and are signed out immediately.</Term>
+            <Term name="Access Level">What they are allowed to do.</Term>
+            <Note>You can’t change your own status or access level.</Note>
+          </>
+        ),
+      },
+      listsSection,
+    ],
+  },
+
+  locations: {
+    title: "Locations",
+    intro: <p>Your organization’s clinic locations. They appear in the schedule, patient records and provider hours.</p>,
+    sections: [
+      {
+        id: "add-edit",
+        title: "Adding and editing",
+        body: (
+          <>
+            <Term name="+ Add location">Opens the Add Location window. Location Name is required (marked in red until filled); time zone, phone, address, NPI and Tax ID can be filled in now or later.</Term>
+            <Term name="Edit">Click the location’s name, or choose Edit from the ☰ menu, to open the Edit Location window. Save and Close becomes available once you change something.</Term>
+            <Note>The time zone is what the schedule uses for that clinic.</Note>
+          </>
+        ),
+      },
+      {
+        id: "deactivate",
+        title: "Deactivate and reactivate",
+        body: (
+          <>
+            <Term name="Deactivate">From the ☰ menu. The location is no longer offered for booking; nothing is deleted.</Term>
+            <Term name="All (incl. inactive)">Shows deactivated locations, so you can reactivate one.</Term>
+          </>
+        ),
+      },
+      listsSection,
+    ],
+  },
+
+  messages: {
+    title: "Messages",
+    intro: <p>Secure messages with patients, one conversation per patient.</p>,
+    sections: [
+      {
+        id: "inbox",
+        title: "Conversations",
+        body: (
+          <>
+            <Term name="Left side">Each patient with messages, newest first. A number shows unread messages.</Term>
+            <Term name="Open a conversation">Click a patient. Their messages are marked as read.</Term>
+          </>
+        ),
+      },
+      {
+        id: "send",
+        title: "Sending",
+        body: (
+          <>
+            <Term name="Reply">Type in the box and press Send (or Ctrl+Enter).</Term>
+            <Term name="+ New message">Search for a patient to start a conversation.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
+  "change-password": {
+    title: "Change Password",
+    intro: <p>Change the password you sign in with.</p>,
+    sections: [
+      {
+        id: "rules",
+        title: "Password rules",
+        body: (
+          <>
+            <Term name="New password">At least 10 characters, with an uppercase letter, a lowercase letter, a number and a symbol. The form shows what is still missing as you type.</Term>
+            <Term name="Eye button">Shows or hides what you typed.</Term>
+            <Note>You stay signed in on this device after changing it.</Note>
+          </>
+        ),
+      },
+    ],
+  },
+};
+
+/** Which help applies to a page address. */
+export function helpKeyFor(pathname: string): string {
+  if (pathname === "/") return "home";
+  if (pathname.startsWith("/schedule/hours")) return "provider-hours";
+  if (pathname.startsWith("/schedule")) return "schedule";
+  if (pathname.startsWith("/chart/")) return "charting";
+  if (/^\/patients\/[^/]+\/documentation/.test(pathname)) return "patient-documentation";
+  if (pathname.startsWith("/patients")) return "patients";
+  if (pathname.startsWith("/providers")) return "providers";
+  if (pathname.startsWith("/billing")) return "billing";
+  if (pathname.startsWith("/workflow")) return "workflow";
+  if (pathname.startsWith("/admin/patients")) return "admin-patients";
+  if (pathname.startsWith("/admin/users")) return "users";
+  if (pathname.startsWith("/admin/logs")) return "logs";
+  if (pathname.startsWith("/admin/locations")) return "locations";
+  if (pathname.startsWith("/admin/messages")) return "messages";
+  if (pathname.startsWith("/admin/change-password")) return "change-password";
+  if (pathname.startsWith("/admin")) return "admin";
+  return "home";
+}

@@ -29,14 +29,14 @@
   border-top-color: color-mix(in srgb, var(--color-border) 55%, transparent);
 }
 
-/* ~44px per half hour, so a 30-minute visit has room for two readable lines. */
+/* ~64px per half hour, so a 30-minute visit has room for two readable 18px lines. */
 .schedule-calendar .rbc-timeslot-group {
-  min-height: 88px;
+  min-height: 128px;
 }
 
 .schedule-calendar .rbc-header {
   padding: 6px 8px;
-  font-size: 0.75rem;
+  font-size: 1.125rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -54,7 +54,7 @@
 
 .schedule-calendar .rbc-label,
 .schedule-calendar .rbc-time-gutter {
-  font-size: 0.75rem;
+  font-size: 1.125rem;
   color: var(--color-text-subtle);
 }
 
@@ -73,12 +73,12 @@
 
 .schedule-calendar .rbc-date-cell {
   padding: 4px 6px;
-  font-size: 0.8rem;
+  font-size: 1.125rem;
 }
 
 .schedule-calendar .rbc-show-more {
   color: var(--color-primary-deep);
-  font-size: 0.75rem;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 
@@ -99,7 +99,7 @@
   border: 1px dashed var(--color-text-subtle);
   color: var(--color-text-muted);
   opacity: 1;
-  font-size: 0.7rem;
+  font-size: 1.125rem;
   font-weight: 600;
   padding: 2px 6px;
 }
@@ -148,7 +148,7 @@
   margin-left: 4px;
   border-radius: 4px;
   padding: 0 4px;
-  font-size: 10px;
+  font-size: 1.125rem;
   font-weight: 600;
   background: rgb(255 255 255 / 0.7);
   color: var(--color-primary-deep);

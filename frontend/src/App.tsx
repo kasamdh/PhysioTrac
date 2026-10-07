@@ -19,6 +19,10 @@ import { PatientListPage } from "./features/admin/pages/PatientListPage";
 import { ChangePasswordPage } from "./features/admin/pages/ChangePasswordPage";
 import { ActivateAccountPage } from "./features/admin/pages/ActivateAccountPage";
 import { ProvidersPage } from "./features/providers/ProvidersPage";
+import { WorkflowPage } from "./features/workflow/WorkflowPage";
+import { LogsPage } from "./features/logs/LogsPage";
+import { ChartingPage } from "./features/charting/ChartingPage";
+import { PatientDocumentationPage } from "./features/documentation/PatientDocumentationPage";
 
 export default function App() {
   return (
@@ -34,17 +38,21 @@ export default function App() {
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<DashboardPage />} />
-                    <Route path="/patients" element={<PatientListPage title="Patients" back={null} allowAdd />} />
+                    <Route path="/patients" element={<PatientListPage title="Patients" back={null} />} />
                     <Route path="/schedule" element={<SchedulePage />} />
                     <Route path="/schedule/hours" element={<ProviderHoursPage />} />
                     <Route path="/providers" element={<ProvidersPage />} />
+                    <Route path="/workflow" element={<WorkflowPage />} />
+                    <Route path="/chart/:noteId" element={<ChartingPage />} />
+                    <Route path="/patients/:patientId/documentation" element={<PatientDocumentationPage />} />
                     <Route path="/billing" element={<PlaceholderPage title="Billing" />} />
                     <Route path="/admin" element={<AdminHomePage />} />
                     <Route path="/admin/change-password" element={<ChangePasswordPage />} />
                     <Route path="/admin/messages" element={<MessagesPage />} />
                     <Route path="/admin/users" element={<UsersAdminPage />} />
                     <Route path="/admin/locations" element={<LocationsAdminPage />} />
-                    <Route path="/admin/patients" element={<PatientListPage />} />
+                    <Route path="/admin/patients" element={<PatientListPage manage />} />
+                    <Route path="/admin/logs" element={<LogsPage />} />
                   </Route>
                 </Route>
               </Routes>

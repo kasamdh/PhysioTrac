@@ -164,7 +164,7 @@ function Conversation({
                 }`}
               >
                 <p className="whitespace-pre-wrap">{m.body}</p>
-                <p className={`mt-1 text-[11px] ${mine ? "text-white/75" : "text-text-subtle"}`}>
+                <p className={`mt-1 text-sm ${mine ? "text-white/75" : "text-text-subtle"}`}>
                   {m.isFromPatient ? "Patient" : mine ? "You" : UserRoleLabels[m.senderRole]} · {formatWhen(m.sentAt)}
                 </p>
               </div>

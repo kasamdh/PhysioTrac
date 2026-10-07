@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Application.Audit;
 using PhysioTrac.Application.Auth;
+using PhysioTrac.Application.Billing;
 using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
@@ -19,17 +20,23 @@ public class ClinicalNoteService : IClinicalNoteService
 {
     /// <summary>Admin/Director may view, edit, sign, and co-sign any note --
     /// and, while role-based access control is off, so may every staff role.</summary>
-    private static readonly IReadOnlySet<UserRole> FinalizingRoles = new RoleSet([UserRole.Admin, UserRole.Director]);
+    /// <summary>Who may finalize, lock or edit anyone's note. A plain set on
+    /// purpose, NOT a <see cref="RoleSet"/>: an electronic clinical
+    /// signature is a legal act, so these checks hold even while role-based
+    /// access control is switched off for development (AccessControl).</summary>
+    private static readonly IReadOnlySet<UserRole> FinalizingRoles = new HashSet<UserRole> { UserRole.Admin, UserRole.Director };
 
     private readonly PhysioTracDbContext _db;
     private readonly ITenantAccessService _tenantAccess;
     private readonly IAuditService _audit;
+    private readonly ISignatureVerifier _signatureVerifier;
 
-    public ClinicalNoteService(PhysioTracDbContext db, ITenantAccessService tenantAccess, IAuditService audit)
+    public ClinicalNoteService(PhysioTracDbContext db, ITenantAccessService tenantAccess, IAuditService audit, ISignatureVerifier signatureVerifier)
     {
         _db = db;
         _tenantAccess = tenantAccess;
         _audit = audit;
+        _signatureVerifier = signatureVerifier;
     }
 
     public bool CanViewNote(ICurrentUser user, ClinicalNote note) =>
@@ -90,6 +97,8 @@ public class ClinicalNoteService : IClinicalNoteService
             Interventions = request.Interventions,
             Assessment = request.Assessment,
             Plan = request.Plan,
+            SubjectiveDetailsJson = ChartJson.Normalize(request.SubjectiveDetailsJson, nameof(request.SubjectiveDetailsJson)) ?? "{}",
+            ObjectiveMeasurementsJson = ChartJson.Normalize(request.ObjectiveMeasurementsJson, nameof(request.ObjectiveMeasurementsJson)) ?? "{}",
             PlanOfCareStart = request.PlanOfCareStart,
             PlanOfCareEnd = request.PlanOfCareEnd,
             FrequencyPerWeek = request.FrequencyPerWeek,
@@ -125,6 +134,10 @@ public class ClinicalNoteService : IClinicalNoteService
         if (request.Interventions is not null) note.Interventions = request.Interventions;
         if (request.Assessment is not null) note.Assessment = request.Assessment;
         if (request.Plan is not null) note.Plan = request.Plan;
+        if (ChartJson.Normalize(request.SubjectiveDetailsJson, nameof(request.SubjectiveDetailsJson)) is string subjectiveJson)
+            note.SubjectiveDetailsJson = subjectiveJson;
+        if (ChartJson.Normalize(request.ObjectiveMeasurementsJson, nameof(request.ObjectiveMeasurementsJson)) is string objectiveJson)
+            note.ObjectiveMeasurementsJson = objectiveJson;
         if (request.PlanOfCareStart is not null) note.PlanOfCareStart = request.PlanOfCareStart;
         if (request.PlanOfCareEnd is not null) note.PlanOfCareEnd = request.PlanOfCareEnd;
         if (request.FrequencyPerWeek is not null) note.FrequencyPerWeek = request.FrequencyPerWeek;
@@ -158,7 +171,7 @@ public class ClinicalNoteService : IClinicalNoteService
             .ToListAsync(ct);
     }
 
-    public async Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, CancellationToken ct = default)
+    public async Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, string? password = null, CancellationToken ct = default)
     {
         var note = await LoadNoteInOrgAsync(noteId, actor, ct);
         if (!CanFinalizeNote(actor, note))
@@ -169,6 +182,7 @@ public class ClinicalNoteService : IClinicalNoteService
         {
             throw new InvalidOperationException("Confirm therapist review and attestation before finalizing this note.");
         }
+        await VerifySignerAsync(note, actor, password, "sign", ct);
 
         var blockers = NoteComplianceEvaluator.Evaluate(note).Where(f => f.FinalizationBlocker).ToList();
         if (blockers.Count > 0)
@@ -332,7 +346,7 @@ public class ClinicalNoteService : IClinicalNoteService
         return serviceDate.AddDays(days);
     }
 
-    public async Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)
+    public async Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, string? password = null, CancellationToken ct = default)
     {
         var note = await LoadNoteInOrgAsync(noteId, actor, ct);
         if (!CanCosignNote(actor, note))
@@ -343,6 +357,7 @@ public class ClinicalNoteService : IClinicalNoteService
         {
             throw new InvalidOperationException("Only a note awaiting cosign can be cosigned.");
         }
+        await VerifySignerAsync(note, actor, password, "cosign", ct);
 
         note.CosignedById = actor.UserId;
         note.CosignedAt = DateTimeOffset.UtcNow;
@@ -393,20 +408,86 @@ public class ClinicalNoteService : IClinicalNoteService
             throw new InvalidOperationException("Interventions cannot be changed once the note is signed.");
         }
 
+        ValidateIntervention(request);
         var intervention = new NoteIntervention
         {
             NoteId = note.Id,
-            Description = request.Description,
+            Description = request.Description.Trim(),
             BodyRegion = request.BodyRegion,
             Category = request.Category,
             Minutes = request.Minutes,
             Units = request.Units,
             IsTimed = request.IsTimed,
             Order = request.Order,
+            PatientResponse = request.PatientResponse,
         };
         _db.NoteInterventions.Add(intervention);
         await _db.SaveChangesAsync(ct);
         return intervention;
+    }
+
+    public async Task<NoteIntervention> UpdateInterventionAsync(Guid noteId, Guid interventionId, CreateInterventionRequest request, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var (note, intervention) = await LoadEditableInterventionAsync(noteId, interventionId, actor, ct);
+        ValidateIntervention(request);
+        intervention.Description = request.Description.Trim();
+        intervention.BodyRegion = request.BodyRegion;
+        intervention.Category = request.Category;
+        intervention.Minutes = request.Minutes;
+        intervention.Units = request.Units;
+        intervention.IsTimed = request.IsTimed;
+        intervention.Order = request.Order;
+        intervention.PatientResponse = request.PatientResponse;
+        intervention.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return intervention;
+    }
+
+    public async Task DeleteInterventionAsync(Guid noteId, Guid interventionId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var (_, intervention) = await LoadEditableInterventionAsync(noteId, interventionId, actor, ct);
+        _db.NoteInterventions.Remove(intervention);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<InterventionSummaryDto> SummarizeInterventionsAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var items = await ListInterventionsAsync(noteId, actor, ct);
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        var timed = items.Where(i => i.IsTimed).Sum(i => i.Minutes);
+        return new InterventionSummaryDto(
+            timed, items.Count(i => !i.IsTimed),
+            EightMinuteRuleCalculator.ComputeUnits(timed, organization.EightMinuteRuleVariant),
+            organization.EightMinuteRuleVariant.ToString());
+    }
+
+    private async Task<(ClinicalNote Note, NoteIntervention Intervention)> LoadEditableInterventionAsync(
+        Guid noteId, Guid interventionId, ICurrentUser actor, CancellationToken ct)
+    {
+        var note = await LoadNoteInOrgAsync(noteId, actor, ct);
+        if (!CanEditNote(actor, note))
+        {
+            throw new ForbiddenException("You are not permitted to edit this note.");
+        }
+        if (note.IsSigned || note.Status == NoteStatus.ReviewRequired)
+        {
+            throw new InvalidOperationException("Interventions cannot be changed once the note is signed.");
+        }
+        var intervention = await _db.NoteInterventions.FirstOrDefaultAsync(i => i.Id == interventionId && i.NoteId == note.Id, ct)
+            ?? throw new NotFoundException("Intervention was not found.");
+        return (note, intervention);
+    }
+
+    private static void ValidateIntervention(CreateInterventionRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Description))
+            throw new InvalidOperationException("Describe the intervention.");
+        if (request.Description.Length > 300 || (request.PatientResponse?.Length ?? 0) > 1000)
+            throw new InvalidOperationException("The intervention text is too long.");
+        if (request.Minutes is < 0 or > 480)
+            throw new InvalidOperationException("Minutes must be between 0 and 480.");
+        if (request.Units is < 0 or > 32)
+            throw new InvalidOperationException("Units must be between 0 and 32.");
     }
 
     public async Task<IReadOnlyList<NoteIntervention>> ListInterventionsAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)
@@ -499,12 +580,30 @@ public class ClinicalNoteService : IClinicalNoteService
     /// overrides a cancellation or no-show, since those reflect what
     /// actually happened. Omits the original's `Authorization.visits_used`
     /// increment — that entity isn't ported yet.</summary>
+    /// <summary>Password step-up before a signature; a failed attempt is
+    /// audited (never the password itself) and rethrown.</summary>
+    private async Task VerifySignerAsync(ClinicalNote note, ICurrentUser actor, string? password, string purpose, CancellationToken ct)
+    {
+        try
+        {
+            await _signatureVerifier.VerifyAsync(actor.UserId, password, ct);
+        }
+        catch (SignatureVerificationException)
+        {
+            var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+            await _audit.RecordAuditEventAsync(actor.UserId, "note.signature_reauth_failed", nameof(ClinicalNote), note.Id,
+                organization.Id, patientId: note.PatientId, metadata: new { purpose }, ct: ct);
+            throw;
+        }
+    }
+
     private async Task CompleteLinkedAppointmentAsync(ClinicalNote note, CancellationToken ct)
     {
         if (note.AppointmentId is not Guid appointmentId) return;
         var appointment = await _db.Appointments.FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
         if (appointment is null) return;
-        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.CheckedIn or AppointmentStatus.InProgress)) return;
+        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.Confirmed
+            or AppointmentStatus.CheckedIn or AppointmentStatus.InProgress)) return;
 
         appointment.Status = AppointmentStatus.Completed;
         appointment.UpdatedAt = DateTimeOffset.UtcNow;

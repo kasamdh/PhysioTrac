@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IProviderAvailabilityService, ProviderAvailabilityService>();
         services.AddScoped<IReminderService, NoOpReminderService>();
         services.AddScoped<IClinicalNoteService, ClinicalNoteService>();
+        services.AddScoped<ISignatureVerifier, PasswordSignatureVerifier>();
         services.AddScoped<IClinicalTemplateService, ClinicalTemplateService>();
         services.AddScoped<IFunctionalGoalService, FunctionalGoalService>();
         services.AddScoped<IOutcomeScoreService, OutcomeScoreService>();

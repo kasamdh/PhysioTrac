@@ -68,13 +68,13 @@ export function ProviderDailySummary({ title, columns, appointments, timezone, o
               {(current || next) && (
                 <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs">
                   {current && (
-                    <button type="button" className="block w-full truncate text-left hover:text-primary" onClick={() => onSelectAppointment(current)}>
+                    <button type="button" className="touch-line block w-full truncate text-left hover:text-primary" onClick={() => onSelectAppointment(current)}>
                       <span className="text-text-muted">Now: </span>
                       {current.patientName}
                     </button>
                   )}
                   {next && (
-                    <button type="button" className="block w-full truncate text-left hover:text-primary" onClick={() => onSelectAppointment(next)}>
+                    <button type="button" className="touch-line block w-full truncate text-left hover:text-primary" onClick={() => onSelectAppointment(next)}>
                       <span className="text-text-muted">Next: </span>
                       {next.patientName} at {formatTime(toWallClock(next.startsAt, timezone))}
                     </button>

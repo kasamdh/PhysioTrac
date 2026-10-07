@@ -263,6 +263,54 @@ public class PatientSearchAndLifecycleTests
     }
 
     [Fact]
+    public async Task Update_CorrectsDateOfBirth_AndRejectsBlankNames()
+    {
+        var (db, _, admin, alpha, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+        UpdatePatientRequest Req(string first, DateOnly? dob) =>
+            new(first, "Anderson", null, null, null, null, null, null, null, null, null, PatientStatus.Active, dob);
+
+        Assert.IsType<OkObjectResult>(await controller.Update(alpha.Id, Req(" Alpha ", new DateOnly(1980, 2, 2))));
+        var saved = await db.Patients.SingleAsync(p => p.Id == alpha.Id);
+        Assert.Equal(new DateOnly(1980, 2, 2), saved.DateOfBirth);
+        Assert.Equal("Alpha", saved.FirstName);
+
+        Assert.IsType<OkObjectResult>(await controller.Update(alpha.Id, Req("Alpha", null))); // null keeps the date
+        Assert.Equal(new DateOnly(1980, 2, 2), (await db.Patients.SingleAsync(p => p.Id == alpha.Id)).DateOfBirth);
+
+        Assert.IsType<UnprocessableEntityObjectResult>(await controller.Update(alpha.Id, Req("  ", null)));
+    }
+
+    [Fact]
+    public async Task Directory_Deleted_ListsOnlySoftDeletedCharts_AndRestoreBringsThemBack()
+    {
+        var (db, _, admin, alpha, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+        Assert.IsType<NoContentResult>(await controller.Delete(alpha.Id));
+
+        var active = Assert.IsType<PagedPatientDirectoryDto>(Assert.IsType<OkObjectResult>(await controller.Directory()).Value);
+        Assert.DoesNotContain(active.Items, i => i.Id == alpha.Id);
+
+        var deleted = Assert.IsType<PagedPatientDirectoryDto>(Assert.IsType<OkObjectResult>(await controller.Directory(deleted: true)).Value);
+        Assert.Equal(alpha.Id, Assert.Single(deleted.Items).Id);
+
+        Assert.IsType<OkObjectResult>(await controller.Restore(alpha.Id));
+        var afterRestore = Assert.IsType<PagedPatientDirectoryDto>(Assert.IsType<OkObjectResult>(await controller.Directory(deleted: true)).Value);
+        Assert.Empty(afterRestore.Items);
+    }
+
+    [Fact]
+    public async Task Directory_Deleted_IsLimitedToRolesThatCanDeleteAndRestore()
+    {
+        var (db, org, _, _, _) = await SeedAsync();
+        var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
+
+        var result = await NewController(db, biller).Directory(deleted: true);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+    }
+
+    [Fact]
     public async Task Create_RejectsFutureDateOfBirth()
     {
         var (db, _, admin, _, _) = await SeedAsync();

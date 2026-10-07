@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { RowMenu } from "../../../components/RowMenu";
 import { SegmentedButtons } from "../../../components/SegmentedButtons";
 import { useAuth } from "../../auth/AuthProvider";
 import { RoleSets, canAccess } from "../../auth/permissions";
-import { NewPatientForm } from "../../patients/NewPatientForm";
+import { EditPatientDialog } from "../../patients/EditPatientDialog";
+import { AddPatientDialog } from "../../patients/AddPatientDialog";
+import { useToast } from "../../../components/Toast";
 import { PatientStatus } from "../../patients/types";
 import { AdminPageHeader } from "../AdminPageHeader";
-import { fetchLocations, fetchPatientDirectory } from "../api";
+import { deletePatient, fetchLocations, fetchPatientDirectory, restorePatient } from "../api";
 import type { PatientDirectoryFilters } from "../types";
 
 const STATUS_LABELS: Record<PatientStatus, string> = {
@@ -44,23 +46,27 @@ function formatDateTime(iso: string | null): string {
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 }
 
-/** Filterable patient list, used both as the Patients module page (with
- * "Add patient") and as Administration › Patient List. Filters live in the
- * URL so a filtered list can be bookmarked or shared. */
+/** Filterable patient list. The Patients module page is list-only;
+ * Administration › Patient List passes `manage` to add, edit, (soft) delete
+ * and restore charts. Filters live in the URL so a filtered list can be
+ * bookmarked or shared. */
 export function PatientListPage({
   title = "Patient List",
   back,
-  allowAdd = false,
+  manage = false,
 }: {
   title?: string;
   back?: { to: string; label: string } | null;
-  allowAdd?: boolean;
+  manage?: boolean;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  // Creating a chart is a Scheduling-role action server-side (PatientsController.Create).
-  const canAdd = allowAdd && canAccess(user, RoleSets.Scheduling);
+  const { showToast } = useToast();
+  // Creating, editing and deleting a chart are Scheduling-role actions
+  // server-side (PatientsController.Create/Update/Delete/Restore).
+  const canManage = manage && canAccess(user, RoleSets.Scheduling);
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [added, setAdded] = useState<{ name: string; mrn: string } | null>(null);
   const [params, setParams] = useSearchParams();
   const filters: PatientDirectoryFilters = {
@@ -69,6 +75,7 @@ export function PatientListPage({
     locationId: params.get("location") ?? undefined,
     appointmentFrom: params.get("from") ?? undefined,
     appointmentTo: params.get("to") ?? undefined,
+    deleted: canManage && params.get("deleted") === "1" ? true : undefined,
     page: Number(params.get("page") ?? 1),
     pageSize: PAGE_SIZE,
   };
@@ -96,6 +103,24 @@ export function PatientListPage({
     return () => window.clearTimeout(timer);
   }, [searchText]);
 
+  const refreshList = () => void queryClient.invalidateQueries({ queryKey: ["admin", "patient-directory"] });
+  const remove = useMutation({
+    mutationFn: (p: { id: string; name: string }) => deletePatient(p.id),
+    onSuccess: (_d, p) => {
+      showToast(`${p.name} deleted. Find them under "Deleted" to restore.`);
+      refreshList();
+    },
+    onError: (e: Error) => showToast(e.message),
+  });
+  const restore = useMutation({
+    mutationFn: (p: { id: string; name: string }) => restorePatient(p.id),
+    onSuccess: (_d, p) => {
+      showToast(`${p.name} restored.`);
+      refreshList();
+    },
+    onError: (e: Error) => showToast(e.message),
+  });
+
   const locations = useQuery({ queryKey: ["admin", "locations", true], queryFn: () => fetchLocations(true) });
   const directory = useQuery({
     queryKey: ["admin", "patient-directory", filters],
@@ -120,7 +145,7 @@ export function PatientListPage({
         title={title}
         back={back}
         actions={
-          canAdd && (
+          canManage && (
             <button
               type="button"
               className="btn-primary"
@@ -146,8 +171,21 @@ export function PatientListPage({
         </div>
       )}
 
+      {editingId && (
+        <EditPatientDialog
+          patientId={editingId}
+          onClose={() => setEditingId(null)}
+          onSaved={(saved) => {
+            setEditingId(null);
+            showToast(`${saved.fullName} saved.`);
+            refreshList();
+            void queryClient.invalidateQueries({ queryKey: ["admin", "patient", saved.id] });
+          }}
+        />
+      )}
+
       {adding && (
-        <NewPatientForm
+        <AddPatientDialog
           onCancel={() => setAdding(false)}
           onCreated={(p) => {
             setAdding(false);
@@ -187,11 +225,25 @@ export function PatientListPage({
         />
         <SegmentedButtons
           label="Patient status"
-          value={filters.status === undefined ? "all" : String(filters.status)}
-          onChange={(v) => setParam("status", v === "all" ? undefined : v)}
+          value={filters.deleted ? "deleted" : filters.status === undefined ? "all" : String(filters.status)}
+          onChange={(v) =>
+            setParams(
+              (prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("page");
+                next.delete("status");
+                next.delete("deleted");
+                if (v === "deleted") next.set("deleted", "1");
+                else if (v !== "all") next.set("status", v);
+                return next;
+              },
+              { replace: true },
+            )
+          }
           options={[
             { value: "all", label: "All" },
             ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+            ...(canManage ? [{ value: "deleted", label: "Deleted" }] : []),
           ]}
         />
         <label className="toolbar-label">
@@ -289,13 +341,35 @@ export function PatientListPage({
                   <td className="cell-menu">
                     <RowMenu
                       label={`Actions for ${p.fullName}`}
-                      items={[
-                        {
-                          label: "View appointments",
-                          to: `/schedule?view=list&listRange=month&location=all&patient=${encodeURIComponent(p.medicalRecordNumber)}`,
-                        },
-                        { label: "Send message", to: `/admin/messages?patient=${p.id}` },
-                      ]}
+                      items={
+                        filters.deleted
+                          ? [{ label: "Restore patient", onSelect: () => restore.mutate({ id: p.id, name: p.fullName }) }]
+                          : [
+                              ...(canManage ? [{ label: "Edit patient", onSelect: () => setEditingId(p.id) }] : []),
+                              {
+                                label: "View appointments",
+                                to: `/schedule?view=list&listRange=month&location=all&patient=${encodeURIComponent(p.medicalRecordNumber)}`,
+                              },
+                              { label: "Patient documentation", to: `/patients/${p.id}/documentation` },
+                              { label: "Send message", to: `/admin/messages?patient=${p.id}` },
+                              ...(canManage
+                                ? [
+                                    {
+                                      label: "Delete patient",
+                                      danger: true,
+                                      onSelect: () => {
+                                        if (
+                                          window.confirm(
+                                            `Delete ${p.fullName} (${p.medicalRecordNumber})? The chart is hidden from lists but kept, and can be restored from "Deleted".`,
+                                          )
+                                        )
+                                          remove.mutate({ id: p.id, name: p.fullName });
+                                      },
+                                    },
+                                  ]
+                                : []),
+                            ]
+                      }
                     />
                   </td>
                   <td data-label="MRN">
@@ -306,7 +380,15 @@ export function PatientListPage({
                       {p.medicalRecordNumber}
                     </Link>
                   </td>
-                  <td data-label="Name">{p.fullName}</td>
+                  <td data-label="Name">
+                    {canManage && !filters.deleted ? (
+                      <button type="button" className="table-link text-left" onClick={() => setEditingId(p.id)}>
+                        {p.fullName}
+                      </button>
+                    ) : (
+                      p.fullName
+                    )}
+                  </td>
                   <td data-label="Date of birth">
                     {formatDate(p.dateOfBirth)} <span className="text-text-muted">({p.age})</span>
                   </td>

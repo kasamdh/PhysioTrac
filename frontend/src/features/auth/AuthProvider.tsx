@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../lib/apiClient";
 import { fetchCurrentUser, login, logout, type LoginRequest } from "./api";
 import type { CurrentUser } from "./types";
+import { recordLogout, type LogoutReason } from "./lastLogout";
 
 export const ME_QUERY_KEY = ["auth", "me"] as const;
 
@@ -12,7 +13,8 @@ interface AuthContextValue {
   loginError: string | null;
   isLoggingIn: boolean;
   signIn: (request: LoginRequest) => Promise<void>;
-  signOut: () => Promise<void>;
+  /** `reason` picks the login page notice: "user" (default) or "idle". */
+  signOut: (reason?: LogoutReason) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -40,8 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
+    mutationFn: (_reason: LogoutReason) => logout(),
+    onSuccess: (_data, reason) => {
+      // Recorded before the user is cleared: clearing it redirects to /login
+      // straight away, and the login page reads this when it opens.
+      recordLogout(reason);
       queryClient.setQueryData(ME_QUERY_KEY, null);
       queryClient.clear();
     },
@@ -56,8 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn: async (request) => {
       await loginMutation.mutateAsync(request);
     },
-    signOut: async () => {
-      await logoutMutation.mutateAsync();
+    signOut: async (reason = "user") => {
+      await logoutMutation.mutateAsync(reason);
     },
   };
 

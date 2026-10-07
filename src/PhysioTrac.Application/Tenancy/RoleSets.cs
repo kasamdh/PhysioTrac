@@ -61,6 +61,13 @@ public static class RoleSets
         UserRole.Admin, UserRole.Director, UserRole.Scheduler, UserRole.Therapist, UserRole.Assistant
     ]);
 
+    /// <summary>May read the organization's activity log (Administration ›
+    /// Logs): administrators, plus the compliance officer whose job it is.</summary>
+    public static readonly IReadOnlySet<UserRole> AuditLogReview = new RoleSet(
+    [
+        UserRole.Admin, UserRole.Director, UserRole.Compliance
+    ]);
+
     /// <summary>Every staff role a tenant can have -- i.e. everyone except
     /// the platform-level SuperAdmin (who has no standing org access at
     /// all) and Patient (the portal role). Used by dashboards whose content

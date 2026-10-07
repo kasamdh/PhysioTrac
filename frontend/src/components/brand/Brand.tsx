@@ -35,8 +35,8 @@ export function BrandWordmark({ className = "" }: { className?: string }) {
 export function HeaderLogo() {
   return (
     <span className="flex items-center gap-2 text-white">
-      <BrandMark className="h-7 w-7" mono />
-      <BrandWordmark className="text-2xl" />
+      <BrandMark className="h-7 w-7 sm:h-8 sm:w-8" mono />
+      <BrandWordmark className="text-2xl sm:text-3xl" />
     </span>
   );
 }

@@ -10,6 +10,7 @@ const commands: { to: string; label: string; allowed?: ReadonlySet<UserRole> }[]
   { to: "/admin/users", label: "Users", allowed: RoleSets.OrganizationAdministration },
   { to: "/admin/locations", label: "Locations", allowed: RoleSets.OrganizationAdministration },
   { to: "/admin/patients", label: "Patient List", allowed: RoleSets.Clinical },
+  { to: "/admin/logs", label: "Logs", allowed: RoleSets.AuditLogReview },
 ];
 
 export function AdminHomePage() {

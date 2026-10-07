@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthProvider";
+import { clearLastLogout, peekLastLogout, type LogoutNotice } from "../features/auth/lastLogout";
 import { BrandMark, BrandWordmark, HeaderLogo, LegalFooter } from "../components/brand/Brand";
 
 const loginSchema = z.object({
@@ -16,6 +17,9 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export function LoginPage() {
   const { user, signIn, isLoggingIn, loginError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  // "Successful Logout at ..." notice for the logout that brought us here.
+  const [logoutNotice] = useState(peekLastLogout);
+  useEffect(() => clearLastLogout(), []);
   const location = useLocation();
   const {
     register,
@@ -63,6 +67,7 @@ export function LoginPage() {
             noValidate
             className="w-full max-w-[440px] space-y-4 rounded-sm border border-slate-500/60 bg-panel px-10 pt-14 pb-12 shadow-[2px_3px_6px_rgba(0,0,0,0.25)] sm:px-14"
           >
+            {logoutNotice && !loginError && <LogoutBanner notice={logoutNotice} />}
             {loginError && <p className="alert-error">{loginError}</p>}
             <div>
               <label className="sr-only" htmlFor="username">
@@ -125,5 +130,31 @@ function EyeIcon({ open }: { open: boolean }) {
       <circle cx="12" cy="12" r="3" />
       {!open && <path d="M3 3l18 18" />}
     </svg>
+  );
+}
+
+function formatLogoutTime(at: Date): string {
+  return `${at.toLocaleDateString("en-US")} ${at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+}
+
+/** Light-green confirmation at the top of the sign-in panel. */
+function LogoutBanner({ notice }: { notice: LogoutNotice }) {
+  const when = formatLogoutTime(notice.at);
+  return (
+    <p
+      role="status"
+      className="-mx-6 -mt-10 mb-6 flex items-start gap-2 rounded border border-[#b5dcae] bg-[#dcf5d5] px-3 py-2 text-[#333] sm:-mx-10"
+    >
+      <svg viewBox="0 0 20 20" className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true">
+        <circle cx="10" cy="10" r="10" fill="#2a6eb0" />
+        <rect x="9" y="8.5" width="2" height="6.5" rx="1" fill="#fff" />
+        <circle cx="10" cy="5.6" r="1.25" fill="#fff" />
+      </svg>
+      <span>
+        {notice.reason === "idle"
+          ? `Signed out after a period of inactivity at ${when}.`
+          : `Successful Logout at ${when}.`}
+      </span>
+    </p>
   );
 }

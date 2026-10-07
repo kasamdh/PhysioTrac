@@ -29,7 +29,15 @@
   --color-info: #2563eb;
   --color-info-light: #dbeafe;
 
-  --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
+  /* House text style on every page: Arial, 18px, regular. xs/sm/base all
+     map to it; only headings (lg and up) are larger. */
+  --font-sans: Arial, sans-serif;
+  --text-xs: 1.125rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 1.125rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 1.125rem;
+  --text-base--line-height: 1.5;
   --color-link: #2a6eb0;
   --color-row-alt: #f4f4f4;
   --color-grid: #dcdcdc;
@@ -38,6 +46,9 @@
 
 body {
   font-family: var(--font-sans);
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.5;
   color: var(--color-text);
   background: var(--color-surface-muted);
 }
@@ -242,10 +253,48 @@ body {
     align-items: center;
     min-height: 44px;
   }
+  /* Single-line, full-width text buttons (truncated): taller line instead
+     of flex, so the ellipsis still works. */
+  .touch-line {
+    line-height: 44px;
+  }
   /* Linked names in list rows: a taller hit area without changing layout. */
   .data-table .table-link {
     display: inline-block;
     padding-block: 12px;
     margin-block: -12px;
   }
+}
+
+/* Lists: every cell, header, link and phone-card label is the house text
+   style -- Arial, 18px, regular (headers included). */
+.data-table,
+.data-table *,
+.data-table td::before {
+  font-family: Arial, sans-serif;
+  font-weight: 400;
+}
+
+/* Printing while the help window is open prints only the help. */
+@media print {
+  body[data-help-open] #root {
+    display: none;
+  }
+  .help-overlay {
+    position: static;
+    display: block;
+    padding: 0;
+    background: none;
+  }
+  .help-dialog,
+  .help-body {
+    max-height: none;
+    overflow: visible;
+    box-shadow: none;
+  }
+}
+
+/* Required-but-empty fields in dialog forms (FormRow `missing`). */
+.form-row-missing :is(input, select, textarea) {
+  border-color: #7a1c1c;
 }

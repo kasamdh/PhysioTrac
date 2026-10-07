@@ -1,0 +1,100 @@
+import type { AppointmentKind, AppointmentStatus, ProviderDiscipline } from "../schedule/types";
+
+// Mirrors PhysioTrac.Domain.Enums.NoteType (only the values this page uses are named).
+export const NoteType = { Evaluation: 0, Daily: 1, Progress: 4, ReEvaluation: 5, Discharge: 6 } as const;
+export type NoteType = number;
+
+export const NoteTypeLabels: Record<number, string> = {
+  0: "Evaluation",
+  1: "Daily note",
+  2: "SOAP note",
+  3: "Home visit",
+  4: "Progress note",
+  5: "Re-evaluation",
+  6: "Discharge summary",
+};
+
+/** Note types whose signing requires plan-of-care details (NoteComplianceEvaluator). */
+export const needsPlanOfCare = (t: NoteType) =>
+  t === NoteType.Evaluation || t === NoteType.Progress || t === NoteType.ReEvaluation;
+
+// Mirrors PhysioTrac.Domain.Enums.NoteStatus.
+export const NoteStatus = { Draft: 0, ReviewRequired: 1, Signed: 2, Amended: 3, Locked: 4 } as const;
+export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
+
+// Matches PhysioTrac.Api.Controllers.WorkflowProviderDto.
+export interface WorkflowProvider {
+  id: string;
+  name: string;
+  credentials: string | null;
+  discipline: ProviderDiscipline;
+  userId: string | null;
+}
+
+// Matches PhysioTrac.Api.Controllers.WorkflowAppointmentDto.
+export interface WorkflowAppointment {
+  appointmentId: string;
+  startsAt: string;
+  endsAt: string;
+  status: AppointmentStatus;
+  kind: AppointmentKind;
+  appointmentTypeName: string | null;
+  appointmentTypeColor: string | null;
+  patientId: string;
+  patientName: string;
+  medicalRecordNumber: string;
+  providerId: string | null;
+  providerName: string | null;
+  locationName: string | null;
+  suggestedNoteType: NoteType;
+  noteId: string | null;
+  noteStatus: NoteStatus | null;
+  noteType: NoteType | null;
+}
+
+// Matches PhysioTrac.Api.Controllers.WorkflowDayDto.
+export interface WorkflowDay {
+  date: string;
+  timezone: string;
+  providers: WorkflowProvider[];
+  myProviderId: string | null;
+  selectedProviderId: string | null;
+  allProviders: boolean;
+  ownDayOnly: boolean;
+  appointments: WorkflowAppointment[];
+}
+
+// Matches PhysioTrac.Application.Clinical.ClinicalNoteDto (fields this page uses).
+export interface VisitNote {
+  id: string;
+  patientId: string;
+  appointmentId: string | null;
+  noteType: NoteType;
+  status: NoteStatus;
+  serviceDate: string;
+  subjective: string | null;
+  objective: string | null;
+  interventions: string | null;
+  assessment: string | null;
+  plan: string | null;
+  planOfCareStart: string | null;
+  planOfCareEnd: string | null;
+  frequencyPerWeek: number | null;
+  durationWeeks: number | null;
+  signatureName: string | null;
+  signedAt: string | null;
+  cosignRequired: boolean;
+}
+
+export interface NoteFields {
+  subjective: string | null;
+  objective: string | null;
+  interventions: string | null;
+  assessment: string | null;
+  plan: string | null;
+  planOfCareStart: string | null;
+  planOfCareEnd: string | null;
+  frequencyPerWeek: number | null;
+  durationWeeks: number | null;
+  reassessmentDue: null;
+}

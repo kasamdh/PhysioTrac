@@ -9,7 +9,8 @@ public record ClinicalNoteDto(
     DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue,
     DateOnly? PlanOfCareCertifiedDate, Guid? PlanOfCareCertifyingProviderId,
     string? SignatureName, string? SignatureCredentials, DateTimeOffset? SignedAt, string? SignatureIpAddress, string? SignatureHash,
-    bool CosignRequired, Guid? CosignedById, DateTimeOffset? CosignedAt);
+    bool CosignRequired, Guid? CosignedById, DateTimeOffset? CosignedAt,
+    string SubjectiveDetailsJson = "{}", string ObjectiveMeasurementsJson = "{}");
 
 public record CertifyPlanOfCareRequest(DateOnly CertifiedDate, Guid CertifyingProviderId);
 
@@ -38,16 +39,23 @@ public record ClinicalNoteVersionDto(Guid Id, Guid NoteId, int VersionNumber, st
 public record CreateNoteRequest(
     Guid PatientId, NoteType NoteType, DateOnly ServiceDate, Guid? AppointmentId,
     string? Subjective, string? Objective, string? Interventions, string? Assessment, string? Plan,
-    DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue);
+    DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue,
+    // Clinical Charting's structured findings (JSON objects); null = none / unchanged.
+    string? SubjectiveDetailsJson = null, string? ObjectiveMeasurementsJson = null);
 
 public record UpdateNoteRequest(
     string? Subjective, string? Objective, string? Interventions, string? Assessment, string? Plan,
-    DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue);
+    DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue,
+    string? SubjectiveDetailsJson = null, string? ObjectiveMeasurementsJson = null);
 
 public record NoteAddendumDto(Guid Id, Guid NoteId, Guid AuthorId, string Reason, string Body, DateTimeOffset CreatedAt);
 
 public record CreateAddendumRequest(string Reason, string Body);
 
-public record InterventionDto(Guid Id, Guid NoteId, string Description, string? BodyRegion, InterventionCategory? Category, int Minutes, int? Units, bool IsTimed, int Order);
+public record InterventionDto(Guid Id, Guid NoteId, string Description, string? BodyRegion, InterventionCategory? Category, int Minutes, int? Units, bool IsTimed, int Order, string? PatientResponse = null);
 
-public record CreateInterventionRequest(string Description, string? BodyRegion, InterventionCategory? Category, int Minutes, int? Units, bool IsTimed, int Order);
+public record CreateInterventionRequest(string Description, string? BodyRegion, InterventionCategory? Category, int Minutes, int? Units, bool IsTimed, int Order, string? PatientResponse = null);
+
+/// <summary>Billing view of a note's interventions: total timed minutes and
+/// the units the organization's 8-minute-rule variant gives for them.</summary>
+public record InterventionSummaryDto(int TimedMinutes, int UntimedCount, int EstimatedTimedUnits, string RuleVariant);

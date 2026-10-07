@@ -7,9 +7,12 @@ import type {
   LocationInput,
   MessageThread,
   PatientDirectoryFilters,
+  PatientDetail,
   PatientDirectoryPage,
   StaffUser,
   ThreadMessage,
+  UpdatePatientInput,
+  UpdateUserInput,
 } from "./types";
 
 function query(params: Record<string, string | number | boolean | undefined>): string {
@@ -37,6 +40,8 @@ export const inviteUser = (input: InviteUserInput) =>
   apiRequest<InviteUserResult>("/api/v1/users/invite", { method: "POST", body: input });
 export const changeUserRole = (id: string, role: UserRole) =>
   apiRequest<StaffUser>(`/api/v1/users/${id}/role`, { method: "PATCH", body: { role } });
+export const updateUser = (id: string, input: UpdateUserInput) =>
+  apiRequest<StaffUser>(`/api/v1/users/${id}`, { method: "PUT", body: input });
 export const setUserActive = (id: string, active: boolean) =>
   apiRequest<StaffUser>(`/api/v1/users/${id}/${active ? "activate" : "deactivate"}`, {
     method: "PATCH",
@@ -55,6 +60,14 @@ export const markThreadRead = (patientId: string) =>
 // Patients
 export const fetchPatientDirectory = (filters: PatientDirectoryFilters, signal?: AbortSignal) =>
   apiRequest<PatientDirectoryPage>(`/api/v1/patients/directory${query({ ...filters })}`, { signal });
+
+export const fetchPatientDetail = (id: string) => apiRequest<PatientDetail>(`/api/v1/patients/${id}`);
+export const updatePatient = (id: string, input: UpdatePatientInput) =>
+  apiRequest<PatientDetail>(`/api/v1/patients/${id}`, { method: "PUT", body: input });
+/** Soft delete: the chart is hidden, never erased, and can be restored. */
+export const deletePatient = (id: string) => apiRequest<void>(`/api/v1/patients/${id}`, { method: "DELETE" });
+export const restorePatient = (id: string) =>
+  apiRequest<PatientDetail>(`/api/v1/patients/${id}/restore`, { method: "PATCH" });
 
 // Account
 export const changePassword = (currentPassword: string, newPassword: string) =>

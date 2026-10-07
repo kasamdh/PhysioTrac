@@ -91,13 +91,26 @@ public class PatientsController : ControllerBase
     public async Task<IActionResult> Directory(
         [FromQuery] string? search = null, [FromQuery] PatientStatus? status = null, [FromQuery] Guid? locationId = null,
         [FromQuery] DateOnly? appointmentFrom = null, [FromQuery] DateOnly? appointmentTo = null,
+        [FromQuery] bool deleted = false,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
     {
         try
         {
             var ct = HttpContext.RequestAborted;
             var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, ct);
-            var query = _tenantAccess.PatientsFor(_currentUser);
+            IQueryable<Patient> query;
+            if (deleted)
+            {
+                // Soft-deleted charts, so they can be found and restored.
+                // PatientsFor hides them by design, so this is org-scoped by
+                // hand -- and limited to the roles that can delete/restore.
+                _tenantAccess.RequireRole(_currentUser, RoleSets.Scheduling);
+                query = _db.Patients.Where(p => p.OrganizationId == organization.Id && p.DeletedAt != null);
+            }
+            else
+            {
+                query = _tenantAccess.PatientsFor(_currentUser);
+            }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -267,8 +280,18 @@ public class PatientsController : ControllerBase
                 ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
                 ct: HttpContext.RequestAborted);
 
-            patient.FirstName = request.FirstName;
-            patient.LastName = request.LastName;
+            if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+            {
+                return UnprocessableEntity(new { detail = "First and last name are required." });
+            }
+            if (request.DateOfBirth is DateOnly dob && (dob > DateOnly.FromDateTime(DateTime.UtcNow) || dob.Year < 1900))
+            {
+                return UnprocessableEntity(new { detail = "Enter a valid date of birth (not in the future)." });
+            }
+
+            patient.FirstName = request.FirstName.Trim();
+            patient.LastName = request.LastName.Trim();
+            if (request.DateOfBirth is DateOnly newDob) patient.DateOfBirth = newDob;
             patient.Phone = request.Phone;
             patient.Email = request.Email;
             patient.Address = request.Address;

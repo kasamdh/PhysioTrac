@@ -31,7 +31,7 @@ public class PtNoteTypesPhase5BTests
 
         var audit = new AuditService(db);
         var tenantAccess = new TenantAccessService(db, audit);
-        var service = new ClinicalNoteService(db, tenantAccess, audit);
+        var service = new ClinicalNoteService(db, tenantAccess, audit, new AcceptAnySignature());
         return (db, service, org, patient);
     }
 

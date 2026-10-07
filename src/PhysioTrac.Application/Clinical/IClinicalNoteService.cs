@@ -48,7 +48,9 @@ public interface IClinicalNoteService
     /// the signer's credentials-at-signing-time, ipAddress, and a content
     /// hash on the note itself, and writes the final immutable
     /// ClinicalNoteVersion snapshot.</summary>
-    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, CancellationToken ct = default);
+    /// <param name="password">The signer's own password (step-up); a missing or
+    /// wrong one throws <see cref="SignatureVerificationException"/>.</param>
+    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, string? password = null, CancellationToken ct = default);
 
     /// <summary>A further, manual step past Signed that additionally blocks
     /// new addenda -- see NoteStatus.Locked's own doc comment.</summary>
@@ -61,7 +63,8 @@ public interface IClinicalNoteService
 
     /// <summary>Completes a PTA-authored note awaiting cosign. Caller must
     /// have already checked <see cref="CanCosignNote"/>.</summary>
-    Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+    /// <param name="password">The cosigner's own password (step-up).</param>
+    Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, string? password = null, CancellationToken ct = default);
 
     /// <summary>Attach a correction to a signed note. The original note is never touched.</summary>
     Task<NoteAddendum> CreateAddendumAsync(Guid noteId, CreateAddendumRequest request, ICurrentUser actor, CancellationToken ct = default);
@@ -85,4 +88,13 @@ public interface IClinicalNoteService
     /// <summary>Whether a progress note is due for this patient right now.
     /// See ProgressNoteStatusDto's own doc comment.</summary>
     Task<ProgressNoteStatusDto> GetProgressNoteStatusAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Clinical Charting: edit an intervention row on a draft note.</summary>
+    Task<NoteIntervention> UpdateInterventionAsync(Guid noteId, Guid interventionId, CreateInterventionRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Clinical Charting: remove an intervention row from a draft note.</summary>
+    Task DeleteInterventionAsync(Guid noteId, Guid interventionId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Total timed minutes and the organization's 8-minute-rule units.</summary>
+    Task<InterventionSummaryDto> SummarizeInterventionsAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
 }
