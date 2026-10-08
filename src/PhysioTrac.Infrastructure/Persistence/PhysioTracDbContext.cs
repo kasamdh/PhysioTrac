@@ -189,6 +189,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         {
             e.HasIndex(a => new { a.OrganizationId, a.CreatedAt });
             e.HasIndex(a => new { a.PatientId, a.CreatedAt });
+            // Per-note lookups (view/update de-duplication, AI-assisted flag at signing).
+            e.HasIndex(a => new { a.ObjectId, a.Action, a.CreatedAt });
             e.Property(a => a.Action).HasMaxLength(80);
             e.Property(a => a.ObjectType).HasMaxLength(80);
         });
@@ -858,7 +860,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.HasIndex(c => new { c.OrganizationId, c.PatientId, c.Status });
             e.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
             // DiagnosisCodeList is a convenience wrapper over DiagnosisCodeListJson
-            // (the actual persisted column) — not a mappable collection of its own.
+            // (the actual persisted column) â€” not a mappable collection of its own.
             e.Ignore(c => c.DiagnosisCodeList);
             e.HasOne(c => c.Organization).WithMany()
                 .HasForeignKey(c => c.OrganizationId).OnDelete(DeleteBehavior.Restrict);
@@ -886,7 +888,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             // Restrict, not SetNull: a second cascading/nulling path to Claims
             // from the same table triggers SQL Server error 1785 ("may cause
             // cycles or multiple cascade paths") alongside the ClaimId FK
-            // above. Restrict is also the more correct rule here — a claim
+            // above. Restrict is also the more correct rule here â€” a claim
             // that is the target of a balance transfer shouldn't be
             // deletable out from under that transfer record anyway.
             e.HasOne(t => t.TransferredToClaim).WithMany()
@@ -1074,7 +1076,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     }
 
     /// <summary>Enforces append-only semantics on <see cref="AuditEvent"/> at
-    /// the persistence boundary — mirrors the Django model's `save()`/
+    /// the persistence boundary â€” mirrors the Django model's `save()`/
     /// `delete()` overrides that raise on any attempted mutation of an
     /// existing row.</summary>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -1164,10 +1166,10 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     }
 
     /// <summary>Mirrors `ClinicalNote.save()`'s override: once a note's
-    /// persisted status is Signed, no further write to that row is allowed —
+    /// persisted status is Signed, no further write to that row is allowed â€”
     /// use an addendum instead. Checked against the row's ORIGINAL
     /// (pre-this-save) status, not the incoming one, so the
-    /// ReviewRequired→Signed cosign transition itself is still legal.</summary>
+    /// ReviewRequiredâ†’Signed cosign transition itself is still legal.</summary>
     private void EnforceSignedNoteImmutability()
     {
         foreach (var entry in ChangeTracker.Entries<Domain.Entities.ClinicalNote>())

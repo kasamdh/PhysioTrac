@@ -119,6 +119,29 @@ public partial class ClinicalNoteService
     /// its plan of care (counting the evaluation that started it), or among
     /// all of the patient's notes when there is none. Amendments, voided
     /// notes and non-visit notes don't count.</summary>
+    /// <summary>The plan and the plans it replaced through an amendment of
+    /// their evaluation: correcting the evaluation creates a new plan, but
+    /// the visits under the plan it replaced belong to the same episode. A
+    /// re-evaluation or recertification starts a new count.</summary>
+    private async Task<(List<Guid> PlanIds, List<Guid> SourceNoteIds)> EpisodePlansAsync(Guid planId, CancellationToken ct)
+    {
+        var planIds = new List<Guid>();
+        var sourceNoteIds = new List<Guid>();
+        Guid? currentId = planId;
+        while (currentId is Guid id && !planIds.Contains(id))
+        {
+            var plan = await _db.PlansOfCare.AsNoTracking().Where(p => p.Id == id)
+                .Select(p => new { p.SourceNoteId, p.PreviousPlanOfCareId }).FirstAsync(ct);
+            planIds.Add(id);
+            sourceNoteIds.Add(plan.SourceNoteId);
+            if (plan.PreviousPlanOfCareId is not Guid previousId) break;
+            var amends = await _db.ClinicalNotes.AsNoTracking().Where(n => n.Id == plan.SourceNoteId).Select(n => n.AmendsNoteId).FirstOrDefaultAsync(ct);
+            var previousSource = await _db.PlansOfCare.AsNoTracking().Where(p => p.Id == previousId).Select(p => p.SourceNoteId).FirstAsync(ct);
+            currentId = amends == previousSource ? previousId : null;
+        }
+        return (planIds, sourceNoteIds);
+    }
+
     private async Task<int> VisitNumberAsync(ClinicalNote note, CancellationToken ct)
     {
         var query = _db.ClinicalNotes.AsNoTracking().Where(n => n.PatientId == note.PatientId && n.AmendsNoteId == null &&
@@ -127,8 +150,8 @@ public partial class ClinicalNoteService
             n.NoteType != NoteType.Consultation);
         if (note.PlanOfCareId is Guid planId)
         {
-            var sourceNoteId = await _db.PlansOfCare.Where(p => p.Id == planId).Select(p => p.SourceNoteId).FirstAsync(ct);
-            query = query.Where(n => n.PlanOfCareId == planId || n.Id == sourceNoteId);
+            var (planIds, sourceNoteIds) = await EpisodePlansAsync(planId, ct);
+            query = query.Where(n => (n.PlanOfCareId != null && planIds.Contains(n.PlanOfCareId.Value)) || sourceNoteIds.Contains(n.Id));
         }
         var earlier = await query.CountAsync(n => n.ServiceDate < note.ServiceDate ||
             (n.ServiceDate == note.ServiceDate && n.CreatedAt < note.CreatedAt), ct);

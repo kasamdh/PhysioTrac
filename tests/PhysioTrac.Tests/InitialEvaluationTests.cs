@@ -278,4 +278,23 @@ public class InitialEvaluationTests
         Assert.Equal(original.Template!.Id, copy.Template!.Id);
         Assert.Equal(original.Values.Count, copy.Values.Count);
     }
+
+    [Fact]
+    public async Task AmendingTheEvaluation_KeepsCountingTheSameEpisode()
+    {
+        var c = await SetupAsync();
+        var evaluation = await NewNoteAsync(c, NoteType.Evaluation);
+        await FillAsync(c, evaluation, (await c.Notes.GetEncounterAsync(evaluation.Id, c.Therapist)).SaveVersion);
+        await c.Notes.SignNoteAsync(evaluation.Id, true, null, c.Therapist, "pw");
+        var firstVisit = await NewNoteAsync(c, NoteType.Daily);
+
+        var amendment = await c.Notes.CreateAmendmentAsync(evaluation.Id, new CreateAmendmentRequest("Wrong frequency"), c.Therapist);
+        await c.Notes.SignNoteAsync(amendment.Id, true, null, c.Therapist, "pw");
+        Assert.Equal(2, c.Db.PlansOfCare.Count(p => p.PatientId == c.Pat.Id)); // the corrected plan replaces the first
+
+        var nextVisit = await NewNoteAsync(c, NoteType.Daily);
+        Assert.NotEqual(firstVisit.PlanOfCareId, nextVisit.PlanOfCareId);
+        // Evaluation, first visit, this visit -- not "visit 1" again.
+        Assert.Equal(3, (await c.Notes.GetEncounterAsync(nextVisit.Id, c.Therapist)).Header.VisitNumber);
+    }
 }
