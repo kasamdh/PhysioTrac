@@ -3,14 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest } from "../../lib/apiClient";
 import { fetchPatientDetail } from "../admin/api";
-import { fetchOutcomes, fetchPullForward } from "../charting/api";
-import { GoalsPanel } from "../charting/components/GoalsPanel";
-import { describeChange } from "../charting/presets";
-import {
-  OUTCOME_MEASURES,
-  parseObjective,
-  parseSubjective,
-} from "../charting/presets";
+import { fetchPullForward } from "../charting/api";
+import { parseObjective, parseSubjective } from "../charting/presets";
+import { GoalsOverview } from "../encounter/goals/GoalTracker";
+import { OutcomesWorkspace } from "../encounter/outcomes/OutcomesWorkspace";
 import type { ChartNote } from "../charting/types";
 import {
   NoteStatus,
@@ -19,7 +15,7 @@ import {
 } from "../workflow/types";
 import { fetchNoteRecord } from "../charting/api";
 import { NoteBody } from "./NoteBody";
-import { fetchPainHistory } from "../encounter/api";
+import { fetchMeasurementHistory, fetchPainHistory } from "../encounter/api";
 import { formatRating } from "../encounter/pain";
 import { NewNoteButton } from "./NewNoteButton";
 import { useAuth } from "../auth/AuthProvider";
@@ -61,10 +57,6 @@ export function PatientDocumentationPage() {
   const notes = useQuery({
     queryKey: ["documentation", "notes", patientId],
     queryFn: () => fetchPatientNotes(patientId),
-  });
-  const outcomes = useQuery({
-    queryKey: ["chart", "outcomes", patientId],
-    queryFn: () => fetchOutcomes(patientId),
   });
   const pullForward = useQuery({
     queryKey: ["chart", "pull-forward", patientId],
@@ -155,56 +147,11 @@ export function PatientDocumentationPage() {
       </Section>
 
       <Section title="Outcome measures">
-        {outcomes.data && outcomes.data.length === 0 && (
-          <p className="text-text-muted">No outcome measures recorded yet.</p>
-        )}
-        {outcomes.data && outcomes.data.length > 0 && (
-          <div className="list-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Measure</th>
-                  <th>Score</th>
-                  <th>Change from previous</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...outcomes.data]
-                  .sort((a, b) => b.measuredOn.localeCompare(a.measuredOn))
-                  .map((s, _i, list) => {
-                    const prev = list.find(
-                      (x) =>
-                        x.measure === s.measure && x.measuredOn < s.measuredOn,
-                    );
-                    const change = prev
-                      ? describeChange(s.measure, prev.score, s.score)
-                      : null;
-                    return (
-                      <tr key={s.id}>
-                        <td data-label="Date">{formatDate(s.measuredOn)}</td>
-                        <td data-label="Measure">
-                          {OUTCOME_MEASURES.find((m) => m.value === s.measure)
-                            ?.label ?? s.measure}
-                        </td>
-                        <td data-label="Score">
-                          {s.score}
-                          {s.maximumScore !== null ? `/${s.maximumScore}` : ""}
-                        </td>
-                        <td data-label="Change" className={change?.tone}>
-                          {change?.text ?? "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <OutcomesWorkspace patientId={patientId} readOnly />
       </Section>
 
       <Section title="Goals">
-        <GoalsPanel patientId={patientId} readOnly />
+        <GoalsOverview patientId={patientId} />
       </Section>
 
       <Section title="Visit notes">
@@ -263,6 +210,10 @@ function Trends({
     queryKey: ["patient", patientId, "pain-history"],
     queryFn: () => fetchPainHistory(patientId),
   });
+  const measured = useQuery({
+    queryKey: ["patient", patientId, "measurement-history"],
+    queryFn: () => fetchMeasurementHistory(patientId),
+  });
   const visits = [...notes].slice(0, 6).reverse(); // oldest -> newest, last 6
   if (visits.length === 0)
     return (
@@ -278,6 +229,18 @@ function Trends({
     if (structured?.current != null)
       pain.set(n.id, formatRating(structured.scale, structured.current));
     else if (s.painNow !== null) pain.set(n.id, `${s.painNow}/10`);
+    // Structured range of motion (template-based notes).
+    for (const m of (measured.data ?? []).filter(
+      (x) =>
+        x.noteId === n.id &&
+        x.category === 0 &&
+        (x.mode ?? "").toUpperCase() === "AROM",
+    )) {
+      if (m.numericValue == null) continue;
+      const label = `${m.item} ${m.movement ?? ""}${m.side != null ? ` (${["L", "R", "B", "Mid"][m.side]})` : ""}`;
+      if (!rows.has(label)) rows.set(label, new Map());
+      rows.get(label)!.set(n.id, `${m.numericValue}°`);
+    }
     for (const r of parseObjective(n.objectiveMeasurementsJson).rom) {
       if (!r.arom && !r.prom) continue;
       const label = `${r.joint} ${r.motion}${r.side ? ` (${r.side})` : ""}`;

@@ -55,14 +55,24 @@ public enum InterventionCategory
     SelfCare,
     PatientEducation,
     Other,
+    CanalithRepositioning,
+    Modalities,
+    DryNeedling,
+    HomeExerciseProgram,
 }
 
+/// <summary>A goal's state. Draft goals await a PT's approval; approved
+/// goals are Not Started, In Progress (Active), Met, Partially Met or
+/// Discontinued. Values are stored, so new states are appended.</summary>
 public enum GoalStatus
 {
     Draft,
+    /// <summary>In progress.</summary>
     Active,
     Met,
     Discontinued,
+    NotStarted,
+    PartiallyMet,
 }
 
 public enum GoalTerm
@@ -92,4 +102,7 @@ public enum OutcomeMeasure
     Tug,
     Berg,
     Psfs,
+    FiveTimesSitToStand,
+    Abc,
+    Fga,
 }

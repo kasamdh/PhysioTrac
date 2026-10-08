@@ -42,10 +42,13 @@ export function NoteBody({
         />
       )}
       <Field label="Objective" value={note.objective} />
-      <div>
-        <p className="mb-1 font-bold text-[#333]">Interventions</p>
-        <InterventionsPanel noteId={note.id} readOnly />
-      </div>
+      {/* Template-based notes show their full flowsheet with the charting above. */}
+      {!note.templateVersionId && (
+        <div>
+          <p className="mb-1 font-bold text-[#333]">Interventions</p>
+          <InterventionsPanel noteId={note.id} readOnly />
+        </div>
+      )}
       <Field label="Treatment summary" value={note.interventions} />
       <Field label="Assessment" value={note.assessment} />
       <Field label="Plan" value={note.plan} />

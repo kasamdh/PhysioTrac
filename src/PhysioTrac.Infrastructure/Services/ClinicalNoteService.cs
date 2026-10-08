@@ -225,7 +225,10 @@ public partial class ClinicalNoteService : IClinicalNoteService
         // the exact content -- including the signature metadata itself --
         // that becomes immutable from this point on.
         note.SignatureHash = ComputeContentHash(note, await CurrentFieldValuesAsync(note.Id, ct),
-            await CurrentPainAsync(note.Id, ct), await CurrentFindingsAsync(note.Id, ct));
+            await CurrentPainAsync(note.Id, ct), await CurrentFindingsAsync(note.Id, ct),
+            await CurrentRowsAsync(_db.ObjectiveMeasurements, note.Id, ct), await CurrentRowsAsync(_db.SpecialTestResults, note.Id, ct),
+            await CurrentRowsAsync(_db.NoteInterventions, note.Id, ct), await CurrentRowsAsync(_db.NoteGoalProgress, note.Id, ct),
+            await NoteOutcomeRowsAsync(note.Id, ct));
         if (note.Status == NoteStatus.Signed) await ApplyFinalSignatureEffectsAsync(note, ct);
         // Same SaveChanges as the signature: the original is superseded
         // exactly when (and only if) its amendment becomes signed.
@@ -334,12 +337,12 @@ public partial class ClinicalNoteService : IClinicalNoteService
         var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, ct: ct);
 
         var activeGoals = await _db.FunctionalGoals
-            .Where(g => g.PatientId == patient.Id && g.Status == GoalStatus.Active)
+            .Where(g => g.PatientId == patient.Id && (g.Status == GoalStatus.Active || g.Status == GoalStatus.NotStarted))
             .OrderBy(g => g.TargetDate)
             .Select(g => new FunctionalGoalDto(
                 g.Id, g.PatientId, g.AuthorId, g.FunctionalLimitation, g.FunctionalTask, g.Term,
                 g.BaselineValue, g.TargetValue, g.CurrentValue, g.Unit, g.MeasurementMethod,
-                g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt, g.PlanOfCareId))
+                g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt, g.PlanOfCareId, g.Comments, g.Version))
             .ToListAsync(ct);
 
         var lastNote = await _db.ClinicalNotes
@@ -657,6 +660,20 @@ public partial class ClinicalNoteService : IClinicalNoteService
             originalPain.RowVersion = [];
             _db.PainAssessments.Add(originalPain);
         }
+        foreach (var m in await _db.ObjectiveMeasurements.AsNoTracking().Where(x => x.NoteId == original.Id).ToListAsync(ct))
+        {
+            m.Id = Guid.NewGuid();
+            m.NoteId = amendment.Id;
+            m.RowVersion = [];
+            _db.ObjectiveMeasurements.Add(m);
+        }
+        foreach (var t in await _db.SpecialTestResults.AsNoTracking().Where(x => x.NoteId == original.Id).ToListAsync(ct))
+        {
+            t.Id = Guid.NewGuid();
+            t.NoteId = amendment.Id;
+            t.RowVersion = [];
+            _db.SpecialTestResults.Add(t);
+        }
         foreach (var finding in await _db.BodyChartFindings.AsNoTracking().Where(f => f.NoteId == original.Id).ToListAsync(ct))
         {
             finding.Id = Guid.NewGuid();
@@ -681,21 +698,19 @@ public partial class ClinicalNoteService : IClinicalNoteService
         }
         _db.ClinicalNotes.Add(amendment);
         RecordStatusChange(amendment, null, NoteStatus.Draft, actor.UserId, reason);
-        var interventions = await _db.NoteInterventions.Where(i => i.NoteId == original.Id).ToListAsync(ct);
-        foreach (var i in interventions)
+        foreach (var i in await _db.NoteInterventions.AsNoTracking().Where(x => x.NoteId == original.Id).ToListAsync(ct))
         {
-            _db.NoteInterventions.Add(new NoteIntervention
-            {
-                NoteId = amendment.Id,
-                Description = i.Description,
-                BodyRegion = i.BodyRegion,
-                Category = i.Category,
-                Minutes = i.Minutes,
-                Units = i.Units,
-                IsTimed = i.IsTimed,
-                Order = i.Order,
-                PatientResponse = i.PatientResponse,
-            });
+            i.Id = Guid.NewGuid();
+            i.NoteId = amendment.Id;
+            i.RowVersion = [];
+            _db.NoteInterventions.Add(i);
+        }
+        foreach (var p in await _db.NoteGoalProgress.AsNoTracking().Where(x => x.NoteId == original.Id).ToListAsync(ct))
+        {
+            p.Id = Guid.NewGuid();
+            p.NoteId = amendment.Id;
+            p.RowVersion = [];
+            _db.NoteGoalProgress.Add(p);
         }
         await SaveWithVersionSnapshotAsync(amendment, actor.UserId, isSignedVersion: false, ct);
 
@@ -894,6 +909,15 @@ public partial class ClinicalNoteService : IClinicalNoteService
         return note;
     }
 
+    /// <summary>The outcome scores recorded on a note (they are their own
+    /// rows, linked by NoteId), for the version snapshot and signature hash.</summary>
+    private async Task<IReadOnlyList<OutcomeScore>> NoteOutcomeRowsAsync(Guid noteId, CancellationToken ct) =>
+        await _db.OutcomeScores.AsNoTracking().Where(o => o.NoteId == noteId).ToListAsync(ct);
+
+    private static IEnumerable<object> OutcomeContent(IReadOnlyList<OutcomeScore> scores) =>
+        scores.OrderBy(o => o.Measure).ThenBy(o => o.MeasuredOn)
+            .Select(o => new { o.Measure, o.MeasuredOn, o.Score, o.MaximumScore, o.Interpretation, o.ItemResponsesJson, o.Notes });
+
     private static string DisplayName(ApplicationUser? user, Guid userId)
     {
         if (user is null) return userId.ToString();
@@ -907,12 +931,20 @@ public partial class ClinicalNoteService : IClinicalNoteService
     /// against accidental/out-of-band corruption, not a cryptographic
     /// signature meant to resist a determined attacker with DB access.</summary>
     private static string ComputeContentHash(ClinicalNote note, IReadOnlyList<ClinicalNoteFieldValue> values,
-        PainAssessment? pain = null, IReadOnlyList<BodyChartFinding>? findings = null)
+        PainAssessment? pain = null, IReadOnlyList<BodyChartFinding>? findings = null,
+        IReadOnlyList<ObjectiveMeasurement>? measurements = null, IReadOnlyList<SpecialTestResult>? specialTests = null,
+        IReadOnlyList<NoteIntervention>? interventions = null, IReadOnlyList<NoteGoalProgress>? goalProgress = null,
+        IReadOnlyList<OutcomeScore>? outcomes = null)
     {
         var charting = System.Text.Json.JsonSerializer.Serialize(new
         {
             Pain = pain is null ? null : ToPainDto(pain),
             BodyChart = (findings ?? []).Select(f => ToFindingDto(f) with { Id = null }),
+            Measurements = (measurements ?? []).OrderBy(m => m.Order).Select(m => ToMeasurementDto(m) with { Id = null }),
+            SpecialTests = (specialTests ?? []).OrderBy(r => r.Order).Select(r => ToSpecialTestDto(r) with { Id = null }),
+            Interventions = (interventions ?? []).OrderBy(i => i.Order).Select(i => ToFlowsheetDto(i) with { Id = null }),
+            GoalProgress = (goalProgress ?? []).OrderBy(p => p.Order).Select(p => ToGoalProgressDto(p) with { Id = null }),
+            Outcomes = OutcomeContent(outcomes ?? []),
         });
         var fieldValues = string.Join('\u001E', values.OrderBy(v => v.FieldKey, StringComparer.Ordinal).Select(v =>
             string.Join('\u001D', v.FieldKey, v.ValueText, v.ValueNumber, v.ValueDate, v.ValueTime, v.ValueBool, v.ValueJson)));
@@ -960,6 +992,11 @@ public partial class ClinicalNoteService : IClinicalNoteService
                 .Select(v => new { v.FieldKey, v.ValueText, v.ValueNumber, v.ValueDate, v.ValueTime, v.ValueBool, v.ValueJson }),
             Pain = (await CurrentPainAsync(note.Id, ct)) is { } pain ? ToPainDto(pain) : null,
             BodyChart = (await CurrentFindingsAsync(note.Id, ct)).Select(ToFindingDto),
+            Measurements = (await CurrentRowsAsync(_db.ObjectiveMeasurements, note.Id, ct)).OrderBy(m => m.Order).Select(m => ToMeasurementDto(m) with { Id = null }),
+            SpecialTests = (await CurrentRowsAsync(_db.SpecialTestResults, note.Id, ct)).OrderBy(r => r.Order).Select(r => ToSpecialTestDto(r) with { Id = null }),
+            Flowsheet = (await CurrentRowsAsync(_db.NoteInterventions, note.Id, ct)).OrderBy(i => i.Order).Select(i => ToFlowsheetDto(i) with { Id = null }),
+            GoalProgress = (await CurrentRowsAsync(_db.NoteGoalProgress, note.Id, ct)).OrderBy(p => p.Order).Select(p => ToGoalProgressDto(p) with { Id = null }),
+            Outcomes = OutcomeContent(await NoteOutcomeRowsAsync(note.Id, ct)),
         };
         _db.ClinicalNoteVersions.Add(new ClinicalNoteVersion
         {

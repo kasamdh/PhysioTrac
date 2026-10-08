@@ -4,19 +4,14 @@ import { Link, useParams } from "react-router-dom";
 import { useToast } from "../../components/Toast";
 import { ApiError } from "../../lib/apiClient";
 import { useAuth } from "../auth/AuthProvider";
-import { canSignClinicalNotes } from "../auth/permissions";
+import { RoleSets, canAccess, canSignClinicalNotes } from "../auth/permissions";
 import { ChartingPage } from "../charting/ChartingPage";
 import {
   fetchCompliance,
   fetchNoteRecord,
-  fetchPullForward,
   signChartNote,
 } from "../charting/api";
-import { GoalsPanel } from "../charting/components/GoalsPanel";
-import { InterventionsPanel } from "../charting/components/InterventionsPanel";
-import { MeasurementTables } from "../charting/components/MeasurementTables";
 import { NoteRecordPanel } from "../charting/components/NoteRecordPanel";
-import { OutcomesPanel } from "../charting/components/OutcomesPanel";
 import { parseObjective, parseSubjective } from "../charting/presets";
 import type { ObjectiveDetails, SubjectiveDetails } from "../charting/types";
 import { fetchTemplates } from "../templates/api";
@@ -40,7 +35,6 @@ import {
   saveEncounter,
 } from "./api";
 import {
-  AddGoalForm,
   DiagnosesPanel,
   MedicalHistoryPanel,
   PlanOfCarePanel,
@@ -55,12 +49,25 @@ import type {
 import { BodyChart } from "./bodychart/BodyChart";
 import { PainAssessmentPanel } from "./PainAssessmentPanel";
 import { emptyPain } from "./pain";
+import { MeasurementsPanel } from "./measurements/MeasurementsPanel";
+import { SpecialTestsPanel } from "./measurements/SpecialTestsPanel";
+import { fetchSpecialTests } from "./measurements/api";
+import { FlowsheetPanel } from "./flowsheet/FlowsheetPanel";
+import { EpisodePanel } from "./episode/EpisodePanel";
+import { SUMMARY_NOTE_TYPES } from "./episode/api";
+import { GoalTracker } from "./goals/GoalTracker";
+import type { GoalProgressRow } from "./goals/model";
+import { OutcomesWorkspace } from "./outcomes/OutcomesWorkspace";
+import type { FlowsheetEntry } from "./flowsheet/model";
+import type { Measurement } from "./measurements/model";
+import type { SpecialTest } from "./measurements/types";
 
 /** Clinical components the workspace can show; sections whose component
  * isn't available yet and that have no fields of their own are left out. */
 const AVAILABLE = new Set([
   "painAssessment",
   "bodyChart",
+  "specialTests",
   "measurements",
   "outcomes",
   "interventions",
@@ -163,10 +170,6 @@ function Workspace({
     queryKey: ["chart", "compliance", note.id],
     queryFn: () => fetchCompliance(note.id),
   });
-  const pullForward = useQuery({
-    queryKey: ["chart", "pull-forward", note.patientId],
-    queryFn: () => fetchPullForward(note.patientId),
-  });
 
   const editable =
     note.status === NoteStatus.Draft ||
@@ -189,7 +192,7 @@ function Workspace({
   const [subj] = useState<SubjectiveDetails>(() =>
     parseSubjective(note.subjectiveDetailsJson),
   );
-  const [obj, setObj] = useState<ObjectiveDetails>(() =>
+  const [obj] = useState<ObjectiveDetails>(() =>
     parseObjective(note.objectiveMeasurementsJson),
   );
   const [pain, setPain] = useState<PainAssessment>(
@@ -198,7 +201,25 @@ function Workspace({
   const [chart, setChart] = useState<BodyFinding[]>(
     () => encounter.bodyChart ?? [],
   );
+  const [measurements, setMeasurements] = useState<Measurement[]>(
+    () => encounter.measurements ?? [],
+  );
+  const [specialTests, setSpecialTests] = useState<SpecialTest[]>(
+    () => encounter.specialTests ?? [],
+  );
+  const [flowsheet, setFlowsheet] = useState<FlowsheetEntry[]>(
+    () => encounter.flowsheet ?? [],
+  );
+  const [goalProgress, setGoalProgress] = useState<GoalProgressRow[]>(
+    () => encounter.goalProgress ?? [],
+  );
   const [saved, setSaved] = useState(() => ({
+    goalProgress: JSON.stringify(encounter.goalProgress ?? []),
+    flowsheet: JSON.stringify(encounter.flowsheet ?? []),
+    measurements: JSON.stringify(encounter.measurements ?? []),
+    specialTests: JSON.stringify(
+      stripDefinitions(encounter.specialTests ?? []),
+    ),
     pain: JSON.stringify(encounter.pain ?? emptyPain()),
     chart: JSON.stringify(encounter.bodyChart ?? []),
     values: valuesMap(encounter.values),
@@ -228,8 +249,28 @@ function Workspace({
       b.objectiveMeasurementsJson = JSON.stringify(obj);
     if (JSON.stringify(pain) !== saved.pain) b.pain = pain;
     if (JSON.stringify(chart) !== saved.chart) b.bodyChart = chart;
+    if (JSON.stringify(flowsheet) !== saved.flowsheet) b.flowsheet = flowsheet;
+    if (JSON.stringify(goalProgress) !== saved.goalProgress)
+      b.goalProgress = goalProgress;
+    if (JSON.stringify(measurements) !== saved.measurements)
+      b.measurements = measurements;
+    const tests = stripDefinitions(specialTests);
+    if (JSON.stringify(tests) !== saved.specialTests) b.specialTests = tests;
     return Object.keys(b).length > 1 ? b : null;
-  }, [values, columns, subj, obj, pain, chart, saved, saveVersion]);
+  }, [
+    values,
+    columns,
+    subj,
+    obj,
+    pain,
+    chart,
+    measurements,
+    specialTests,
+    flowsheet,
+    goalProgress,
+    saved,
+    saveVersion,
+  ]);
   const dirty = body !== null;
 
   const save = useMutation({
@@ -253,6 +294,16 @@ function Workspace({
         obj: b.objectiveMeasurementsJson ?? s.obj,
         pain: b.pain ? JSON.stringify(b.pain) : s.pain,
         chart: b.bodyChart ? JSON.stringify(b.bodyChart) : s.chart,
+        flowsheet: b.flowsheet ? JSON.stringify(b.flowsheet) : s.flowsheet,
+        goalProgress: b.goalProgress
+          ? JSON.stringify(b.goalProgress)
+          : s.goalProgress,
+        measurements: b.measurements
+          ? JSON.stringify(b.measurements)
+          : s.measurements,
+        specialTests: b.specialTests
+          ? JSON.stringify(b.specialTests)
+          : s.specialTests,
       }));
       void queryClient.invalidateQueries({
         queryKey: ["chart", "compliance", note.id],
@@ -362,10 +413,48 @@ function Workspace({
 
   const reload = onReload;
 
-  const previousObjective = useMemo(() => {
-    const json = pullForward.data?.lastObjectiveMeasurementsJson;
-    return readOnly || !json ? null : parseObjective(json);
-  }, [pullForward.data, readOnly]);
+  // Library entries for tests already on the note (warnings, result kind).
+  const library = useQuery({
+    queryKey: ["special-tests", "all"],
+    queryFn: () => fetchSpecialTests({ includeInactive: true }),
+    enabled: specialTests.some((t) => !!t.definitionId),
+    staleTime: 5 * 60_000,
+  });
+  const definitions = useMemo(
+    () => new Map((library.data ?? []).map((d) => [d.id, d])),
+    [library.data],
+  );
+
+  // Where "Insert goal progress" writes: the note's goal-progress field
+  // (daily note, progress report, discharge), else its assessment.
+  const narrativeField = (() => {
+    const fields = sections.flatMap((x) => x.fields);
+    return (
+      ["progressTowardGoals", "functionalImprovement", "functionalOutcome"]
+        .map((k) => fields.find((f) => f.key === k))
+        .find(Boolean) ?? fields.find((f) => f.noteColumn === "assessment")
+    );
+  })();
+  const goalNarrativeTarget = narrativeField
+    ? {
+        label: narrativeField.label,
+        insert: (text: string) => {
+          const join = (old: string) =>
+            old.trim() ? `${old.trimEnd()}\n${text}` : text;
+          if (narrativeField.noteColumn)
+            setColumn(
+              narrativeField.noteColumn,
+              join(columns[narrativeField.noteColumn as keyof Columns] ?? ""),
+            );
+          else
+            setValue({
+              ...values[narrativeField.key],
+              key: narrativeField.key,
+              text: join(values[narrativeField.key]?.text ?? ""),
+            });
+        },
+      }
+    : null;
 
   const renderComponent = (component: string): ReactNode => {
     switch (component) {
@@ -400,16 +489,32 @@ function Workspace({
         );
       case "measurements":
         return (
-          <MeasurementTables
-            value={obj}
-            previous={previousObjective}
+          <MeasurementsPanel
+            value={measurements}
+            onChange={(next) => {
+              setSaveErrors([]);
+              setMeasurements(next);
+            }}
             readOnly={readOnly}
-            onChange={setObj}
+            history={encounter.measurementHistory ?? []}
+          />
+        );
+      case "specialTests":
+        return (
+          <SpecialTestsPanel
+            value={specialTests}
+            onChange={(next) => {
+              setSaveErrors([]);
+              setSpecialTests(next);
+            }}
+            readOnly={readOnly}
+            history={encounter.specialTestHistory ?? []}
+            definitions={definitions}
           />
         );
       case "outcomes":
         return (
-          <OutcomesPanel
+          <OutcomesWorkspace
             patientId={note.patientId}
             noteId={note.id}
             serviceDate={note.serviceDate}
@@ -417,13 +522,35 @@ function Workspace({
           />
         );
       case "interventions":
-        return <InterventionsPanel noteId={note.id} readOnly={readOnly} />;
+        return (
+          <FlowsheetPanel
+            value={flowsheet}
+            onChange={(next) => {
+              setSaveErrors([]);
+              setFlowsheet(next);
+            }}
+            readOnly={readOnly}
+            previous={encounter.previousFlowsheet}
+            ruleVariant={encounter.flowsheetSummary?.ruleVariant ?? "Medicare"}
+            canShareGroups={canAccess(
+              user,
+              RoleSets.OrganizationAdministration,
+            )}
+          />
+        );
       case "goals":
         return (
-          <div className="space-y-3">
-            <GoalsPanel patientId={note.patientId} readOnly={readOnly} />
-            {!readOnly && <AddGoalForm patientId={note.patientId} />}
-          </div>
+          <GoalTracker
+            patientId={note.patientId}
+            value={goalProgress}
+            onChange={(next) => {
+              setSaveErrors([]);
+              setGoalProgress(next);
+            }}
+            readOnly={readOnly}
+            canApprove={canSignClinicalNotes(user)}
+            insertTarget={goalNarrativeTarget}
+          />
         );
       case "diagnoses":
         return (
@@ -533,6 +660,18 @@ function Workspace({
             ))}
           </ul>
         </div>
+      )}
+
+      {SUMMARY_NOTE_TYPES.has(note.noteType) && (
+        <EpisodePanel
+          noteId={note.id}
+          readOnly={readOnly}
+          saveVersion={saveVersion}
+          busy={dirty || save.isPending}
+          prefilledAt={note.prefilledAt}
+          prefillReviewedAt={note.prefillReviewedAt}
+          onFilled={reload}
+        />
       )}
 
       <nav
@@ -956,4 +1095,13 @@ function ProgressMark({
       </>
     );
   return null;
+}
+
+/** Special tests as sent to the server (without the client-only library entry). */
+function stripDefinitions(tests: SpecialTest[]): SpecialTest[] {
+  return tests.map((t) => {
+    const copy = { ...t };
+    delete copy.definition;
+    return copy;
+  });
 }

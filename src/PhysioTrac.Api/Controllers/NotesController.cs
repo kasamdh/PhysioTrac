@@ -245,6 +245,51 @@ public class NotesController : ControllerBase
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
+    /// <summary>The episode summarized from signed charting, for progress
+    /// notes, re-evaluations, recertifications and discharge summaries.</summary>
+    [HttpGet("{id:guid}/episode-summary")]
+    public async Task<IActionResult> EpisodeSummary(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetEpisodeSummaryAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Fills the note's empty fields from the episode summary. 409
+    /// EDIT_CONFLICT like an encounter save.</summary>
+    [HttpPost("{id:guid}/prefill")]
+    public async Task<IActionResult> Prefill(Guid id, [FromBody] PrefillNoteRequest request)
+    {
+        try
+        {
+            return Ok(await _notes.PrefillAsync(id, request, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (EncounterConflictException ex)
+        {
+            return Conflict(new { detail = ex.Message, code = "EDIT_CONFLICT", saveVersion = ex.CurrentSaveVersion, savedAt = ex.SavedAt, savedByName = ex.SavedByName });
+        }
+        catch (TemplateValidationException ex) { return UnprocessableEntity(new { detail = ex.Message, errors = ex.Errors }); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The therapist confirms they reviewed the pre-filled content.</summary>
+    [HttpPost("{id:guid}/prefill/review")]
+    public async Task<IActionResult> ReviewPrefill(Guid id)
+    {
+        try
+        {
+            return Ok(ClinicalNoteMapper.ToDto(await _notes.ReviewPrefillAsync(id, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
     /// <summary>Opens the encounter for an appointment: its note, or a new
     /// draft of the visit's note type. 422 for a cancelled/no-show visit.</summary>
     [HttpPost("for-appointment/{appointmentId:guid}")]
@@ -257,6 +302,18 @@ public class NotesController : ControllerBase
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Measurements from the patient's signed notes, oldest first.</summary>
+    [HttpGet("patient/{patientId:guid}/measurement-history")]
+    public async Task<IActionResult> MeasurementHistory(Guid patientId)
+    {
+        try
+        {
+            return Ok(await _notes.GetMeasurementHistoryAsync(patientId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
     /// <summary>Pain ratings from the patient's signed notes, oldest first.</summary>

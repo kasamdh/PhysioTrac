@@ -420,8 +420,35 @@ export const pageHelp: Record<string, PageHelp> = {
             <Term name="Quality, frequency, irritability">Tap the words that apply; tap again to clear.</Term>
             <Term name="Body chart">Choose what to mark (pain, numbness, tingling, burning, swelling, tenderness, incision, scar, radiating, other), then tap the front or back drawing. R and L show the patient’s right and left. Select a marker to drag it; edit its severity, radiation, annotation and comments in the table.</Term>
             <Term name="Without the drawing">Every finding can be added and edited in the table with the keyboard (+ Add finding, then choose view, region and side).</Term>
+            <Term name="Objective measurements">Range of motion (AROM/PROM, end feel, pain), strength (manual muscle test grade or dynamometer force), neurological tests, gait, balance and functional tests. Each value shows its baseline, previous value and change from earlier signed notes; recorded values are never changed.</Term>
+            <Term name="Special tests">Search the library or tick Favorites only; ☆ marks a favorite. A red notice shows any precaution before you record the result (positive, negative, not tested, and a number where the test has one). Your interpretation is free text — PhysioTrac does not interpret results.</Term>
             <Term name="Show last visit’s findings">Overlays the last signed visit’s findings as dashed circles and lists them.</Term>
             <Note>Findings are saved as data (region, side, point, type, severity), not as a picture, and are locked with the note when it is signed.</Note>
+          </>
+        ),
+      },
+      {
+        id: "flowsheet",
+        title: "Intervention flowsheet",
+        body: (
+          <>
+            <Term name="Add intervention">Type a name or CPT code; Enter adds the first match from the approved library with its default dose. With no match, Enter adds what you typed. ☆ marks a favorite; favorites show as one-click buttons.</Term>
+            <Term name="Groups">“+ group name” adds a saved set of interventions at once. “Save as group…” saves the current entries for reuse (administrators can share a group with the clinic).</Term>
+            <Term name="Each entry">Category, CPT, timed or untimed, start/end (minutes fill in from the times), units, sets, reps, resistance, duration, distance, position, equipment, assistance, cueing, modification, pain before/after, status (completed, modified, held, discontinued), patient response and comments. Last visit’s dose is shown underneath.</Term>
+            <Term name="Carry forward">Brings chosen entries from the last signed visit — never the whole note. Each carried entry is marked and must be ticked “reviewed” before the note can be signed; carrying forward is recorded in the audit log.</Term>
+            <Term name="Totals and warnings">Timed minutes, untimed services and estimated units under your clinic’s 8-minute rule, with warnings for overlapping times, missing responses, minutes that don’t match the times, and units that don’t match the minutes. These are advice only — nothing is billed or submitted from the flowsheet.</Term>
+          </>
+        ),
+      },
+      {
+        id: "episode",
+        title: "Progress notes, re-evaluations, recertifications and discharge",
+        body: (
+          <>
+            <Term name="From the patient’s signed charting">The reporting period (since the last progress note, or since the evaluation), signed visits, attendance from the schedule, the plan of care, and — under “Changes over the episode” — pain, measurements, outcome scores, goals, comparisons with the evaluation and the last progress note, and the home program. Only signed notes are used.</Term>
+            <Term name="Fill empty fields from charting">Writes that information into the note’s empty fields (period, visits, changes, functional improvement or outcome, frequency, duration, certification dates, home program) and adds the episode’s goals so you can record their status. Fields you have already written are never replaced. Reason for discharge, prognosis and your assessment are left for you.</Term>
+            <Term name="Review before signing">A pre-filled note can’t be signed until you press “I have reviewed the pre-filled content”. Edit anything that isn’t right first.</Term>
+            <Term name="What signing does">A re-evaluation or recertification creates a new plan of care; the previous one is kept as superseded. A discharge summary closes the plan of care with the reason for discharge. A progress note doesn’t change the plan — if its frequency or duration differ, the signing checks suggest a recertification.</Term>
           </>
         ),
       },
@@ -457,7 +484,13 @@ export const pageHelp: Record<string, PageHelp> = {
       {
         id: "outcomes",
         title: "Outcome measures",
-        body: <Term name="Record score">Choose the measure (LEFS, ODI, NDI, QuickDASH, TUG, Berg, PSFS) and enter today’s score. The table shows the change since the previous score and whether that is an improvement for that measure.</Term>,
+        body: (
+          <>
+            <Term name="Record a measure">Choose the measure — LEFS, Oswestry (ODI), Neck Disability Index, QuickDASH, Patient-Specific Functional Scale, Berg, Timed Up and Go, Five Times Sit-to-Stand, ABC Scale or Functional Gait Assessment. Administer the official form and enter each item’s score (“Item by item”); the score and its interpretation update as you go and the responses are saved with it. “Total only” records a total you already have.</Term>
+            <Term name="Comparison">For each measure: baseline (first score), previous and current score, change from baseline, the interpretation, and whether the change reaches the measure’s meaningful-change value. The trend chart plots every score; the dashed line is the baseline. “Score history” lists them all.</Term>
+            <Term name="Signed notes">A score recorded on a note becomes part of it: once the note is signed it can’t be changed or removed. Interpretations are commonly cited reference values — clinical judgement applies.</Term>
+          </>
+        ),
       },
       {
         id: "interventions",
@@ -472,7 +505,14 @@ export const pageHelp: Record<string, PageHelp> = {
       {
         id: "progress",
         title: "Goals & progress",
-        body: <Term name="Update progress">Enter today’s value for a goal; the progress bar shows how far the patient is from baseline to target.</Term>,
+        body: (
+          <>
+            <Term name="This visit">For each goal enter today’s value, its status (not started, in progress, met, partially met, discontinued) and a comment. The progress bar shows how far the patient has moved from baseline to target. Progress is saved with the note and reaches the goal when the note is signed.</Term>
+            <Term name="Insert goal progress">Writes the goals ticked “Include in note” into the progress, functional-improvement or assessment field, ready to edit.</Term>
+            <Term name="+ Add goal / Edit goal">Write goals as what the patient will do, how much, how it’s measured and by when; advice appears under the form if the wording isn’t measurable. New goals are drafts until a PT approves them. Editing creates a new version — earlier versions stay in the goal’s history, and signed notes keep the goal as they documented it.</Term>
+            <Term name="History">Every version of the goal and every progress entry, with the note it came from.</Term>
+          </>
+        ),
       },
       {
         id: "sign",
@@ -540,6 +580,25 @@ export const pageHelp: Record<string, PageHelp> = {
     ],
   },
 
+  "special-tests": {
+    title: "Special Tests Library",
+    intro: <p>The special tests clinicians pick from when charting. Built-in tests come with PhysioTrac; add your clinic’s own as needed.</p>,
+    sections: [
+      {
+        id: "manage",
+        title: "Managing tests",
+        body: (
+          <>
+            <Term name="+ Add test">Name, specialty, body region, the kind of result (positive/negative, a number with its unit, or both), a description, an interpretation guide and any contraindication warning.</Term>
+            <Term name="Deactivate">Stops offering the test for new notes. Results already recorded keep their own copy of the name.</Term>
+            <Term name="⚠">The test has a precaution that clinicians see before recording it.</Term>
+            <Note>Interpretation guides are reference text for clinicians; PhysioTrac never interprets a result or makes a diagnosis.</Note>
+          </>
+        ),
+      },
+    ],
+  },
+
   "patient-documentation": {
     title: "Patient Documentation",
     intro: <p>Everything documented for one patient: visit notes with their charting, pain and range-of-motion trends, outcome measures, goals, diagnoses and precautions.</p>,
@@ -553,6 +612,16 @@ export const pageHelp: Record<string, PageHelp> = {
         id: "trends",
         title: "Trends",
         body: <Term name="Pain & range-of-motion trend">Pain and each measured motion across the last six signed visits, oldest to newest.</Term>,
+      },
+      {
+        id: "outcomes-goals",
+        title: "Outcome measures & goals",
+        body: (
+          <>
+            <Term name="Outcome measures">Each measure’s baseline, previous and current score, change from baseline, interpretation, trend chart and full history.</Term>
+            <Term name="Goals">Every goal with its status and progress; “History” shows each version and progress entry.</Term>
+          </>
+        ),
       },
       {
         id: "notes",
@@ -779,6 +848,7 @@ export function helpKeyFor(pathname: string): string {
   if (pathname.startsWith("/admin/users")) return "users";
   if (pathname.startsWith("/admin/logs")) return "logs";
   if (pathname.startsWith("/admin/templates")) return "templates";
+  if (pathname.startsWith("/admin/special-tests")) return "special-tests";
   if (pathname.startsWith("/admin/locations")) return "locations";
   if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/change-password")) return "change-password";

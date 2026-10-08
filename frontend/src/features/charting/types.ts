@@ -70,6 +70,7 @@ export interface ChartNote {
   /** Set on a formal amendment: the signed note it corrects. */
   amendsNoteId?: string | null;
   amendmentReason?: string | null;
+  templateVersionId?: string | null;
 }
 
 // Matches PhysioTrac.Application.Clinical.NoteActionsDto.
@@ -198,7 +199,7 @@ export interface Goal {
   unit: string;
   measurementMethod: string;
   targetDate: string;
-  status: number; // 0 draft, 1 active, 2 met, 3 discontinued
+  status: number; // 0 draft, 1 in progress, 2 met, 3 discontinued, 4 not started, 5 partially met
   progressPercent: number | null;
 }
 

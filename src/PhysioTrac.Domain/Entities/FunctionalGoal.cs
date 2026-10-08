@@ -27,16 +27,15 @@ public class FunctionalGoal : BaseEntity
     public string? SuggestedWording { get; set; }
     public GoalStatus Status { get; set; } = GoalStatus.Draft;
 
+    /// <summary>The therapist's standing comments on the goal.</summary>
+    public string? Comments { get; set; }
+
+    /// <summary>Goal definition version: bumped by every edit; each version
+    /// is kept in <see cref="FunctionalGoalHistory"/>.</summary>
+    public int Version { get; set; } = 1;
+
     public Guid? ApprovedById { get; set; }
     public DateTimeOffset? ApprovedAt { get; set; }
 
-    public int? ProgressPercent
-    {
-        get
-        {
-            if (CurrentValue is null || TargetValue == BaselineValue) return null;
-            var progress = (CurrentValue.Value - BaselineValue) / (TargetValue - BaselineValue) * 100;
-            return Math.Max(0, Math.Min(100, (int)Math.Round(progress)));
-        }
-    }
+    public int? ProgressPercent => FunctionalGoalMath.Progress(BaselineValue, TargetValue, CurrentValue);
 }

@@ -152,3 +152,52 @@ public enum BodyFindingType
     Radiating,
     Other,
 }
+
+public enum MeasurementCategory
+{
+    RangeOfMotion,
+    Strength,
+    Sensation,
+    Dermatome,
+    Myotome,
+    Reflex,
+    Tone,
+    Coordination,
+    CranialNerve,
+    Gait,
+    Balance,
+    Functional,
+}
+
+/// <summary>What a special test's result consists of.</summary>
+public enum SpecialTestResultKind
+{
+    PositiveNegative,
+    Numeric,
+    Both,
+}
+
+public enum SpecialTestOutcome
+{
+    NotTested,
+    Positive,
+    Negative,
+}
+
+/// <summary>What happened with a flowsheet entry this visit.</summary>
+public enum InterventionStatus
+{
+    Completed,
+    Modified,
+    Held,
+    Discontinued,
+}
+
+/// <summary>What a goal history entry records.</summary>
+public enum GoalHistoryKind
+{
+    Created,
+    Approved,
+    Edited,
+    Progress,
+}

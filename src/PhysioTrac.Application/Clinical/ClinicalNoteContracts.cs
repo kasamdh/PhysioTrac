@@ -13,7 +13,8 @@ public record ClinicalNoteDto(
     string SubjectiveDetailsJson = "{}", string ObjectiveMeasurementsJson = "{}",
     Guid? AmendsNoteId = null, string? AmendmentReason = null,
     Guid? TreatingProviderId = null, Guid? SupervisingProviderId = null, Guid? TemplateVersionId = null, Guid? PlanOfCareId = null,
-    DateOnly? PeriodStart = null, DateOnly? PeriodEnd = null, string? ReturnReason = null, string? VoidReason = null);
+    DateOnly? PeriodStart = null, DateOnly? PeriodEnd = null, string? ReturnReason = null, string? VoidReason = null,
+    DateTimeOffset? PrefilledAt = null, DateTimeOffset? PrefillReviewedAt = null);
 
 /// <summary>An electronic signature on a note, as recorded at signing.</summary>
 public record ElectronicSignatureDto(

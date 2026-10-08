@@ -197,6 +197,7 @@ public class DocumentationTemplateTests
         c.Db.AppointmentTypes.Add(type);
         await c.Db.SaveChangesAsync();
         var assigned = await c.Templates.CreateAsync(Request() with { AppointmentTypeIds = [type.Id] }, c.Admin);
+        Assert.Single(assigned.Template.AppointmentTypeIds); // listed once, not duplicated
 
         Assert.Equal(assigned.Template.Id, (await c.Templates.SuggestAsync(c.Therapist, NoteType.Daily, type.Id))!.Id);
         // A progress note has no clinic template, so the system one is suggested.

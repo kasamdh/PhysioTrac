@@ -47,8 +47,16 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<PlanOfCare> PlansOfCare => Set<PlanOfCare>();
     public DbSet<PainAssessment> PainAssessments => Set<PainAssessment>();
     public DbSet<BodyChartFinding> BodyChartFindings => Set<BodyChartFinding>();
+    public DbSet<ObjectiveMeasurement> ObjectiveMeasurements => Set<ObjectiveMeasurement>();
+    public DbSet<SpecialTestDefinition> SpecialTestDefinitions => Set<SpecialTestDefinition>();
+    public DbSet<SpecialTestResult> SpecialTestResults => Set<SpecialTestResult>();
+    public DbSet<InterventionLibraryItem> InterventionLibraryItems => Set<InterventionLibraryItem>();
+    public DbSet<InterventionGroup> InterventionGroups => Set<InterventionGroup>();
+    public DbSet<InterventionGroupItem> InterventionGroupItems => Set<InterventionGroupItem>();
     public DbSet<FunctionalGoal> FunctionalGoals => Set<FunctionalGoal>();
     public DbSet<OutcomeScore> OutcomeScores => Set<OutcomeScore>();
+    public DbSet<FunctionalGoalHistory> FunctionalGoalHistory => Set<FunctionalGoalHistory>();
+    public DbSet<NoteGoalProgress> NoteGoalProgress => Set<NoteGoalProgress>();
     public DbSet<Waitlist> Waitlists => Set<Waitlist>();
     public DbSet<DiagnosisCode> DiagnosisCodes => Set<DiagnosisCode>();
     public DbSet<Payer> Payers => Set<Payer>();
@@ -374,7 +382,10 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             // removed by deleting something they point at.
             e.HasIndex(n => new { n.TreatingProviderId, n.ServiceDate });
             e.HasIndex(n => new { n.Status, n.ServiceDate });
-            e.HasIndex(n => n.PlanOfCareId);
+            // Many notes belong to one plan of care. Explicitly non-unique:
+            // EF's convention first pairs PlanOfCare.SourceNote with this
+            // navigation as one-to-one and would otherwise keep the index unique.
+            e.HasIndex(n => n.PlanOfCareId).IsUnique(false);
             e.HasOne(n => n.TreatingProvider).WithMany()
                 .HasForeignKey(n => n.TreatingProviderId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(n => n.SupervisingProvider).WithMany()
@@ -542,6 +553,64 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(f => f.NoteId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        builder.Entity<ObjectiveMeasurement>(e =>
+        {
+            e.HasIndex(m => new { m.NoteId, m.Order });
+            e.HasIndex(m => new { m.PatientId, m.Category });
+            e.Property(m => m.Category).HasConversion<string>().HasMaxLength(20);
+            e.Property(m => m.Side).HasConversion<string>().HasMaxLength(10);
+            e.Property(m => m.Item).HasMaxLength(100);
+            e.Property(m => m.Movement).HasMaxLength(100);
+            e.Property(m => m.Mode).HasMaxLength(30);
+            e.Property(m => m.NumericValue).HasPrecision(12, 2);
+            e.Property(m => m.TextValue).HasMaxLength(100);
+            e.Property(m => m.Unit).HasMaxLength(20);
+            e.Property(m => m.BodyRegion).HasMaxLength(60);
+            e.Property(m => m.EndFeel).HasMaxLength(40);
+            e.Property(m => m.Compensation).HasMaxLength(300);
+            e.Property(m => m.AssistiveDevice).HasMaxLength(100);
+            e.Property(m => m.AssistanceLevel).HasMaxLength(40);
+            e.Property(m => m.Surface).HasMaxLength(60);
+            e.Property(m => m.Condition).HasMaxLength(100);
+            e.Property(m => m.Comment).HasMaxLength(1000);
+            e.HasOne(m => m.Note).WithMany()
+                .HasForeignKey(m => m.NoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<SpecialTestDefinition>(e =>
+        {
+            e.HasIndex(d => d.Code).IsUnique();
+            e.HasIndex(d => new { d.Specialty, d.IsActive });
+            e.Property(d => d.Code).HasMaxLength(60);
+            e.Property(d => d.Name).HasMaxLength(150);
+            e.Property(d => d.Specialty).HasConversion<string>().HasMaxLength(30);
+            e.Property(d => d.ResultKind).HasConversion<string>().HasMaxLength(20);
+            e.Property(d => d.BodyRegion).HasMaxLength(60);
+            e.Property(d => d.Description).HasMaxLength(1000);
+            e.Property(d => d.Unit).HasMaxLength(20);
+            e.Property(d => d.InterpretationGuide).HasMaxLength(1000);
+            e.Property(d => d.ContraindicationWarning).HasMaxLength(1000);
+        });
+
+        builder.Entity<SpecialTestResult>(e =>
+        {
+            e.HasIndex(r => new { r.NoteId, r.Order });
+            e.HasIndex(r => new { r.PatientId, r.TestName });
+            e.Property(r => r.TestName).HasMaxLength(150);
+            e.Property(r => r.Specialty).HasConversion<string>().HasMaxLength(30);
+            e.Property(r => r.Side).HasConversion<string>().HasMaxLength(10);
+            e.Property(r => r.Outcome).HasConversion<string>().HasMaxLength(20);
+            e.Property(r => r.BodyRegion).HasMaxLength(60);
+            e.Property(r => r.NumericValue).HasPrecision(12, 2);
+            e.Property(r => r.Unit).HasMaxLength(20);
+            e.Property(r => r.Interpretation).HasMaxLength(500);
+            e.Property(r => r.Comment).HasMaxLength(1000);
+            e.HasOne(r => r.Note).WithMany()
+                .HasForeignKey(r => r.NoteId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Definition).WithMany()
+                .HasForeignKey(r => r.DefinitionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         builder.Entity<PlanOfCare>(e =>
         {
             e.HasIndex(p => new { p.PatientId, p.Status });
@@ -598,8 +667,66 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         builder.Entity<NoteIntervention>(e =>
         {
             e.Property(i => i.Category).HasConversion<string>().HasMaxLength(32);
+            // Restrict like every other clinical record: a note's treatment
+            // lines are never removed by deleting something else.
             e.HasOne(i => i.Note).WithMany(n => n.InterventionItems)
-                .HasForeignKey(i => i.NoteId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(i => i.NoteId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(i => i.LibraryItem).WithMany()
+                .HasForeignKey(i => i.LibraryItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(i => i.CarriedForwardFromNoteId);
+            e.Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(i => i.Description).HasMaxLength(300);
+            e.Property(i => i.BodyRegion).HasMaxLength(60);
+            e.Property(i => i.CptCode).HasMaxLength(10);
+            e.Property(i => i.Resistance).HasMaxLength(60);
+            e.Property(i => i.Duration).HasMaxLength(60);
+            e.Property(i => i.Distance).HasMaxLength(60);
+            e.Property(i => i.Position).HasMaxLength(60);
+            e.Property(i => i.Equipment).HasMaxLength(100);
+            e.Property(i => i.AssistanceLevel).HasMaxLength(40);
+            e.Property(i => i.Cueing).HasMaxLength(60);
+            e.Property(i => i.Modification).HasMaxLength(200);
+            e.Property(i => i.PatientResponse).HasMaxLength(1000);
+            e.Property(i => i.Comment).HasMaxLength(1000);
+        });
+
+        builder.Entity<InterventionLibraryItem>(e =>
+        {
+            e.HasIndex(i => i.Code).IsUnique();
+            e.HasIndex(i => new { i.Category, i.IsActive });
+            e.Property(i => i.Code).HasMaxLength(60);
+            e.Property(i => i.Name).HasMaxLength(150);
+            e.Property(i => i.Category).HasConversion<string>().HasMaxLength(32);
+            e.Property(i => i.CptCode).HasMaxLength(10);
+            e.Property(i => i.BodyRegion).HasMaxLength(60);
+            e.Property(i => i.Description).HasMaxLength(1000);
+            e.Property(i => i.DefaultResistance).HasMaxLength(60);
+            e.Property(i => i.DefaultDuration).HasMaxLength(60);
+            e.Property(i => i.DefaultEquipment).HasMaxLength(100);
+            e.Property(i => i.DefaultPosition).HasMaxLength(60);
+        });
+
+        builder.Entity<InterventionGroup>(e =>
+        {
+            e.HasIndex(g => new { g.OwnerUserId, g.IsActive });
+            e.Property(g => g.Name).HasMaxLength(120);
+            e.Property(g => g.Description).HasMaxLength(500);
+        });
+
+        builder.Entity<InterventionGroupItem>(e =>
+        {
+            e.HasIndex(i => new { i.GroupId, i.Order });
+            e.Property(i => i.Name).HasMaxLength(300);
+            e.Property(i => i.Category).HasConversion<string>().HasMaxLength(32);
+            e.Property(i => i.CptCode).HasMaxLength(10);
+            e.Property(i => i.Resistance).HasMaxLength(60);
+            e.Property(i => i.Duration).HasMaxLength(60);
+            e.Property(i => i.Equipment).HasMaxLength(100);
+            e.Property(i => i.Position).HasMaxLength(60);
+            e.HasOne(i => i.Group).WithMany(g => g.Items)
+                .HasForeignKey(i => i.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(i => i.LibraryItem).WithMany()
+                .HasForeignKey(i => i.LibraryItemId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<FunctionalGoal>(e =>
@@ -610,8 +737,40 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(g => g.BaselineValue).HasPrecision(8, 2);
             e.Property(g => g.TargetValue).HasPrecision(8, 2);
             e.Property(g => g.CurrentValue).HasPrecision(8, 2);
+            e.Property(g => g.Comments).HasMaxLength(2000);
             e.HasOne(g => g.Patient).WithMany(p => p.Goals)
                 .HasForeignKey(g => g.PatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<FunctionalGoalHistory>(e =>
+        {
+            e.ToTable("FunctionalGoalHistory");
+            e.HasIndex(h => new { h.GoalId, h.CreatedAt });
+            e.HasIndex(h => h.NoteId);
+            e.Property(h => h.Kind).HasConversion<string>().HasMaxLength(16);
+            e.Property(h => h.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(h => h.CurrentValue).HasPrecision(8, 2);
+            e.Property(h => h.Comment).HasMaxLength(2000);
+            e.HasOne(h => h.Goal).WithMany()
+                .HasForeignKey(h => h.GoalId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<NoteGoalProgress>(e =>
+        {
+            e.ToTable("NoteGoalProgress");
+            e.HasIndex(p => new { p.NoteId, p.GoalId }).IsUnique();
+            e.HasIndex(p => p.GoalId);
+            e.Property(p => p.Term).HasConversion<string>().HasMaxLength(16);
+            e.Property(p => p.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(p => p.BaselineValue).HasPrecision(8, 2);
+            e.Property(p => p.TargetValue).HasPrecision(8, 2);
+            e.Property(p => p.PreviousValue).HasPrecision(8, 2);
+            e.Property(p => p.CurrentValue).HasPrecision(8, 2);
+            e.Property(p => p.Comment).HasMaxLength(2000);
+            e.HasOne(p => p.Note).WithMany()
+                .HasForeignKey(p => p.NoteId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.Goal).WithMany()
+                .HasForeignKey(p => p.GoalId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<OutcomeScore>(e =>
@@ -620,6 +779,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(o => o.Measure).HasConversion<string>().HasMaxLength(20);
             e.Property(o => o.Score).HasPrecision(8, 2);
             e.Property(o => o.MaximumScore).HasPrecision(8, 2);
+            e.Property(o => o.Interpretation).HasMaxLength(200);
             e.HasOne(o => o.Patient).WithMany(p => p.Outcomes)
                 .HasForeignKey(o => o.PatientId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(o => o.Note).WithMany()
@@ -947,6 +1107,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             {
                 ElectronicSignature => "Electronic signatures cannot be changed or deleted.",
                 ClinicalNoteStatusChange => "Note status history cannot be changed or deleted.",
+                Domain.Entities.FunctionalGoalHistory => "Goal history cannot be changed or deleted.",
                 ClinicalNoteTemplateVersion or ClinicalNoteTemplateSection or ClinicalNoteTemplateField =>
                     "A published template version cannot be changed. Publish a new version instead.",
                 _ => null,

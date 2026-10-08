@@ -1,7 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchEncounter } from "./api";
 import { BodyChart } from "./bodychart/BodyChart";
+import { MeasurementsPanel } from "./measurements/MeasurementsPanel";
+import { SpecialTestsPanel } from "./measurements/SpecialTestsPanel";
+import { FlowsheetPanel } from "./flowsheet/FlowsheetPanel";
+import { GoalProgressSummary } from "./goals/GoalTracker";
+import { formatScore } from "./outcomes/model";
+import { useOutcomeDefinitions } from "./outcomes/queries";
 import { FREQUENCY, IRRITABILITY, PainScaleLabels, formatRating } from "./pain";
+import type { OutcomeScore } from "./outcomes/model";
 import type { PainAssessment } from "./types";
 
 /** A signed (or any) note's pain assessment as read-only text. */
@@ -53,7 +60,17 @@ export function NoteCharting({ noteId }: { noteId: string }) {
     queryFn: () => fetchEncounter(noteId),
   });
   const e = encounter.data;
-  if (!e || (!e.pain && !e.bodyChart?.length)) return null;
+  if (
+    !e ||
+    (!e.pain &&
+      !e.bodyChart?.length &&
+      !e.measurements?.length &&
+      !e.flowsheet?.length &&
+      !e.goalProgress?.length &&
+      !e.outcomes?.length &&
+      !e.specialTests?.length)
+  )
+    return null;
   return (
     <div className="space-y-3">
       {e.pain && <PainSummary pain={e.pain} />}
@@ -63,6 +80,69 @@ export function NoteCharting({ noteId }: { noteId: string }) {
           <BodyChart findings={e.bodyChart} readOnly />
         </div>
       )}
+      {!!e.measurements?.length && (
+        <div>
+          <p className="font-bold text-[#333]">Objective measurements</p>
+          <MeasurementsPanel
+            value={e.measurements}
+            onChange={() => {}}
+            readOnly
+            history={e.measurementHistory ?? []}
+          />
+        </div>
+      )}
+      {!!e.flowsheet?.length && (
+        <div>
+          <p className="font-bold text-[#333]">Interventions</p>
+          <FlowsheetPanel
+            value={e.flowsheet}
+            onChange={() => {}}
+            readOnly
+            previous={null}
+            ruleVariant={e.flowsheetSummary?.ruleVariant ?? "Medicare"}
+            canShareGroups={false}
+          />
+        </div>
+      )}
+      {!!e.goalProgress?.length && (
+        <div>
+          <p className="font-bold text-[#333]">Goal progress</p>
+          <GoalProgressSummary rows={e.goalProgress} />
+        </div>
+      )}
+      {!!e.outcomes?.length && <NoteOutcomes scores={e.outcomes} />}
+      {!!e.specialTests?.length && (
+        <div className="break-inside-avoid">
+          <p className="font-bold text-[#333]">Special tests</p>
+          <SpecialTestsPanel
+            value={e.specialTests}
+            onChange={() => {}}
+            readOnly
+            history={e.specialTestHistory ?? []}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The outcome scores recorded on a note, with their interpretation. */
+function NoteOutcomes({ scores }: { scores: OutcomeScore[] }) {
+  const definitions = useOutcomeDefinitions();
+  const def = (m: number) => definitions.data?.find((d) => d.measure === m);
+  return (
+    <div className="break-inside-avoid">
+      <p className="font-bold text-[#333]">Outcome measures</p>
+      <ul className="space-y-1">
+        {scores.map((s) => (
+          <li key={s.id} className="text-[#333]">
+            <strong>{def(s.measure)?.abbreviation ?? "Measure"}</strong>{" "}
+            {formatScore(def(s.measure), s.score)}
+            {s.interpretation ? ` — ${s.interpretation}` : ""}
+            {s.notes ? ` (${s.notes})` : ""}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

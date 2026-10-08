@@ -230,6 +230,8 @@ if (app.Environment.IsDevelopment())
     if (!(await db.Database.GetPendingMigrationsAsync()).Any())
     {
         await SystemTemplateSeeder.SeedAsync(db);
+        await SpecialTestSeeder.SeedAsync(db);
+        await InterventionLibrarySeeder.SeedAsync(db);
     }
 }
 

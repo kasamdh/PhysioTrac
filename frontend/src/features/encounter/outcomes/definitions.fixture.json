@@ -1,0 +1,948 @@
+[
+  {
+    "measure": 0,
+    "code": "lefs",
+    "abbreviation": "LEFS",
+    "name": "Lower Extremity Functional Scale",
+    "domain": "Lower extremity function",
+    "description": "20 activities rated from 0 (extreme difficulty or unable) to 4 (no difficulty).",
+    "scoring": 0,
+    "items": [
+      {
+        "key": "i1",
+        "label": "Usual work, housework or school activities"
+      },
+      {
+        "key": "i2",
+        "label": "Usual hobbies, recreational or sporting activities"
+      },
+      {
+        "key": "i3",
+        "label": "Getting into or out of the bath"
+      },
+      {
+        "key": "i4",
+        "label": "Walking between rooms"
+      },
+      {
+        "key": "i5",
+        "label": "Putting on shoes or socks"
+      },
+      {
+        "key": "i6",
+        "label": "Squatting"
+      },
+      {
+        "key": "i7",
+        "label": "Lifting an object, like a bag of groceries, from the floor"
+      },
+      {
+        "key": "i8",
+        "label": "Light activities around the home"
+      },
+      {
+        "key": "i9",
+        "label": "Heavy activities around the home"
+      },
+      {
+        "key": "i10",
+        "label": "Getting into or out of a car"
+      },
+      {
+        "key": "i11",
+        "label": "Walking 2 blocks"
+      },
+      {
+        "key": "i12",
+        "label": "Walking a mile"
+      },
+      {
+        "key": "i13",
+        "label": "Going up or down 10 stairs (about 1 flight)"
+      },
+      {
+        "key": "i14",
+        "label": "Standing for 1 hour"
+      },
+      {
+        "key": "i15",
+        "label": "Sitting for 1 hour"
+      },
+      {
+        "key": "i16",
+        "label": "Running on even ground"
+      },
+      {
+        "key": "i17",
+        "label": "Running on uneven ground"
+      },
+      {
+        "key": "i18",
+        "label": "Making sharp turns while running fast"
+      },
+      {
+        "key": "i19",
+        "label": "Hopping"
+      },
+      {
+        "key": "i20",
+        "label": "Rolling over in bed"
+      }
+    ],
+    "itemMin": 0,
+    "itemMax": 4,
+    "itemStep": 1,
+    "options": [
+      {
+        "value": 0,
+        "label": "0 — Extreme difficulty or unable"
+      },
+      {
+        "value": 1,
+        "label": "1 — Quite a bit of difficulty"
+      },
+      {
+        "value": 2,
+        "label": "2 — Moderate difficulty"
+      },
+      {
+        "value": 3,
+        "label": "3 — A little bit of difficulty"
+      },
+      {
+        "value": 4,
+        "label": "4 — No difficulty"
+      }
+    ],
+    "minAnswered": 20,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": 80,
+    "unit": "points",
+    "higherIsBetter": true,
+    "decimals": 0,
+    "meaningfulChange": 9,
+    "meaningfulChangeNote": "Minimal clinically important difference ≈ 9 points.",
+    "bands": [],
+    "reference": null
+  },
+  {
+    "measure": 1,
+    "code": "odi",
+    "abbreviation": "ODI",
+    "name": "Oswestry Disability Index",
+    "domain": "Low back",
+    "description": "10 sections scored 0–5; reported as a percentage of the maximum for the sections answered.",
+    "scoring": 1,
+    "items": [
+      {
+        "key": "i1",
+        "label": "Pain intensity"
+      },
+      {
+        "key": "i2",
+        "label": "Personal care"
+      },
+      {
+        "key": "i3",
+        "label": "Lifting"
+      },
+      {
+        "key": "i4",
+        "label": "Walking"
+      },
+      {
+        "key": "i5",
+        "label": "Sitting"
+      },
+      {
+        "key": "i6",
+        "label": "Standing"
+      },
+      {
+        "key": "i7",
+        "label": "Sleeping"
+      },
+      {
+        "key": "i8",
+        "label": "Sex life (if applicable)"
+      },
+      {
+        "key": "i9",
+        "label": "Social life"
+      },
+      {
+        "key": "i10",
+        "label": "Travelling"
+      }
+    ],
+    "itemMin": 0,
+    "itemMax": 5,
+    "itemStep": 1,
+    "options": [
+      {
+        "value": 0,
+        "label": "0 — least limitation"
+      },
+      {
+        "value": 1,
+        "label": "1"
+      },
+      {
+        "value": 2,
+        "label": "2"
+      },
+      {
+        "value": 3,
+        "label": "3"
+      },
+      {
+        "value": 4,
+        "label": "4"
+      },
+      {
+        "value": 5,
+        "label": "5 — most limitation"
+      }
+    ],
+    "minAnswered": 9,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": 100,
+    "unit": "%",
+    "higherIsBetter": false,
+    "decimals": 0,
+    "meaningfulChange": 10,
+    "meaningfulChangeNote": "Minimal clinically important difference ≈ 10 percentage points.",
+    "bands": [
+      {
+        "min": 0,
+        "label": "Minimal disability (0–20%)"
+      },
+      {
+        "min": 21,
+        "label": "Moderate disability (21–40%)"
+      },
+      {
+        "min": 41,
+        "label": "Severe disability (41–60%)"
+      },
+      {
+        "min": 61,
+        "label": "Very severe disability (61–80%)"
+      },
+      {
+        "min": 81,
+        "label": "Bed-bound or symptoms possibly exaggerated (81–100%)"
+      }
+    ],
+    "reference": "Bands from the ODI scoring guide. One unanswered section is allowed."
+  },
+  {
+    "measure": 2,
+    "code": "ndi",
+    "abbreviation": "NDI",
+    "name": "Neck Disability Index",
+    "domain": "Neck",
+    "description": "10 sections scored 0–5; total out of 50 (scaled up when one section is unanswered).",
+    "scoring": 2,
+    "items": [
+      {
+        "key": "i1",
+        "label": "Pain intensity"
+      },
+      {
+        "key": "i2",
+        "label": "Personal care"
+      },
+      {
+        "key": "i3",
+        "label": "Lifting"
+      },
+      {
+        "key": "i4",
+        "label": "Reading"
+      },
+      {
+        "key": "i5",
+        "label": "Headaches"
+      },
+      {
+        "key": "i6",
+        "label": "Concentration"
+      },
+      {
+        "key": "i7",
+        "label": "Work"
+      },
+      {
+        "key": "i8",
+        "label": "Driving"
+      },
+      {
+        "key": "i9",
+        "label": "Sleeping"
+      },
+      {
+        "key": "i10",
+        "label": "Recreation"
+      }
+    ],
+    "itemMin": 0,
+    "itemMax": 5,
+    "itemStep": 1,
+    "options": [
+      {
+        "value": 0,
+        "label": "0 — least limitation"
+      },
+      {
+        "value": 1,
+        "label": "1"
+      },
+      {
+        "value": 2,
+        "label": "2"
+      },
+      {
+        "value": 3,
+        "label": "3"
+      },
+      {
+        "value": 4,
+        "label": "4"
+      },
+      {
+        "value": 5,
+        "label": "5 — most limitation"
+      }
+    ],
+    "minAnswered": 9,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": 50,
+    "unit": "points",
+    "higherIsBetter": false,
+    "decimals": 0,
+    "meaningfulChange": 7.5,
+    "meaningfulChangeNote": "Minimal clinically important difference ≈ 7.5 points (out of 50).",
+    "bands": [
+      {
+        "min": 0,
+        "label": "No disability (0–4)"
+      },
+      {
+        "min": 5,
+        "label": "Mild disability (5–14)"
+      },
+      {
+        "min": 15,
+        "label": "Moderate disability (15–24)"
+      },
+      {
+        "min": 25,
+        "label": "Severe disability (25–34)"
+      },
+      {
+        "min": 35,
+        "label": "Complete disability (35–50)"
+      }
+    ],
+    "reference": "Bands from Vernon's scoring guide. One unanswered section is allowed."
+  },
+  {
+    "measure": 3,
+    "code": "quickdash",
+    "abbreviation": "QuickDASH",
+    "name": "QuickDASH (Disabilities of the Arm, Shoulder and Hand)",
+    "domain": "Upper extremity function",
+    "description": "11 items scored 1–5; score = (mean of answered items − 1) × 25, from 0 (no disability) to 100.",
+    "scoring": 3,
+    "items": [
+      {
+        "key": "i1",
+        "label": "Open a tight or new jar"
+      },
+      {
+        "key": "i2",
+        "label": "Do heavy household chores"
+      },
+      {
+        "key": "i3",
+        "label": "Carry a shopping bag or briefcase"
+      },
+      {
+        "key": "i4",
+        "label": "Wash your back"
+      },
+      {
+        "key": "i5",
+        "label": "Use a knife to cut food"
+      },
+      {
+        "key": "i6",
+        "label": "Recreation with force or impact through the arm, shoulder or hand"
+      },
+      {
+        "key": "i7",
+        "label": "Interference with normal social activities"
+      },
+      {
+        "key": "i8",
+        "label": "Limitation in work or other daily activities"
+      },
+      {
+        "key": "i9",
+        "label": "Arm, shoulder or hand pain"
+      },
+      {
+        "key": "i10",
+        "label": "Tingling (pins and needles)"
+      },
+      {
+        "key": "i11",
+        "label": "Difficulty sleeping because of pain"
+      }
+    ],
+    "itemMin": 1,
+    "itemMax": 5,
+    "itemStep": 1,
+    "options": [
+      {
+        "value": 1,
+        "label": "1 — none / no difficulty"
+      },
+      {
+        "value": 2,
+        "label": "2"
+      },
+      {
+        "value": 3,
+        "label": "3"
+      },
+      {
+        "value": 4,
+        "label": "4"
+      },
+      {
+        "value": 5,
+        "label": "5 — extreme / unable"
+      }
+    ],
+    "minAnswered": 10,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": 100,
+    "unit": "points",
+    "higherIsBetter": false,
+    "decimals": 1,
+    "meaningfulChange": 8,
+    "meaningfulChangeNote": "Minimal clinically important difference reported at about 8–16 points.",
+    "bands": [],
+    "reference": "At least 10 of the 11 items must be answered."
+  },
+  {
+    "measure": 6,
+    "code": "psfs",
+    "abbreviation": "PSFS",
+    "name": "Patient-Specific Functional Scale",
+    "domain": "Patient-specific function",
+    "description": "The patient names up to 5 activities they find hard and rates each from 0 (unable) to 10 (able at prior level).",
+    "scoring": 4,
+    "items": [
+      {
+        "key": "activity1",
+        "label": "Activity 1"
+      },
+      {
+        "key": "activity2",
+        "label": "Activity 2"
+      },
+      {
+        "key": "activity3",
+        "label": "Activity 3"
+      },
+      {
+        "key": "activity4",
+        "label": "Activity 4"
+      },
+      {
+        "key": "activity5",
+        "label": "Activity 5"
+      }
+    ],
+    "itemMin": 0,
+    "itemMax": 10,
+    "itemStep": 1,
+    "options": [
+      {
+        "value": 0,
+        "label": "0 — unable"
+      },
+      {
+        "value": 1,
+        "label": "1"
+      },
+      {
+        "value": 2,
+        "label": "2"
+      },
+      {
+        "value": 3,
+        "label": "3"
+      },
+      {
+        "value": 4,
+        "label": "4"
+      },
+      {
+        "value": 5,
+        "label": "5"
+      },
+      {
+        "value": 6,
+        "label": "6"
+      },
+      {
+        "value": 7,
+        "label": "7"
+      },
+      {
+        "value": 8,
+        "label": "8"
+      },
+      {
+        "value": 9,
+        "label": "9"
+      },
+      {
+        "value": 10,
+        "label": "10 — able at prior level"
+      }
+    ],
+    "minAnswered": 1,
+    "itemsNamedByPatient": true,
+    "scoreMin": 0,
+    "scoreMax": 10,
+    "unit": "points",
+    "higherIsBetter": true,
+    "decimals": 1,
+    "meaningfulChange": 2,
+    "meaningfulChangeNote": "Minimal detectable change ≈ 2 points for the average score (3 for a single activity).",
+    "bands": [],
+    "reference": "Rate the same activities at each visit."
+  },
+  {
+    "measure": 5,
+    "code": "berg",
+    "abbreviation": "BBS",
+    "name": "Berg Balance Scale",
+    "domain": "Balance",
+    "description": "14 tasks scored 0–4; total out of 56.",
+    "scoring": 0,
+    "items": [
+      {
+        "key": "i1",
+        "label": "Sitting to standing"
+      },
+      {
+        "key": "i2",
+        "label": "Standing unsupported"
+      },
+      {
+        "key": "i3",
+        "label": "Sitting unsupported"
+      },
+      {
+        "key": "i4",
+        "label": "Standing to sitting"
+      },
+      {
+        "key": "i5",
+        "label": "Transfers"
+      },
+      {
+        "key": "i6",
+        "label": "Standing with eyes closed"
+      },
+      {
+        "key": "i7",
+        "label": "Standing with feet together"
+      },
+      {
+        "key": "i8",
+        "label": "Reaching forward with outstretched arm"
+      },
+      {
+        "key": "i9",
+        "label": "Retrieving an object from the floor"
+      },
+      {
+        "key": "i10",
+        "label": "Turning to look behind"
+      },
+      {
+        "key": "i11",
+        "label": "Turning 360 degrees"
+      },
+      {
+        "key": "i12",
+        "label": "Placing alternate foot on a stool"
+      },
+      {
+        "key": "i13",
+        "label": "Standing with one foot in front"
+      },
+      {
+        "key": "i14",
+        "label": "Standing on one foot"
+      }
+    ],
+    "itemMin": 0,
+    "itemMax": 4,
+    "itemStep": 1,
+    "options": [
+      {
+        "value": 0,
+        "label": "0 — unable / needs most help"
+      },
+      {
+        "value": 1,
+        "label": "1"
+      },
+      {
+        "value": 2,
+        "label": "2"
+      },
+      {
+        "value": 3,
+        "label": "3"
+      },
+      {
+        "value": 4,
+        "label": "4 — independent and safe"
+      }
+    ],
+    "minAnswered": 14,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": 56,
+    "unit": "points",
+    "higherIsBetter": true,
+    "decimals": 0,
+    "meaningfulChange": 5,
+    "meaningfulChangeNote": "Minimal detectable change ≈ 5 points in older adults.",
+    "bands": [
+      {
+        "min": 0,
+        "label": "High fall risk (0–20)"
+      },
+      {
+        "min": 21,
+        "label": "Medium fall risk (21–40)"
+      },
+      {
+        "min": 41,
+        "label": "Low fall risk (41–56)"
+      }
+    ],
+    "reference": "Scores of 45 or less are commonly associated with increased fall risk in older adults."
+  },
+  {
+    "measure": 4,
+    "code": "tug",
+    "abbreviation": "TUG",
+    "name": "Timed Up and Go",
+    "domain": "Mobility and fall risk",
+    "description": "Rise from a chair, walk 3 m, turn, walk back and sit, at a comfortable pace. Enter 1–3 trials; the mean is scored.",
+    "scoring": 5,
+    "items": [
+      {
+        "key": "trial1",
+        "label": "Trial 1 (seconds)"
+      },
+      {
+        "key": "trial2",
+        "label": "Trial 2 (seconds)"
+      },
+      {
+        "key": "trial3",
+        "label": "Trial 3 (seconds)"
+      }
+    ],
+    "itemMin": 0.1,
+    "itemMax": 300,
+    "itemStep": 0.01,
+    "options": [],
+    "minAnswered": 1,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": null,
+    "unit": "seconds",
+    "higherIsBetter": false,
+    "decimals": 1,
+    "meaningfulChange": null,
+    "meaningfulChangeNote": null,
+    "bands": [
+      {
+        "min": 0,
+        "label": "Typical for community-dwelling older adults (under 10 s)"
+      },
+      {
+        "min": 10,
+        "label": "Slower than typical (10–13.4 s)"
+      },
+      {
+        "min": 13.5,
+        "label": "Increased fall risk (13.5 s or more, community-dwelling older adults)"
+      }
+    ],
+    "reference": "Record any assistive device in the notes; use the same device for comparison."
+  },
+  {
+    "measure": 7,
+    "code": "5xsts",
+    "abbreviation": "5xSTS",
+    "name": "Five Times Sit-to-Stand",
+    "domain": "Lower extremity strength and balance",
+    "description": "Time to stand up fully and sit down 5 times as quickly as possible with arms folded. Enter 1–3 trials; the mean is scored.",
+    "scoring": 5,
+    "items": [
+      {
+        "key": "trial1",
+        "label": "Trial 1 (seconds)"
+      },
+      {
+        "key": "trial2",
+        "label": "Trial 2 (seconds)"
+      },
+      {
+        "key": "trial3",
+        "label": "Trial 3 (seconds)"
+      }
+    ],
+    "itemMin": 0.1,
+    "itemMax": 300,
+    "itemStep": 0.01,
+    "options": [],
+    "minAnswered": 1,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": null,
+    "unit": "seconds",
+    "higherIsBetter": false,
+    "decimals": 1,
+    "meaningfulChange": 2.3,
+    "meaningfulChangeNote": "Minimal clinically important difference ≈ 2.3 seconds (vestibular disorders).",
+    "bands": [
+      {
+        "min": 0,
+        "label": "Typical (under 12 s)"
+      },
+      {
+        "min": 12,
+        "label": "Slower than typical (12–14.9 s)"
+      },
+      {
+        "min": 15,
+        "label": "Increased fall risk (15 s or more, older adults)"
+      }
+    ],
+    "reference": "Reference values vary with age; compare against age norms."
+  },
+  {
+    "measure": 8,
+    "code": "abc",
+    "abbreviation": "ABC",
+    "name": "Activities-specific Balance Confidence Scale",
+    "domain": "Balance confidence",
+    "description": "16 activities rated for confidence from 0% (none) to 100% (complete); score = mean of the 16 ratings.",
+    "scoring": 4,
+    "items": [
+      {
+        "key": "i1",
+        "label": "Walk around the house"
+      },
+      {
+        "key": "i2",
+        "label": "Walk up or down stairs"
+      },
+      {
+        "key": "i3",
+        "label": "Bend over and pick up a slipper from the floor"
+      },
+      {
+        "key": "i4",
+        "label": "Reach for a small can on a shelf at eye level"
+      },
+      {
+        "key": "i5",
+        "label": "Stand on tiptoes and reach above the head"
+      },
+      {
+        "key": "i6",
+        "label": "Stand on a chair and reach for something"
+      },
+      {
+        "key": "i7",
+        "label": "Sweep the floor"
+      },
+      {
+        "key": "i8",
+        "label": "Walk outside to a nearby car"
+      },
+      {
+        "key": "i9",
+        "label": "Get into or out of a car"
+      },
+      {
+        "key": "i10",
+        "label": "Walk across a parking lot"
+      },
+      {
+        "key": "i11",
+        "label": "Walk up or down a ramp"
+      },
+      {
+        "key": "i12",
+        "label": "Walk in a crowded mall"
+      },
+      {
+        "key": "i13",
+        "label": "Get bumped into while walking in a crowd"
+      },
+      {
+        "key": "i14",
+        "label": "Escalator holding the railing"
+      },
+      {
+        "key": "i15",
+        "label": "Escalator without holding the railing"
+      },
+      {
+        "key": "i16",
+        "label": "Walk outside on icy sidewalks"
+      }
+    ],
+    "itemMin": 0,
+    "itemMax": 100,
+    "itemStep": 1,
+    "options": [],
+    "minAnswered": 16,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": 100,
+    "unit": "%",
+    "higherIsBetter": true,
+    "decimals": 1,
+    "meaningfulChange": null,
+    "meaningfulChangeNote": null,
+    "bands": [
+      {
+        "min": 0,
+        "label": "Low level of physical functioning (under 50%)"
+      },
+      {
+        "min": 50,
+        "label": "Moderate level of functioning (50–79%)"
+      },
+      {
+        "min": 80,
+        "label": "High level of functioning (80% or more)"
+      }
+    ],
+    "reference": "Scores below 67% are commonly associated with increased fall risk in older adults."
+  },
+  {
+    "measure": 9,
+    "code": "fga",
+    "abbreviation": "FGA",
+    "name": "Functional Gait Assessment",
+    "domain": "Gait and dynamic balance",
+    "description": "10 walking tasks scored 0 (severe impairment) to 3 (normal); total out of 30.",
+    "scoring": 0,
+    "items": [
+      {
+        "key": "i1",
+        "label": "Gait on a level surface"
+      },
+      {
+        "key": "i2",
+        "label": "Change in gait speed"
+      },
+      {
+        "key": "i3",
+        "label": "Gait with horizontal head turns"
+      },
+      {
+        "key": "i4",
+        "label": "Gait with vertical head turns"
+      },
+      {
+        "key": "i5",
+        "label": "Gait and pivot turn"
+      },
+      {
+        "key": "i6",
+        "label": "Step over obstacle"
+      },
+      {
+        "key": "i7",
+        "label": "Gait with narrow base of support"
+      },
+      {
+        "key": "i8",
+        "label": "Gait with eyes closed"
+      },
+      {
+        "key": "i9",
+        "label": "Ambulating backwards"
+      },
+      {
+        "key": "i10",
+        "label": "Steps"
+      }
+    ],
+    "itemMin": 0,
+    "itemMax": 3,
+    "itemStep": 1,
+    "options": [
+      {
+        "value": 0,
+        "label": "0 — Severe impairment"
+      },
+      {
+        "value": 1,
+        "label": "1 — Moderate impairment"
+      },
+      {
+        "value": 2,
+        "label": "2 — Mild impairment"
+      },
+      {
+        "value": 3,
+        "label": "3 — Normal"
+      }
+    ],
+    "minAnswered": 10,
+    "itemsNamedByPatient": false,
+    "scoreMin": 0,
+    "scoreMax": 30,
+    "unit": "points",
+    "higherIsBetter": true,
+    "decimals": 0,
+    "meaningfulChange": 4,
+    "meaningfulChangeNote": "Minimal clinically important difference ≈ 4 points (vestibular disorders).",
+    "bands": [
+      {
+        "min": 0,
+        "label": "Increased fall risk (22 or less, older adults)"
+      },
+      {
+        "min": 23,
+        "label": "Lower fall risk (23–30)"
+      }
+    ],
+    "reference": null
+  }
+]

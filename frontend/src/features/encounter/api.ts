@@ -145,3 +145,20 @@ export const fetchPainHistory = (patientId: string) =>
   apiRequest<PainHistoryPoint[]>(
     `/api/v1/notes/patient/${patientId}/pain-history`,
   );
+
+export interface PatientMeasurement {
+  noteId: string;
+  serviceDate: string;
+  category: number;
+  item: string;
+  movement: string | null;
+  side: number | null;
+  mode: string | null;
+  unit: string | null;
+  numericValue: number | null;
+  textValue: string | null;
+}
+export const fetchMeasurementHistory = (patientId: string) =>
+  apiRequest<PatientMeasurement[]>(
+    `/api/v1/notes/patient/${patientId}/measurement-history`,
+  );

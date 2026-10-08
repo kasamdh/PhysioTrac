@@ -42,8 +42,9 @@ public class DocumentationTemplateService : IDocumentationTemplateService
         if (!includeInactive) query = query.Where(t => t.IsActive);
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim();
-            query = query.Where(t => t.Name.Contains(term) || (t.Description != null && t.Description.Contains(term)));
+            var like = $"%{SpecialTestLibraryService.EscapeLike(search.Trim())}%";
+            query = query.Where(t => EF.Functions.Like(t.Name, like, "\\") ||
+                (t.Description != null && EF.Functions.Like(t.Description, like, "\\")));
         }
         var templates = await query.Include(t => t.AppointmentTypes).ToListAsync(ct);
         return await ToDtosAsync(templates, actor, ct);
@@ -294,7 +295,7 @@ public class DocumentationTemplateService : IDocumentationTemplateService
             // as an existing row to update.
             var link = new ClinicalNoteTemplateAppointmentType { TemplateId = template.Id, AppointmentTypeId = id };
             _db.ClinicalNoteTemplateAppointmentTypes.Add(link);
-            template.AppointmentTypes.Add(link);
+            if (!template.AppointmentTypes.Contains(link)) template.AppointmentTypes.Add(link);
         }
     }
 

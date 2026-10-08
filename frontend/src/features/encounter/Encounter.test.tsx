@@ -118,10 +118,10 @@ const encounter = (over: Partial<Encounter> = {}): Encounter => ({
         component: "bodyChart",
       },
       {
-        key: "tests",
-        title: "Special tests",
+        key: "carry",
+        title: "Carry forward",
         fields: [],
-        component: "specialTests",
+        component: "carryForward",
       },
       { key: "goals", title: "Goals", fields: [], component: "goals" },
     ],
@@ -236,7 +236,7 @@ describe("Encounter workspace", () => {
     expect(screen.getByRole("heading", { name: /^Goals/ })).toBeInTheDocument();
     // A section whose only content is a component not available yet is left out.
     expect(
-      screen.queryByRole("heading", { name: /Special tests/ }),
+      screen.queryByRole("heading", { name: /Carry forward/ }),
     ).not.toBeInTheDocument();
   });
 

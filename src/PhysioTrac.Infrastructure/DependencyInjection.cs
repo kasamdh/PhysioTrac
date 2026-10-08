@@ -57,6 +57,8 @@ public static class DependencyInjection
         services.AddScoped<IReminderService, NoOpReminderService>();
         services.AddScoped<IClinicalNoteService, ClinicalNoteService>();
         services.AddScoped<IDocumentationTemplateService, DocumentationTemplateService>();
+        services.AddScoped<ISpecialTestLibraryService, SpecialTestLibraryService>();
+        services.AddScoped<IInterventionLibraryService, InterventionLibraryService>();
         services.AddScoped<ISignatureVerifier, PasswordSignatureVerifier>();
         services.AddScoped<IClinicalTemplateService, ClinicalTemplateService>();
         services.AddScoped<IFunctionalGoalService, FunctionalGoalService>();

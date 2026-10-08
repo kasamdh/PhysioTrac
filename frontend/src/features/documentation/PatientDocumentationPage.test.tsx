@@ -17,8 +17,23 @@ vi.mock("../encounter/api", () => ({
   createPatientNote: vi.fn(),
   fetchEncounter: vi.fn().mockResolvedValue({ pain: null, bodyChart: [] }),
   fetchPainHistory: vi.fn().mockResolvedValue([]),
+  fetchMeasurementHistory: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock("../encounter/outcomes/api", () => ({
+  fetchOutcomeDefinitions: vi.fn().mockResolvedValue([]),
+  fetchPatientOutcomes: vi.fn().mockResolvedValue([]),
+  recordOutcomeScore: vi.fn(),
+  deleteOutcomeScore: vi.fn(),
+}));
+vi.mock("../encounter/goals/api", () => ({
+  goalsKey: (id: string) => ["chart", "goals", id],
+  fetchPatientGoals: vi.fn().mockResolvedValue([]),
+  fetchGoalHistory: vi.fn().mockResolvedValue([]),
+  createPatientGoal: vi.fn(),
+  editGoal: vi.fn(),
+  approvePatientGoal: vi.fn(),
+}));
 vi.mock("../../lib/apiClient", () => ({ apiRequest: vi.fn() }));
 vi.mock("../admin/api", () => ({ fetchPatientDetail: vi.fn() }));
 vi.mock("../charting/api", () => ({

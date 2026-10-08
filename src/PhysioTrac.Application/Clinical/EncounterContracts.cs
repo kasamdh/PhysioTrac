@@ -25,7 +25,16 @@ public record EncounterDto(
     string? LastSavedByName,
     PainAssessmentDto? Pain = null,
     IReadOnlyList<BodyChartFindingDto>? BodyChart = null,
-    PreviousChartingDto? Previous = null);
+    PreviousChartingDto? Previous = null,
+    IReadOnlyList<ObjectiveMeasurementDto>? Measurements = null,
+    IReadOnlyList<SpecialTestResultDto>? SpecialTests = null,
+    IReadOnlyList<MeasurementHistoryDto>? MeasurementHistory = null,
+    IReadOnlyList<SpecialTestHistoryDto>? SpecialTestHistory = null,
+    IReadOnlyList<FlowsheetEntryDto>? Flowsheet = null,
+    FlowsheetSummaryDto? FlowsheetSummary = null,
+    PreviousFlowsheetDto? PreviousFlowsheet = null,
+    IReadOnlyList<NoteGoalProgressDto>? GoalProgress = null,
+    IReadOnlyList<OutcomeScoreDto>? Outcomes = null);
 
 /// <summary>An encounter save (autosave). <see cref="BaseSaveVersion"/> is
 /// the SaveVersion the editor last loaded or saved; if someone else saved
@@ -40,7 +49,15 @@ public record SaveEncounterRequest(
     // The pain assessment (replaces it; an empty one removes it) and the
     // whole body chart (replaces every finding; an empty list clears it).
     PainAssessmentDto? Pain = null,
-    IReadOnlyList<BodyChartFindingDto>? BodyChart = null);
+    IReadOnlyList<BodyChartFindingDto>? BodyChart = null,
+    // Objective measurements and special tests (each replaces the note's whole list).
+    IReadOnlyList<ObjectiveMeasurementDto>? Measurements = null,
+    IReadOnlyList<SpecialTestResultDto>? SpecialTests = null,
+    // The intervention / exercise flowsheet (replaces the note's whole list).
+    IReadOnlyList<FlowsheetEntryDto>? Flowsheet = null,
+    // Goal progress documented this visit (replaces the note's whole list;
+    // applied to the goals when the note is signed).
+    IReadOnlyList<NoteGoalProgressDto>? GoalProgress = null);
 
 public record EncounterSaveResultDto(int SaveVersion, DateTimeOffset SavedAt, string? SavedByName);
 

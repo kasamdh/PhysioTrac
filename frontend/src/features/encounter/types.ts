@@ -1,3 +1,12 @@
+import type { GoalProgressRow } from "./goals/model";
+import type { OutcomeScore } from "./outcomes/model";
+import type {
+  FlowsheetEntry,
+  FlowsheetSummary,
+  PreviousFlowsheet,
+} from "./flowsheet/model";
+import type { Measurement, MeasurementHistory } from "./measurements/model";
+import type { SpecialTest, SpecialTestHistory } from "./measurements/types";
 import type { ChartNote } from "../charting/types";
 import type { FieldValue, TemplateVersion } from "../templates/types";
 
@@ -30,6 +39,8 @@ export interface Encounter {
   note: ChartNote & {
     templateVersionId?: string | null;
     planOfCareId?: string | null;
+    prefilledAt?: string | null;
+    prefillReviewedAt?: string | null;
   };
   templateName: string | null;
   template: TemplateVersion | null;
@@ -41,6 +52,15 @@ export interface Encounter {
   pain?: PainAssessment | null;
   bodyChart?: BodyFinding[] | null;
   previous?: PreviousCharting | null;
+  measurements?: Measurement[] | null;
+  specialTests?: SpecialTest[] | null;
+  measurementHistory?: MeasurementHistory[] | null;
+  specialTestHistory?: SpecialTestHistory[] | null;
+  flowsheet?: FlowsheetEntry[] | null;
+  flowsheetSummary?: FlowsheetSummary | null;
+  previousFlowsheet?: PreviousFlowsheet | null;
+  goalProgress?: GoalProgressRow[] | null;
+  outcomes?: OutcomeScore[] | null;
 }
 
 // Matches SaveEncounterRequest.
@@ -56,6 +76,10 @@ export interface SaveEncounterBody {
   objectiveMeasurementsJson?: string;
   pain?: PainAssessment;
   bodyChart?: BodyFinding[];
+  measurements?: Measurement[];
+  specialTests?: SpecialTest[];
+  flowsheet?: FlowsheetEntry[];
+  goalProgress?: GoalProgressRow[];
 }
 
 export interface EncounterSaveResult {

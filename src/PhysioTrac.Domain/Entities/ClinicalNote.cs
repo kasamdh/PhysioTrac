@@ -54,6 +54,14 @@ public class ClinicalNote : BaseEntity, IUserStamped
     public DateOnly? PeriodStart { get; set; }
     public DateOnly? PeriodEnd { get; set; }
 
+    /// <summary>When fields were pre-filled from the patient's signed charting
+    /// (progress, re-evaluation, recertification, discharge). A pre-filled
+    /// note can't be signed until the therapist confirms the review.</summary>
+    public DateTimeOffset? PrefilledAt { get; set; }
+    public Guid? PrefilledById { get; set; }
+    public DateTimeOffset? PrefillReviewedAt { get; set; }
+    public Guid? PrefillReviewedById { get; set; }
+
     public NoteType NoteType { get; set; } = NoteType.Daily;
     public NoteStatus Status { get; set; } = NoteStatus.Draft;
     public DateOnly ServiceDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);

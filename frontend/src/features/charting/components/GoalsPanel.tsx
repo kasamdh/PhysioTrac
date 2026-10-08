@@ -10,6 +10,8 @@ const STATUS: Record<number, string> = {
   1: "Active",
   2: "Met",
   3: "Discontinued",
+  4: "Not started",
+  5: "Partially met",
 };
 
 /** Functional goals with baseline → current → target; the therapist updates
@@ -26,7 +28,7 @@ export function GoalsPanel({
     queryFn: () => fetchGoals(patientId),
   });
   const shown = (goals.data ?? []).filter(
-    (g) => g.status === 0 || g.status === 1,
+    (g) => g.status === 0 || g.status === 1 || g.status === 4,
   );
 
   if (goals.isLoading) return <p className="text-text-muted">Loading…</p>;
@@ -115,7 +117,7 @@ function GoalRow({
           <ApproveGoalButton goalId={goal.id} patientId={patientId} />
         </div>
       )}
-      {!readOnly && goal.status === 1 && (
+      {!readOnly && (goal.status === 1 || goal.status === 4) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="toolbar-label">
             Today

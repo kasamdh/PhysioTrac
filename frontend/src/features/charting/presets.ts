@@ -181,6 +181,27 @@ export const OUTCOME_MEASURES: {
     higherIsBetter: true,
     unit: "points",
   },
+  {
+    value: 7,
+    label: "5xSTS (Five Times Sit-to-Stand)",
+    max: null,
+    higherIsBetter: false,
+    unit: "seconds",
+  },
+  {
+    value: 8,
+    label: "ABC (Activities-specific Balance Confidence)",
+    max: 100,
+    higherIsBetter: true,
+    unit: "%",
+  },
+  {
+    value: 9,
+    label: "FGA (Functional Gait Assessment)",
+    max: 30,
+    higherIsBetter: true,
+    unit: "points",
+  },
 ];
 
 export const newId = () =>

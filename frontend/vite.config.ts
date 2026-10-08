@@ -18,6 +18,6 @@ export default defineConfig({
     // jsdom + userEvent tests run several times slower when the whole suite
     // runs in parallel on a busy machine; 5s (the default) caused spurious
     // timeouts on tests that pass in well under a second on their own.
-    testTimeout: 15_000,
+    testTimeout: 30_000,
   },
 });

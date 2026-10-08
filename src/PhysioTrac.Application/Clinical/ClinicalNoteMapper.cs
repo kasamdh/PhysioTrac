@@ -14,5 +14,5 @@ public static class ClinicalNoteMapper
         n.CosignRequired, n.CosignedById, n.CosignedAt,
         n.SubjectiveDetailsJson, n.ObjectiveMeasurementsJson, n.AmendsNoteId, n.AmendmentReason,
         n.TreatingProviderId, n.SupervisingProviderId, n.TemplateVersionId, n.PlanOfCareId,
-        n.PeriodStart, n.PeriodEnd, n.ReturnReason, n.VoidReason);
+        n.PeriodStart, n.PeriodEnd, n.ReturnReason, n.VoidReason, n.PrefilledAt, n.PrefillReviewedAt);
 }

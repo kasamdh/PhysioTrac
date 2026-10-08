@@ -25,6 +25,7 @@ import { EncounterPage } from "./features/encounter/EncounterPage";
 import { NotePrintPage } from "./features/charting/NotePrintPage";
 import { TemplatesPage } from "./features/templates/pages/TemplatesPage";
 import { TemplateEditorPage } from "./features/templates/pages/TemplateEditorPage";
+import { SpecialTestsAdminPage } from "./features/encounter/measurements/SpecialTestsAdminPage";
 import { PatientDocumentationPage } from "./features/documentation/PatientDocumentationPage";
 
 export default function App() {
@@ -61,6 +62,7 @@ export default function App() {
                     <Route path="/admin/templates" element={<TemplatesPage />} />
                     <Route path="/admin/templates/new" element={<TemplateEditorPage />} />
                     <Route path="/admin/templates/:templateId" element={<TemplateEditorPage />} />
+                    <Route path="/admin/special-tests" element={<SpecialTestsAdminPage />} />
                   </Route>
                 </Route>
               </Routes>

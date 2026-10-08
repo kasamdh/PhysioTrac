@@ -133,10 +133,24 @@ public interface IClinicalNoteService
     /// cancelled or no-show visit -- no treatment is documented for it.</summary>
     Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
 
+    /// <summary>Every measurement on the patient's signed notes, oldest first (values exactly as recorded).</summary>
+    Task<IReadOnlyList<PatientMeasurementDto>> GetMeasurementHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
     /// <summary>Pain ratings from the patient's signed notes, oldest first.</summary>
     Task<IReadOnlyList<PainHistoryPointDto>> GetPainHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>The note's latest save (cheap; polled to warn about another editor).</summary>
+    /// <summary>The patient's episode summarized from signed charting (visits,
+    /// attendance, pain, measurements, outcomes, goals, comparisons).</summary>
+    Task<EpisodeSummaryDto> GetEpisodeSummaryAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Fills a progress / re-evaluation / recertification / discharge
+    /// note's empty fields from the episode summary. The note then can't be
+    /// signed until <see cref="ReviewPrefillAsync"/> confirms the review.</summary>
+    Task<PrefillResultDto> PrefillAsync(Guid noteId, PrefillNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<ClinicalNote> ReviewPrefillAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
     Task<EncounterStatusDto> GetEncounterStatusAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>Switches a draft to another template before any field is filled.</summary>
