@@ -561,6 +561,18 @@ export const pageHelp: Record<string, PageHelp> = {
         ),
       },
       {
+        id: "ai-drafting",
+        title: "Drafting with AI",
+        body: (
+          <>
+            <Term name="Draft assessment / plan with AI">Under the Assessment and Plan fields of a note you are writing. AI drafts text from this visit’s structured charting — pain, measurements, special tests, interventions, goal progress and outcome scores. It is not given the patient’s name, date of birth, MRN or your narrative.</Term>
+            <Term name="The suggestion">Appears in a yellow box and is not part of the note. Choose Insert into note (or Add below my text / Replace my text), or Discard. Inserted text is edited and saved like anything you type.</Term>
+            <Term name="[Clinician: …]">Marks what only you can judge, such as the patient’s response and why skilled therapy is needed. Replace each one with your own words.</Term>
+            <Term name="Your responsibility">AI never signs, cosigns or finalizes a note and does not diagnose. You review every statement and sign as usual. A signed note that contains inserted AI text is marked AI-assisted in the audit log.</Term>
+          </>
+        ),
+      },
+      {
         id: "after-signing",
         title: "After signing",
         body: (
@@ -572,7 +584,7 @@ export const pageHelp: Record<string, PageHelp> = {
             <Term name="+ Add addendum">Adds a dated late entry or clarification under the signed note, with a reason. The signed note itself doesn’t change.</Term>
             <Term name="Amend note">Corrects the signed note: enter the reason, and you get a copy of the note to edit and sign. Once the amendment is signed it replaces the original, which stays viewable marked “Amended”.</Term>
             <Term name="Lock note">Administrators and directors: closes the note to further addenda and amendments (for example when billing has closed).</Term>
-            <Term name="Print / PDF">Opens the note as a printable document with the signature block; choose “Save as PDF” in the print dialog for a PDF.</Term>
+            <Term name="Print / PDF">Opens the note as a printable document with the signature block, and the clinic, patient, MRN and page numbers on every page. Use Print, or Save as PDF for a file. Times are shown in the clinic’s time zone. Every print and export is recorded in the audit log.</Term>
             <Term name="Version history">Every saved version of the note, including each autosave and the signed version, with who saved it and when.</Term>
           </>
         ),
@@ -669,6 +681,16 @@ export const pageHelp: Record<string, PageHelp> = {
             <Term name="▸ Date — note type">Click to expand the full note: pain, measurements, interventions with patient response, and the narrative.</Term>
             <Term name="Open note / Continue charting">Opens the note in Clinical Charting.</Term>
             <Term name="+ New note">Starts a note that isn’t tied to an appointment — a phone call, consultation, missed visit or addendum.</Term>
+          </>
+        ),
+      },
+      {
+        id: "reports",
+        title: "Print reports",
+        body: (
+          <>
+            <Term name="Reports">Plan of care (with its goals), body chart history (signed notes only), measurement comparison across visits, goal progress and outcome measure history. Each opens as a printable page with the clinic, patient, MRN and page numbers on every page.</Term>
+            <Term name="Print / Save as PDF">Every print and export is recorded in the audit log.</Term>
           </>
         ),
       },

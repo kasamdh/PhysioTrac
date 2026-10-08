@@ -148,3 +148,16 @@ describe("PatientReportPrintPage", () => {
     expect(print).not.toHaveBeenCalled();
   });
 });
+
+describe("PageMargins", () => {
+  it("puts clinic, patient, title and page numbers on every page, escaping quotes", async () => {
+    const { PageMargins } = await import("./PageMargins");
+    const { container } = render(
+      <PageMargins clinic='The "Best" PT' patient="Quinn Alvarez" mrn="SM-1" title="Goal progress" />,
+    );
+    const css = container.querySelector("style")!.textContent!;
+    expect(css).toContain('content: "The \\"Best\\" PT · Quinn Alvarez · MRN SM-1"');
+    expect(css).toContain('@top-right { content: "Goal progress"');
+    expect(css).toContain('"Page " counter(page) " of " counter(pages)');
+  });
+});

@@ -11,6 +11,7 @@ import {
 import { fetchChartNote, fetchNoteRecord } from "./api";
 import { fetchEncounter } from "../encounter/api";
 import { recordNoteOutput } from "../printing/api";
+import { PageMargins } from "../printing/PageMargins";
 import { PrintActions } from "../printing/PrintActions";
 import { formatInZone, usePrintOutput } from "../printing/usePrintOutput";
 
@@ -70,6 +71,12 @@ export function NotePrintPage() {
   return (
     <div className="mx-auto max-w-4xl bg-white p-4 text-[#222] sm:p-8 print:max-w-none print:p-0">
       <PrintActions {...printing} />
+      <PageMargins
+        clinic={org.data!.name}
+        patient={p.fullName}
+        mrn={p.medicalRecordNumber}
+        title={`${NoteTypeLabels[n.noteType] ?? "Visit note"} · ${formatDate(n.serviceDate)}`}
+      />
 
       <header className="border-b-2 border-[#1565b8] pb-3">
         <p className="text-2xl font-bold text-[#1565b8]">{org.data!.name}</p>

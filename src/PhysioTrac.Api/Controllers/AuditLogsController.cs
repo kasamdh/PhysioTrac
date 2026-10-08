@@ -270,6 +270,8 @@ public static class AuditDescriber
         ["note.prefilled"] = "Prefilled a note from the episode",
         ["note.prefill_reviewed"] = "Reviewed prefilled note content",
         ["note.service_date_moved"] = "Moved a note's date of service with its visit",
+        ["note.ai_draft_requested"] = "Asked AI to draft part of a note",
+        ["note.ai_draft_inserted"] = "Inserted an AI draft into a note for review",
         ["patient_report.printed"] = "Printed a patient report",
         ["patient_report.exported"] = "Exported a patient report (PDF)",
         ["message.sent"] = "Sent a message",

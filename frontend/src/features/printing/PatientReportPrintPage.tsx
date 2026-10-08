@@ -18,6 +18,7 @@ import {
   recordReportOutput,
   type PatientReport,
 } from "./api";
+import { PageMargins } from "./PageMargins";
 import { PrintActions } from "./PrintActions";
 import { formatInZone, usePrintOutput } from "./usePrintOutput";
 
@@ -71,6 +72,12 @@ export function PatientReportPrintPage() {
   return (
     <div className="mx-auto max-w-4xl bg-white p-4 text-[#222] sm:p-8 print:max-w-none print:p-0">
       <PrintActions {...printing} />
+      <PageMargins
+        clinic={org.data!.name}
+        patient={p.fullName}
+        mrn={p.medicalRecordNumber}
+        title={PatientReports[report]}
+      />
 
       <header className="border-b-2 border-[#1565b8] pb-3">
         <p className="text-2xl font-bold text-[#1565b8]">{org.data!.name}</p>

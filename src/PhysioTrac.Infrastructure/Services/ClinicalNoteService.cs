@@ -279,7 +279,13 @@ public partial class ClinicalNoteService : IClinicalNoteService
         });
         await _audit.RecordAuditEventAsync(actor.UserId, pendingCosign ? "note.submitted_for_cosign" : "note.signed",
             nameof(ClinicalNote), note.Id, organization.Id, patientId: note.PatientId,
-            metadata: NoteAudit(note, organization, previousStatus, new { cosignReason, signedVersion = await LatestVersionNumberAsync(note.Id, ct) }), ct: ct);
+            metadata: NoteAudit(note, organization, previousStatus, new
+            {
+                cosignReason,
+                signedVersion = await LatestVersionNumberAsync(note.Id, ct),
+                // The clinician put AI-drafted text into this note (and attested to it by signing).
+                aiAssisted = await _db.AuditEvents.AnyAsync(e => e.ObjectId == note.Id && e.Action == AiRules.InsertedAction, ct),
+            }), ct: ct);
 
         if (note.Status == NoteStatus.Signed)
         {

@@ -61,6 +61,7 @@ import { SUMMARY_NOTE_TYPES } from "./episode/api";
 import { GoalTracker } from "./goals/GoalTracker";
 import type { GoalProgressRow } from "./goals/model";
 import { OutcomesWorkspace } from "./outcomes/OutcomesWorkspace";
+import { AiDraftAssist } from "./ai/AiDraftAssist";
 import type { FlowsheetEntry } from "./flowsheet/model";
 import type { Measurement } from "./measurements/model";
 import type { SpecialTest } from "./measurements/types";
@@ -785,6 +786,17 @@ function Workspace({
                 onChange={setValue}
                 onColumnChange={setColumn}
                 renderComponent={(c) => renderComponent(c)}
+                renderFieldExtra={(f) =>
+                  !readOnly &&
+                  (f.noteColumn === "assessment" || f.noteColumn === "plan") ? (
+                    <AiDraftAssist
+                      noteId={note.id}
+                      section={f.noteColumn}
+                      currentText={columns[f.noteColumn]}
+                      onInsert={(t) => setColumn(f.noteColumn!, t)}
+                    />
+                  ) : null
+                }
               />
             </div>
           </section>

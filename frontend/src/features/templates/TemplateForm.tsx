@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { PainScale } from "../charting/components/PainScale";
 import { fieldError, isVisible, valueAsList } from "./rules";
 import {
@@ -22,6 +22,8 @@ export interface TemplateFormProps {
   renderComponent?: (component: string, section: TemplateSection) => ReactNode;
   /** Labels to flag as missing (e.g. after a failed sign attempt). */
   missing?: ReadonlySet<string>;
+  /** Extra controls shown full width below a field (e.g. AI drafting). */
+  renderFieldExtra?: (field: TemplateField) => ReactNode;
 }
 
 /** Renders any template version: no clinical field is hard-coded here --
@@ -58,6 +60,7 @@ export function TemplateSectionFields({
   onColumnChange,
   renderComponent,
   missing,
+  renderFieldExtra,
 }: TemplateFormProps & { section: TemplateSection }) {
   return (
     <div className="space-y-4">
@@ -74,22 +77,27 @@ export function TemplateSectionFields({
       <div className="grid gap-4 md:grid-cols-2">
         {section.fields
           .filter((f) => isVisible(f, values))
-          .map((f) => (
-            <FieldInput
-              key={f.key}
-              field={f}
-              value={values[f.key]}
-              columnText={
-                f.noteColumn ? (columns[f.noteColumn] ?? "") : undefined
-              }
-              readOnly={readOnly}
-              missing={missing?.has(f.label) ?? false}
-              onChange={(v) => onChange?.(v)}
-              onColumnChange={(t) =>
-                f.noteColumn && onColumnChange?.(f.noteColumn, t)
-              }
-            />
-          ))}
+          .map((f) => {
+            const extra = renderFieldExtra?.(f);
+            return (
+              <Fragment key={f.key}>
+                <FieldInput
+                  field={f}
+                  value={values[f.key]}
+                  columnText={
+                    f.noteColumn ? (columns[f.noteColumn] ?? "") : undefined
+                  }
+                  readOnly={readOnly}
+                  missing={missing?.has(f.label) ?? false}
+                  onChange={(v) => onChange?.(v)}
+                  onColumnChange={(t) =>
+                    f.noteColumn && onColumnChange?.(f.noteColumn, t)
+                  }
+                />
+                {extra && <div className="md:col-span-2">{extra}</div>}
+              </Fragment>
+            );
+          })}
       </div>
     </div>
   );

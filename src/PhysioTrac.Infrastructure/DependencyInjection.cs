@@ -17,6 +17,7 @@ using PhysioTrac.Application.Sessions;
 using PhysioTrac.Application.SuperAdmin;
 using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Application.Users;
+using PhysioTrac.Infrastructure.Ai;
 using PhysioTrac.Infrastructure.Auditing;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
@@ -63,6 +64,17 @@ public static class DependencyInjection
         services.AddScoped<IClinicalTemplateService, ClinicalTemplateService>();
         services.AddScoped<IFunctionalGoalService, FunctionalGoalService>();
         services.AddScoped<IOutcomeScoreService, OutcomeScoreService>();
+        // AI drafting: provider chosen in config ("Mock" by default, "None" = off).
+        var aiProvider = configuration.GetSection(DocumentationAiOptions.SectionName).Get<DocumentationAiOptions>()?.Provider ?? "Mock";
+        switch (aiProvider.Trim().ToLowerInvariant())
+        {
+            case "mock": services.AddSingleton<IDocumentationAiProvider, MockDocumentationAiProvider>(); break;
+            case "none" or "": break;
+            default: throw new InvalidOperationException($"Unknown DocumentationAi:Provider '{aiProvider}' (use Mock or None).");
+        }
+        services.AddScoped<IDocumentationAiService>(sp => new DocumentationAiService(
+            sp.GetRequiredService<IClinicalNoteService>(), sp.GetRequiredService<ITenantAccessService>(),
+            sp.GetRequiredService<IAuditService>(), sp.GetService<IDocumentationAiProvider>()));
         services.AddScoped<IPublicBookingService, PublicBookingService>();
         services.AddScoped<IPortalBookingService, PortalBookingService>();
         services.AddScoped<IChargeService, ChargeService>();
