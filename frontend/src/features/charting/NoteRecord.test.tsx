@@ -12,6 +12,7 @@ import { UserRole } from "../auth/types";
 import { ToastProvider } from "../../components/Toast";
 import { NoteStatus, NoteType } from "../workflow/types";
 import type { ChartNote, NoteActions, NoteRecord } from "./types";
+import { recordNoteOutput } from "../printing/api";
 
 vi.mock("./api", () => ({
   fetchChartNote: vi.fn(),
@@ -36,6 +37,9 @@ vi.mock("./api", () => ({
   lockNote: vi.fn(),
 }));
 vi.mock("../admin/api", () => ({ fetchPatientDetail: vi.fn() }));
+vi.mock("../printing/api", () => ({
+  recordNoteOutput: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("../encounter/api", () => ({
   fetchEncounter: vi.fn().mockResolvedValue({
     pain: {
@@ -160,6 +164,7 @@ function setup(note: ChartNote, rec: NoteRecord, path = "/chart/n1") {
     id: "o",
     name: "Source Motion Physical Therapy",
     locations: [],
+    timezone: "America/Chicago",
   });
   vi.mocked(fetchPatientDetail).mockResolvedValue({
     id: "p1",
@@ -366,6 +371,26 @@ describe("Signed note record", () => {
       "Jamie Chen, PT, DPT",
     );
     await waitFor(() => expect(print).toHaveBeenCalled(), { timeout: 3000 });
+    // Recorded in the audit trail before the dialog opened.
+    expect(recordNoteOutput).toHaveBeenCalledWith("n1", "print");
+    await userEvent.click(screen.getByRole("button", { name: "Save as PDF" }));
+    await waitFor(() =>
+      expect(recordNoteOutput).toHaveBeenCalledWith("n1", "export"),
+    );
+    expect(print).toHaveBeenCalledTimes(2);
+    print.mockRestore();
+  });
+
+  it("doesn't print when the print is refused", async () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    vi.mocked(recordNoteOutput).mockRejectedValueOnce(
+      new Error("You don't have access to this note."),
+    );
+    setup(signed, record(), "/notes/n1/print");
+    expect(
+      await screen.findByRole("alert", {}, { timeout: 3000 }),
+    ).toHaveTextContent("You don't have access to this note.");
+    expect(print).not.toHaveBeenCalled();
     print.mockRestore();
   });
 });

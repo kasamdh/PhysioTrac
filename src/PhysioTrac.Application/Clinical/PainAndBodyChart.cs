@@ -101,3 +101,6 @@ public static class PainRules
         string.IsNullOrWhiteSpace(p.EasingFactors) && string.IsNullOrWhiteSpace(p.DailyPattern) &&
         string.IsNullOrWhiteSpace(p.SleepImpact) && string.IsNullOrWhiteSpace(p.FunctionalImpact);
 }
+
+/// <summary>The body chart recorded on one signed note.</summary>
+public record BodyChartHistoryDto(Guid NoteId, DateOnly ServiceDate, NoteType NoteType, IReadOnlyList<BodyChartFindingDto> Findings);

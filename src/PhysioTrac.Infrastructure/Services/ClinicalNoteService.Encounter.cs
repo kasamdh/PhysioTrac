@@ -189,6 +189,7 @@ public partial class ClinicalNoteService
             // per note, so the second one lands here instead of overwriting.
             throw new EncounterConflictException(request.BaseSaveVersion + 1, DateTimeOffset.UtcNow, null);
         }
+        await AuditNoteOnceAsync(note, "note.updated", actor, UpdateAuditWindow, new { saveVersion = saved }, ct);
         var name = (await NamesAsync([actor.UserId], ct)).GetValueOrDefault(actor.UserId);
         return new EncounterSaveResultDto(saved, note.UpdatedAt, name);
     }

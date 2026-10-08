@@ -23,6 +23,7 @@ import { WorkflowPage } from "./features/workflow/WorkflowPage";
 import { LogsPage } from "./features/logs/LogsPage";
 import { EncounterPage } from "./features/encounter/EncounterPage";
 import { NotePrintPage } from "./features/charting/NotePrintPage";
+import { PatientReportPrintPage } from "./features/printing/PatientReportPrintPage";
 import { TemplatesPage } from "./features/templates/pages/TemplatesPage";
 import { TemplateEditorPage } from "./features/templates/pages/TemplateEditorPage";
 import { SpecialTestsAdminPage } from "./features/encounter/measurements/SpecialTestsAdminPage";
@@ -43,6 +44,7 @@ export default function App() {
                 <Route element={<ProtectedRoute />}>
                   {/* A printable document: no app header or navigation. */}
                   <Route path="/notes/:noteId/print" element={<NotePrintPage />} />
+                  <Route path="/patients/:patientId/reports/:report/print" element={<PatientReportPrintPage />} />
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/patients" element={<PatientListPage title="Patients" back={null} />} />

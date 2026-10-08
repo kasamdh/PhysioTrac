@@ -269,7 +269,7 @@ export function MedicalHistoryPanel({
   );
 }
 
-const PLAN_STATUS: Record<number, string> = {
+export const PLAN_STATUS: Record<number, string> = {
   0: "Draft",
   1: "Active",
   2: "Superseded",

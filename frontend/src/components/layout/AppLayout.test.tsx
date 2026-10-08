@@ -44,7 +44,7 @@ function renderAppLayout(role: UserRole) {
     signIn: vi.fn(),
     signOut: vi.fn(),
   });
-  mockedFetchOrganization.mockResolvedValue({ id: "org-1", name: "Source Motion Physical Therapy", locations: [] });
+  mockedFetchOrganization.mockResolvedValue({ id: "org-1", name: "Source Motion Physical Therapy", locations: [], timezone: "America/New_York" });
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 

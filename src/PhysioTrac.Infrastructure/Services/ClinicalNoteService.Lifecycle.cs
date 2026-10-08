@@ -39,7 +39,7 @@ public partial class ClinicalNoteService
 
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
         await _audit.RecordAuditEventAsync(actor.UserId, "note.review_started", nameof(ClinicalNote), note.Id, organization.Id,
-            patientId: note.PatientId, ct: ct);
+            patientId: note.PatientId, metadata: NoteAudit(note, organization, NoteStatus.ReviewRequired), ct: ct);
         return note;
     }
 
@@ -53,6 +53,7 @@ public partial class ClinicalNoteService
         if (!LifecycleRules.IsAwaitingReview(note.Status)) throw new InvalidOperationException("Only a note awaiting review can be returned.");
         var why = RequireReason(reason, "Say what needs to be corrected.");
 
+        var previousStatus = note.Status;
         RecordStatusChange(note, note.Status, NoteStatus.ReturnedForCorrection, actor.UserId, why);
         note.Status = NoteStatus.ReturnedForCorrection;
         note.ReturnReason = why;
@@ -73,7 +74,7 @@ public partial class ClinicalNoteService
 
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
         await _audit.RecordAuditEventAsync(actor.UserId, "note.returned_for_correction", nameof(ClinicalNote), note.Id, organization.Id,
-            patientId: note.PatientId, ct: ct);
+            patientId: note.PatientId, metadata: NoteAudit(note, organization, previousStatus), ct: ct);
         return note;
     }
 
@@ -97,6 +98,7 @@ public partial class ClinicalNoteService
 
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
         var appointmentId = note.AppointmentId;
+        var previousStatus = note.Status;
         RecordStatusChange(note, note.Status, NoteStatus.Voided, actor.UserId, why);
         note.Status = NoteStatus.Voided;
         note.VoidReason = why;
@@ -139,7 +141,7 @@ public partial class ClinicalNoteService
 
         await _audit.RecordAuditEventAsync(actor.UserId, "note.voided", nameof(ClinicalNote), note.Id, organization.Id,
             patientId: note.PatientId,
-            metadata: new { wasSigned, appointmentId, plansVoided = plans.Count }, ct: ct);
+            metadata: NoteAudit(note, organization, previousStatus, new { wasSigned, appointmentId, plansVoided = plans.Count }), ct: ct);
         return note;
     }
 

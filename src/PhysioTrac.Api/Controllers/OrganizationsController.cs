@@ -51,7 +51,7 @@ public class OrganizationsController : ControllerBase
                 .Select(l => new LocationSummaryDto(l.Id, l.Name))
                 .ToListAsync(HttpContext.RequestAborted);
 
-            return Ok(new CurrentOrganizationDto(organization.Id, organization.Name, locations));
+            return Ok(new CurrentOrganizationDto(organization.Id, organization.Name, locations, organization.Timezone));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
@@ -135,7 +135,8 @@ public class OrganizationsController : ControllerBase
 
 public record LocationSummaryDto(Guid Id, string Name);
 
-public record CurrentOrganizationDto(Guid Id, string Name, IReadOnlyList<LocationSummaryDto> Locations);
+/// <param name="Timezone">IANA zone used to display times (printouts, audit).</param>
+public record CurrentOrganizationDto(Guid Id, string Name, IReadOnlyList<LocationSummaryDto> Locations, string Timezone);
 
 public record OrganizationProfileDto(
     Guid Id, string Name, string Timezone, string? NpiNumber, string? TaxId,

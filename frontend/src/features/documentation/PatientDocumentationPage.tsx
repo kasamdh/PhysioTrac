@@ -20,6 +20,7 @@ import { formatRating } from "../encounter/pain";
 import { NewNoteButton } from "./NewNoteButton";
 import { useAuth } from "../auth/AuthProvider";
 import { RoleSets, canAccess } from "../auth/permissions";
+import { PatientReports } from "../printing/api";
 
 interface ProgressNoteStatus {
   isDue: boolean;
@@ -153,6 +154,28 @@ export function PatientDocumentationPage() {
       <Section title="Goals">
         <GoalsOverview patientId={patientId} />
       </Section>
+
+      {canWrite && (
+        <Section title="Print reports">
+          <p className="text-text-muted">
+            Opens a printable page; choose “Save as PDF” for a file. Prints
+            and exports are recorded in the audit log.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(PatientReports).map(([key, label]) => (
+              <a
+                key={key}
+                href={`/patients/${patientId}/reports/${key}/print`}
+                target="_blank"
+                rel="noopener"
+                className="btn-refresh"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section title="Visit notes">
         {notes.isLoading && <p className="text-text-muted">Loading…</p>}

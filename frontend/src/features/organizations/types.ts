@@ -8,4 +8,6 @@ export interface CurrentOrganization {
   id: string;
   name: string;
   locations: LocationSummary[];
+  /** IANA zone for displaying times (printouts). */
+  timezone: string;
 }

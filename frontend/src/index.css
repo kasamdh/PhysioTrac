@@ -120,6 +120,19 @@ body {
     @apply text-link hover:underline;
   }
 
+  /* Printed reports: a plain ruled table that scrolls sideways on phones
+     instead of collapsing to cards, and never splits a row across pages. */
+  .print-table {
+    @apply block w-full overflow-x-auto border-collapse text-sm print:table;
+  }
+  .print-table th,
+  .print-table td {
+    @apply border border-[#999] px-2 py-1 text-left align-top;
+  }
+  .print-table tr {
+    break-inside: avoid;
+  }
+
   /* Toolbar above a list: joined quick-filter buttons, bold inline labels,
      dropdowns and a Refresh button. */
   .list-toolbar {

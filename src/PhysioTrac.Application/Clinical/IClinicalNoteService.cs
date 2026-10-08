@@ -166,6 +166,17 @@ public interface IClinicalNoteService
     /// <summary>The documentation dashboard for the caller's patients.</summary>
     Task<DocumentationDashboardDto> GetDashboardAsync(DashboardFilter filter, ICurrentUser actor, CancellationToken ct = default);
 
+    /// <summary>Records that the caller opened a note (at most once per five minutes per person).</summary>
+    Task RecordNoteViewAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Records a print or PDF export of a note ("print" / "export"); refused when the caller can't view it.</summary>
+    Task RecordNoteOutputAsync(Guid noteId, string kind, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Records a print or export of a patient report.</summary>
+    Task RecordPatientReportOutputAsync(Guid patientId, string report, string kind, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<IReadOnlyList<BodyChartHistoryDto>> GetBodyChartHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
     Task<EncounterStatusDto> GetEncounterStatusAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>Switches a draft to another template before any field is filled.</summary>

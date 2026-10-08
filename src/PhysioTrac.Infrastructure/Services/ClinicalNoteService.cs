@@ -133,7 +133,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         await SaveWithVersionSnapshotAsync(note, actor.UserId, isSignedVersion: false, ct);
 
         await _audit.RecordAuditEventAsync(actor.UserId, "note.created", nameof(ClinicalNote), note.Id, organization.Id,
-            patientId: patient.Id, metadata: new { noteType = note.NoteType.ToString() }, ct: ct);
+            patientId: patient.Id, metadata: NoteAudit(note, organization, null), ct: ct);
 
         return note;
     }
@@ -166,7 +166,8 @@ public partial class ClinicalNoteService : IClinicalNoteService
         // "autosave" safe to call as often as the frontend likes: each call
         // is just another UpdateDraftAsync, and each one is a fully
         // reconstructable point in the note's history.
-        await SaveWithVersionSnapshotAsync(note, actor.UserId, isSignedVersion: false, ct);
+        var savedVersion = await SaveWithVersionSnapshotAsync(note, actor.UserId, isSignedVersion: false, ct);
+        await AuditNoteOnceAsync(note, "note.updated", actor, UpdateAuditWindow, new { saveVersion = savedVersion }, ct);
         return note;
     }
 
@@ -278,7 +279,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         });
         await _audit.RecordAuditEventAsync(actor.UserId, pendingCosign ? "note.submitted_for_cosign" : "note.signed",
             nameof(ClinicalNote), note.Id, organization.Id, patientId: note.PatientId,
-            metadata: new { noteType = note.NoteType.ToString(), status = note.Status.ToString(), cosignReason }, ct: ct);
+            metadata: NoteAudit(note, organization, previousStatus, new { cosignReason, signedVersion = await LatestVersionNumberAsync(note.Id, ct) }), ct: ct);
 
         if (note.Status == NoteStatus.Signed)
         {
@@ -306,7 +307,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
 
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
         await _audit.RecordAuditEventAsync(actor.UserId, "note.locked", nameof(ClinicalNote), note.Id, organization.Id,
-            patientId: note.PatientId, ct: ct);
+            patientId: note.PatientId, metadata: NoteAudit(note, organization, NoteStatus.Signed), ct: ct);
 
         return note;
     }
@@ -433,6 +434,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         var cosigner = await _db.Users.FirstOrDefaultAsync(u => u.Id == actor.UserId, ct);
         note.CosignedById = actor.UserId;
         note.CosignedAt = DateTimeOffset.UtcNow;
+        var reviewStatus = note.Status;
         RecordStatusChange(note, note.Status, NoteStatus.Signed, actor.UserId);
         note.Status = NoteStatus.Signed;
         note.UpdatedAt = DateTimeOffset.UtcNow;
@@ -465,7 +467,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         await _db.SaveChangesAsync(ct);
 
         await _audit.RecordAuditEventAsync(actor.UserId, "note.cosigned", nameof(ClinicalNote), note.Id, organization.Id,
-            patientId: note.PatientId, metadata: new { noteType = note.NoteType.ToString() }, ct: ct);
+            patientId: note.PatientId, metadata: NoteAudit(note, organization, reviewStatus), ct: ct);
         await AuditAmendmentAsync(note, amendedOriginal, actor, organization, ct);
 
         await CompleteLinkedAppointmentAsync(note, ct);
@@ -729,7 +731,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         await SaveWithVersionSnapshotAsync(amendment, actor.UserId, isSignedVersion: false, ct);
 
         await _audit.RecordAuditEventAsync(actor.UserId, "note.amendment_started", nameof(ClinicalNote), amendment.Id, organization.Id,
-            patientId: original.PatientId, metadata: new { amendsNoteId = original.Id }, ct: ct);
+            patientId: original.PatientId, metadata: NoteAudit(amendment, organization, null, new { amendsNoteId = original.Id }), ct: ct);
         return amendment;
     }
 
@@ -852,7 +854,8 @@ public partial class ClinicalNoteService : IClinicalNoteService
     {
         if (original is null) return;
         await _audit.RecordAuditEventAsync(actor.UserId, "note.amended", nameof(ClinicalNote), original.Id, organization.Id,
-            patientId: note.PatientId, metadata: new { amendmentNoteId = note.Id }, ct: ct);
+            patientId: note.PatientId,
+            metadata: NoteAudit(original, organization, NoteStatus.Signed, new { amendmentNoteId = note.Id, amendmentReason = note.AmendmentReason }), ct: ct);
     }
 
     /// <summary>Appends a status-history row (saved with the caller's next SaveChanges).</summary>

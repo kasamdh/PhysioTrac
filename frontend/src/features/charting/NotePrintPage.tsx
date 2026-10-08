@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { fetchPatientDetail } from "../admin/api";
@@ -11,6 +10,9 @@ import {
 } from "../workflow/types";
 import { fetchChartNote, fetchNoteRecord } from "./api";
 import { fetchEncounter } from "../encounter/api";
+import { recordNoteOutput } from "../printing/api";
+import { PrintActions } from "../printing/PrintActions";
+import { formatInZone, usePrintOutput } from "../printing/usePrintOutput";
 
 const formatDate = (iso: string) => {
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -19,7 +21,8 @@ const formatDate = (iso: string) => {
 
 /** A visit note as a clean document for printing or "Save as PDF": the
  * organization's letterhead, patient identifiers, the full note, addenda,
- * and the electronic signature block. Opens the print dialog once loaded. */
+ * and the electronic signature block, with times in the clinic's time zone.
+ * Opens the print dialog once loaded; each print or export is audited first. */
 export function NotePrintPage() {
   const { noteId = "" } = useParams();
   const note = useQuery({
@@ -52,14 +55,9 @@ export function NotePrintPage() {
     !!patient.data &&
     !!org.data &&
     !charting.isLoading;
-  const printed = useRef(false);
-  useEffect(() => {
-    if (!ready || printed.current) return;
-    printed.current = true;
-    // Give the interventions table a moment to load before printing.
-    const t = window.setTimeout(() => window.print(), 800);
-    return () => window.clearTimeout(t);
-  }, [ready]);
+  const printing = usePrintOutput(ready, (kind) =>
+    recordNoteOutput(noteId, kind),
+  );
 
   const error = note.error ?? record.error ?? patient.error;
   if (error) return <p className="alert-error m-4">{error.message}</p>;
@@ -68,24 +66,10 @@ export function NotePrintPage() {
   const n = note.data!;
   const p = patient.data!;
   const r = record.data!;
+  const tz = org.data!.timezone;
   return (
     <div className="mx-auto max-w-4xl bg-white p-4 text-[#222] sm:p-8 print:max-w-none print:p-0">
-      <div className="mb-4 flex flex-wrap gap-2 print:hidden">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => window.print()}
-        >
-          Print / Save as PDF
-        </button>
-        <button
-          type="button"
-          className="btn-refresh"
-          onClick={() => window.close()}
-        >
-          Close
-        </button>
-      </div>
+      <PrintActions {...printing} />
 
       <header className="border-b-2 border-[#1565b8] pb-3">
         <p className="text-2xl font-bold text-[#1565b8]">{org.data!.name}</p>
@@ -124,9 +108,9 @@ export function NotePrintPage() {
             Electronically signed by <strong>{n.signatureName}</strong>
             {n.signatureCredentials
               ? `, ${n.signatureCredentials}`
-              : ""} on {new Date(n.signedAt).toLocaleString("en-US")}.
+              : ""} on {formatInZone(n.signedAt, tz)}.
             {r.cosignedByName && n.cosignedAt
-              ? ` Cosigned by ${r.cosignedByName} on ${new Date(n.cosignedAt).toLocaleString("en-US")}.`
+              ? ` Cosigned by ${r.cosignedByName} on ${formatInZone(n.cosignedAt, tz)}.`
               : ""}
           </p>
         ) : (
@@ -136,7 +120,7 @@ export function NotePrintPage() {
           </p>
         )}
         <p className="mt-2 text-text-muted">
-          Printed {new Date().toLocaleString("en-US")}. Confidential patient
+          Printed {formatInZone(new Date().toISOString(), tz)}. Confidential patient
           information.
         </p>
       </footer>
