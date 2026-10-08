@@ -116,4 +116,24 @@ public interface IClinicalNoteService
 
     /// <summary>The current user's documentation work queues.</summary>
     Task<NoteQueuesDto> GetNoteQueuesAsync(ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The note's electronic signatures and every status change.</summary>
+    Task<NoteHistoryDto> GetNoteHistoryAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The note opened as an encounter: template version, values, header facts.</summary>
+    Task<EncounterDto> GetEncounterAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Autosave of a draft encounter (template values + narrative),
+    /// refused with <see cref="EncounterConflictException"/> when someone
+    /// else saved since <see cref="SaveEncounterRequest.BaseSaveVersion"/>.</summary>
+    Task<EncounterSaveResultDto> SaveEncounterAsync(Guid noteId, SaveEncounterRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Switches a draft to another template before any field is filled.</summary>
+    Task<ClinicalNote> ChangeTemplateAsync(Guid noteId, Guid templateId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Documentation checks, including the template's required fields.</summary>
+    Task<IReadOnlyList<ComplianceFinding>> GetComplianceAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The patient's plans of care, newest first.</summary>
+    Task<IReadOnlyList<PlanOfCareDto>> ListPlansOfCareAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
 }

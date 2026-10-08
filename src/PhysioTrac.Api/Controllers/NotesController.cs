@@ -99,8 +99,7 @@ public class NotesController : ControllerBase
     {
         try
         {
-            var note = await _notes.GetAsync(id, _currentUser, HttpContext.RequestAborted);
-            return Ok(NoteComplianceEvaluator.Evaluate(note));
+            return Ok(await _notes.GetComplianceAsync(id, _currentUser, HttpContext.RequestAborted));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
@@ -214,6 +213,75 @@ public class NotesController : ControllerBase
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
+    /// <summary>The note as a clinical encounter: template version, values and header facts.</summary>
+    [HttpGet("{id:guid}/encounter")]
+    public async Task<IActionResult> Encounter(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetEncounterAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Autosave of a draft encounter. 409 EDIT_CONFLICT when someone
+    /// else saved since the editor's BaseSaveVersion; 422 with the field
+    /// problems when a value breaks its template's rules.</summary>
+    [HttpPut("{id:guid}/encounter")]
+    public async Task<IActionResult> SaveEncounter(Guid id, [FromBody] SaveEncounterRequest request)
+    {
+        try
+        {
+            return Ok(await _notes.SaveEncounterAsync(id, request, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (EncounterConflictException ex)
+        {
+            return Conflict(new { detail = ex.Message, code = "EDIT_CONFLICT", saveVersion = ex.CurrentSaveVersion, savedAt = ex.SavedAt, savedByName = ex.SavedByName });
+        }
+        catch (TemplateValidationException ex) { return UnprocessableEntity(new { detail = ex.Message, errors = ex.Errors }); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Switch a draft to another template (before any field is filled in).</summary>
+    [HttpPut("{id:guid}/template")]
+    public async Task<IActionResult> ChangeTemplate(Guid id, [FromBody] ChangeNoteTemplateRequest request)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.ChangeTemplateAsync(id, request.TemplateId, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Electronic signatures and status history of a note.</summary>
+    [HttpGet("{id:guid}/history")]
+    public async Task<IActionResult> History(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetNoteHistoryAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The patient's plans of care, newest first.</summary>
+    [HttpGet("patient/{patientId:guid}/plans-of-care")]
+    public async Task<IActionResult> PlansOfCare(Guid patientId)
+    {
+        try
+        {
+            return Ok(await _notes.ListPlansOfCareAsync(patientId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
     /// <summary>The current user's unsigned notes and notes awaiting their cosignature.</summary>
     [HttpGet("queues")]
     public async Task<IActionResult> Queues()
@@ -287,14 +355,7 @@ public class NotesController : ControllerBase
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
-    private static ClinicalNoteDto ToDto(ClinicalNote n) => new(
-        n.Id, n.PatientId, n.TherapistId, n.AppointmentId, n.NoteType, n.Status, n.ServiceDate,
-        n.Subjective, n.Objective, n.Interventions, n.Assessment, n.Plan,
-        n.PlanOfCareStart, n.PlanOfCareEnd, n.FrequencyPerWeek, n.DurationWeeks, n.ReassessmentDue,
-        n.PlanOfCareCertifiedDate, n.PlanOfCareCertifyingProviderId,
-        n.SignatureName, n.SignatureCredentials, n.SignedAt, n.SignatureIpAddress, n.SignatureHash,
-        n.CosignRequired, n.CosignedById, n.CosignedAt,
-        n.SubjectiveDetailsJson, n.ObjectiveMeasurementsJson, n.AmendsNoteId, n.AmendmentReason);
+    private static ClinicalNoteDto ToDto(ClinicalNote n) => ClinicalNoteMapper.ToDto(n);
 
     private static InterventionDto ToInterventionDto(NoteIntervention i) => new(
         i.Id, i.NoteId, i.Description, i.BodyRegion, i.Category, i.Minutes, i.Units, i.IsTimed, i.Order, i.PatientResponse);

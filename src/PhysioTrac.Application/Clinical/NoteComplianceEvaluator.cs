@@ -13,23 +13,26 @@ public static class NoteComplianceEvaluator
         var effectiveToday = today ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var findings = new List<ComplianceFinding>();
 
-        if (string.IsNullOrWhiteSpace(note.Objective))
+        // Communication, missed-visit and addendum notes record no treatment,
+        // so the S/O/A/P checks don't apply to them.
+        var isVisitNote = note.NoteType is not (NoteType.Communication or NoteType.MissedVisit or NoteType.Addendum);
+        if (isVisitNote && string.IsNullOrWhiteSpace(note.Objective))
         {
             findings.Add(new ComplianceFinding("missing_objective", "high", "Objective findings are missing",
                 "Document measurable tests, observations, or treatment response.", true));
         }
-        if (string.IsNullOrWhiteSpace(note.Assessment))
+        if (isVisitNote && string.IsNullOrWhiteSpace(note.Assessment))
         {
             findings.Add(new ComplianceFinding("missing_assessment", "medium", "Assessment is missing",
                 "Explain clinical reasoning and the patient response to treatment."));
         }
-        if (string.IsNullOrWhiteSpace(note.Plan))
+        if (isVisitNote && string.IsNullOrWhiteSpace(note.Plan))
         {
             findings.Add(new ComplianceFinding("missing_plan", "high", "Plan is missing",
                 "Document the next-visit plan, progression, and needed follow-up.", true));
         }
 
-        if (note.NoteType is NoteType.Evaluation or NoteType.Progress or NoteType.ReEvaluation)
+        if (note.NoteType is NoteType.Evaluation or NoteType.Progress or NoteType.ReEvaluation or NoteType.Recertification)
         {
             var pocComplete = note.PlanOfCareStart is not null && note.PlanOfCareEnd is not null
                 && note.FrequencyPerWeek is not null && note.DurationWeeks is not null;

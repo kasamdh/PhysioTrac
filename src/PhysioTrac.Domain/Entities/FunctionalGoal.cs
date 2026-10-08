@@ -9,6 +9,10 @@ public class FunctionalGoal : BaseEntity
     public Guid PatientId { get; set; }
     public Patient? Patient { get; set; }
 
+    /// <summary>The plan of care the goal belongs to, when set from an evaluation.</summary>
+    public Guid? PlanOfCareId { get; set; }
+    public PlanOfCare? PlanOfCare { get; set; }
+
     public Guid AuthorId { get; set; }
 
     public string FunctionalLimitation { get; set; } = string.Empty;

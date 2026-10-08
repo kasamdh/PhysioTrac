@@ -6,7 +6,7 @@ namespace PhysioTrac.Domain.Entities;
 /// <summary>Editable draft note that becomes immutable after therapist
 /// signature. Deliberately omits the original's `episode_of_care`/
 /// `authorization` FKs — not ported yet.</summary>
-public class ClinicalNote : BaseEntity
+public class ClinicalNote : BaseEntity, IUserStamped
 {
     public Guid PatientId { get; set; }
     public Patient? Patient { get; set; }
@@ -16,6 +16,43 @@ public class ClinicalNote : BaseEntity
 
     public Guid? AppointmentId { get; set; }
     public Appointment? Appointment { get; set; }
+
+    /// <summary>The treating clinician's Provider record (the therapist on
+    /// the schedule); TherapistId remains the author's user id.</summary>
+    public Guid? TreatingProviderId { get; set; }
+    public Provider? TreatingProvider { get; set; }
+
+    /// <summary>The supervising PT when an assistant authors the note.</summary>
+    public Guid? SupervisingProviderId { get; set; }
+    public Provider? SupervisingProvider { get; set; }
+
+    /// <summary>The exact template version this note was written with --
+    /// never changes once set, so template edits never alter the note.</summary>
+    public Guid? TemplateVersionId { get; set; }
+    public ClinicalNoteTemplateVersion? TemplateVersion { get; set; }
+
+    /// <summary>The patient's plan of care this visit falls under.</summary>
+    public Guid? PlanOfCareId { get; set; }
+    public PlanOfCare? PlanOfCare { get; set; }
+
+    public Guid? CreatedById { get; set; }
+    public Guid? UpdatedById { get; set; }
+
+    /// <summary>When an assistant submitted it for cosign (UTC).</summary>
+    public DateTimeOffset? SubmittedAt { get; set; }
+
+    /// <summary>Set when a supervising PT returns the note for correction.</summary>
+    public string? ReturnReason { get; set; }
+
+    /// <summary>Required to void; the note is kept, never deleted.</summary>
+    public string? VoidReason { get; set; }
+    public DateTimeOffset? VoidedAt { get; set; }
+    public Guid? VoidedById { get; set; }
+
+    /// <summary>Reporting / certification period for progress notes,
+    /// re-evaluations and recertifications.</summary>
+    public DateOnly? PeriodStart { get; set; }
+    public DateOnly? PeriodEnd { get; set; }
 
     public NoteType NoteType { get; set; } = NoteType.Daily;
     public NoteStatus Status { get; set; } = NoteStatus.Draft;
@@ -105,4 +142,10 @@ public class ClinicalNote : BaseEntity
     public bool IsLocked => Status == NoteStatus.Locked;
 
     public ICollection<ClinicalNoteVersion> Versions { get; set; } = new List<ClinicalNoteVersion>();
+    public ICollection<ClinicalNoteFieldValue> FieldValues { get; set; } = new List<ClinicalNoteFieldValue>();
+    public ICollection<ElectronicSignature> Signatures { get; set; } = new List<ElectronicSignature>();
+    public ICollection<ClinicalNoteStatusChange> StatusChanges { get; set; } = new List<ClinicalNoteStatusChange>();
+
+    /// <summary>Content may be edited only in these statuses.</summary>
+    public bool IsEditable => Status is NoteStatus.Draft or NoteStatus.ReturnedForCorrection;
 }

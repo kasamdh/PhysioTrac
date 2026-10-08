@@ -21,8 +21,10 @@ import { ActivateAccountPage } from "./features/admin/pages/ActivateAccountPage"
 import { ProvidersPage } from "./features/providers/ProvidersPage";
 import { WorkflowPage } from "./features/workflow/WorkflowPage";
 import { LogsPage } from "./features/logs/LogsPage";
-import { ChartingPage } from "./features/charting/ChartingPage";
+import { EncounterPage } from "./features/encounter/EncounterPage";
 import { NotePrintPage } from "./features/charting/NotePrintPage";
+import { TemplatesPage } from "./features/templates/pages/TemplatesPage";
+import { TemplateEditorPage } from "./features/templates/pages/TemplateEditorPage";
 import { PatientDocumentationPage } from "./features/documentation/PatientDocumentationPage";
 
 export default function App() {
@@ -46,7 +48,7 @@ export default function App() {
                     <Route path="/schedule/hours" element={<ProviderHoursPage />} />
                     <Route path="/providers" element={<ProvidersPage />} />
                     <Route path="/workflow" element={<WorkflowPage />} />
-                    <Route path="/chart/:noteId" element={<ChartingPage />} />
+                    <Route path="/chart/:noteId" element={<EncounterPage />} />
                     <Route path="/patients/:patientId/documentation" element={<PatientDocumentationPage />} />
                     <Route path="/billing" element={<PlaceholderPage title="Billing" />} />
                     <Route path="/admin" element={<AdminHomePage />} />
@@ -56,6 +58,9 @@ export default function App() {
                     <Route path="/admin/locations" element={<LocationsAdminPage />} />
                     <Route path="/admin/patients" element={<PatientListPage manage />} />
                     <Route path="/admin/logs" element={<LogsPage />} />
+                    <Route path="/admin/templates" element={<TemplatesPage />} />
+                    <Route path="/admin/templates/new" element={<TemplateEditorPage />} />
+                    <Route path="/admin/templates/:templateId" element={<TemplateEditorPage />} />
                   </Route>
                 </Route>
               </Routes>

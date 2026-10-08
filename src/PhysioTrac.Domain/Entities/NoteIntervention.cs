@@ -6,7 +6,7 @@ namespace PhysioTrac.Domain.Entities;
 /// <summary>One structured treatment line item on a note (the "treatment
 /// timer" — repeatable, billing-adjacent, and summed, unlike the free-text
 /// <see cref="ClinicalNote.Interventions"/> field it sits alongside).</summary>
-public class NoteIntervention : BaseEntity
+public class NoteIntervention : BaseEntity, INoteOwned
 {
     public Guid NoteId { get; set; }
     public ClinicalNote? Note { get; set; }

@@ -11,7 +11,26 @@ public record ClinicalNoteDto(
     string? SignatureName, string? SignatureCredentials, DateTimeOffset? SignedAt, string? SignatureIpAddress, string? SignatureHash,
     bool CosignRequired, Guid? CosignedById, DateTimeOffset? CosignedAt,
     string SubjectiveDetailsJson = "{}", string ObjectiveMeasurementsJson = "{}",
-    Guid? AmendsNoteId = null, string? AmendmentReason = null);
+    Guid? AmendsNoteId = null, string? AmendmentReason = null,
+    Guid? TreatingProviderId = null, Guid? SupervisingProviderId = null, Guid? TemplateVersionId = null, Guid? PlanOfCareId = null,
+    DateOnly? PeriodStart = null, DateOnly? PeriodEnd = null, string? ReturnReason = null, string? VoidReason = null);
+
+/// <summary>An electronic signature on a note, as recorded at signing.</summary>
+public record ElectronicSignatureDto(
+    Guid Id, Guid SignerUserId, string SignerName, string? Credentials, string Role, SignatureMeaning Meaning,
+    DateTimeOffset SignedAt, string DisplayTimeZone, int NoteVersionNumber);
+
+public record NoteStatusChangeDto(Guid Id, NoteStatus? FromStatus, NoteStatus ToStatus, Guid ChangedById, string? ChangedByName, string? Reason, DateTimeOffset ChangedAt);
+
+/// <summary>A note's signature and status history, oldest first.</summary>
+public record NoteHistoryDto(IReadOnlyList<ElectronicSignatureDto> Signatures, IReadOnlyList<NoteStatusChangeDto> StatusChanges);
+
+public record PlanOfCareDto(
+    Guid Id, Guid PatientId, Guid SourceNoteId, Guid? PreviousPlanOfCareId, PlanOfCareStatus Status,
+    DateOnly StartDate, DateOnly EndDate, int? FrequencyPerWeek, int? DurationWeeks,
+    string? TreatmentDiagnosis, string? Prognosis, string? RehabPotential, string? PlannedInterventions,
+    string? HomeProgram, string? PatientEducation, string? Referrals,
+    DateOnly? CertifiedDate, Guid? CertifyingProviderId, DischargeReason? DischargeReason, Guid? DischargeNoteId);
 
 public record CertifyPlanOfCareRequest(DateOnly CertifiedDate, Guid CertifyingProviderId);
 
@@ -42,7 +61,9 @@ public record CreateNoteRequest(
     string? Subjective, string? Objective, string? Interventions, string? Assessment, string? Plan,
     DateOnly? PlanOfCareStart, DateOnly? PlanOfCareEnd, int? FrequencyPerWeek, int? DurationWeeks, DateOnly? ReassessmentDue,
     // Clinical Charting's structured findings (JSON objects); null = none / unchanged.
-    string? SubjectiveDetailsJson = null, string? ObjectiveMeasurementsJson = null);
+    string? SubjectiveDetailsJson = null, string? ObjectiveMeasurementsJson = null,
+    // The documentation template to write it with; null = the suggested one.
+    Guid? TemplateId = null);
 
 public record UpdateNoteRequest(
     string? Subjective, string? Objective, string? Interventions, string? Assessment, string? Plan,

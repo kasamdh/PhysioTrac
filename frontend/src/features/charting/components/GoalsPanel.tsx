@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../../components/Toast";
 import { fetchGoals, updateGoalProgress } from "../api";
+import { ApproveGoalButton } from "../../encounter/components/ClinicalPanels";
 import type { Goal } from "../types";
 
 const STATUS: Record<number, string> = {
@@ -109,6 +110,11 @@ function GoalRow({
           {goal.progressPercent === null ? "—" : `${pct}%`}
         </span>
       </div>
+      {!readOnly && goal.status === 0 && (
+        <div className="mt-2">
+          <ApproveGoalButton goalId={goal.id} patientId={patientId} />
+        </div>
+      )}
       {!readOnly && goal.status === 1 && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="toolbar-label">

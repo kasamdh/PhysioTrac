@@ -222,6 +222,17 @@ if (app.Environment.IsDevelopment())
     await DemoDataSeeder.SeedAsync(scope.ServiceProvider);
 }
 
+// System documentation templates are reference data (no patient data), kept
+// current in every environment -- once the schema is up to date.
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<PhysioTracDbContext>();
+    if (!(await db.Database.GetPendingMigrationsAsync()).Any())
+    {
+        await SystemTemplateSeeder.SeedAsync(db);
+    }
+}
+
 // Access control OFF: give the platform SuperAdmin a clinic to work in.
 await AccessControlStartup.ResolveSuperAdminOrganizationAsync(app.Services);
 

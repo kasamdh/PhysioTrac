@@ -42,6 +42,9 @@ public class EntityChangeAuditInterceptor : SaveChangesInterceptor
     private static readonly HashSet<string> IgnoredEntityTypes = new()
     {
         nameof(UserSession), nameof(ClinicalNoteVersion), nameof(AppointmentStatusHistory),
+        // Autosaved note content and the note's own status history: the
+        // note itself is logged, and its actions are audited explicitly.
+        nameof(ClinicalNoteFieldValue), nameof(ClinicalNoteStatusChange),
     };
 
     private readonly ICurrentUser _currentUser;

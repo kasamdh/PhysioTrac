@@ -17,6 +17,11 @@ public enum NoteType
     PlanOfCare,
     DryNeedlingTreatment,
     PelvicHealthEvaluation,
+    Recertification,
+    Consultation,
+    Communication,
+    MissedVisit,
+    Addendum,
 }
 
 /// <summary>Locked is a further, manual step past Signed -- Signed already
@@ -32,6 +37,12 @@ public enum NoteStatus
     Signed,
     Amended,
     Locked,
+    /// <summary>A supervising PT sent an assistant's submitted note back
+    /// with a reason; the assistant edits it again and resubmits.</summary>
+    ReturnedForCorrection,
+    /// <summary>Withdrawn with a reason (e.g. documented on the wrong
+    /// patient). Kept, never deleted; excluded from the active record.</summary>
+    Voided,
 }
 
 public enum InterventionCategory

@@ -16,7 +16,7 @@ using PhysioTrac.Infrastructure.Persistence;
 namespace PhysioTrac.Infrastructure.Services;
 
 /// <summary>Direct port of `care/note_management.py`.</summary>
-public class ClinicalNoteService : IClinicalNoteService
+public partial class ClinicalNoteService : IClinicalNoteService
 {
     /// <summary>Admin/Director may view, edit, sign, and co-sign any note --
     /// and, while role-based access control is off, so may every staff role.</summary>
@@ -121,7 +121,14 @@ public class ClinicalNoteService : IClinicalNoteService
             // silently changes an in-progress note's cosign requirement.
             CosignRequired = organization.PtaCosignRequired && actor.Role == UserRole.Assistant,
         };
+        await LinkEncounterAsync(note, actor, ct);
+        note.TemplateVersionId = request.TemplateId is Guid templateId
+            ? await DocumentationTemplateService.CurrentVersionIdAsync(_db, organization.Id, templateId, ct)
+                ?? throw new NotFoundException("Template was not found.")
+            : await DocumentationTemplateService.SuggestVersionIdAsync(_db, organization.Id, actor.UserId, note.NoteType,
+                await AppointmentTypeIdAsync(note.AppointmentId, ct), ct);
         _db.ClinicalNotes.Add(note);
+        RecordStatusChange(note, null, NoteStatus.Draft, actor.UserId);
         await SaveWithVersionSnapshotAsync(note, actor.UserId, isSignedVersion: false, ct);
 
         await _audit.RecordAuditEventAsync(actor.UserId, "note.created", nameof(ClinicalNote), note.Id, organization.Id,
@@ -193,12 +200,12 @@ public class ClinicalNoteService : IClinicalNoteService
         }
         await VerifySignerAsync(note, actor, password, "sign", ct);
 
-        var blockers = NoteComplianceEvaluator.Evaluate(note).Where(f => f.FinalizationBlocker).ToList();
+        var blockers = (await ComplianceAsync(note, ct)).Where(f => f.FinalizationBlocker).ToList();
         if (blockers.Count > 0)
         {
             throw new InvalidOperationException(
                 "Note cannot be finalized until required documentation checks are resolved: " +
-                string.Join(", ", blockers.Select(b => b.Code)));
+                string.Join("; ", blockers.Select(b => b.Code == "missing_required_fields" ? $"{b.Code} ({b.Detail})" : b.Code)));
         }
 
         var amendedOriginal = await LoadAmendedOriginalAsync(note, ct);
@@ -210,23 +217,48 @@ public class ClinicalNoteService : IClinicalNoteService
         note.SignatureIpAddress = ipAddress;
         note.FinalizationAttestation = true;
         var pendingCosign = note.CosignRequired && actor.Role == UserRole.Assistant;
+        var previousStatus = note.Status;
         note.Status = pendingCosign ? NoteStatus.ReviewRequired : NoteStatus.Signed;
+        if (pendingCosign) note.SubmittedAt = DateTimeOffset.UtcNow;
         note.UpdatedAt = DateTimeOffset.UtcNow;
         // Computed after every other field above is set, so the hash covers
         // the exact content -- including the signature metadata itself --
         // that becomes immutable from this point on.
-        note.SignatureHash = ComputeContentHash(note);
+        note.SignatureHash = ComputeContentHash(note, await CurrentFieldValuesAsync(note.Id, ct));
+        if (note.Status == NoteStatus.Signed) await ApplyFinalSignatureEffectsAsync(note, ct);
         // Same SaveChanges as the signature: the original is superseded
         // exactly when (and only if) its amendment becomes signed.
         if (amendedOriginal is not null && note.Status == NoteStatus.Signed)
         {
+            RecordStatusChange(amendedOriginal, amendedOriginal.Status, NoteStatus.Amended, actor.UserId, note.AmendmentReason);
             amendedOriginal.Status = NoteStatus.Amended;
             amendedOriginal.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
-        await SaveWithVersionSnapshotAsync(note, actor.UserId, isSignedVersion: true, ct);
-
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        RecordStatusChange(note, previousStatus, note.Status, actor.UserId);
+        if (pendingCosign)
+        {
+            _db.NoteCosignRequests.Add(new NoteCosignRequest
+            {
+                NoteId = note.Id,
+                RequestedById = actor.UserId,
+                SupervisorUserId = await SupervisorUserIdAsync(note, ct),
+            });
+        }
+        await SaveWithVersionSnapshotAsync(note, actor.UserId, isSignedVersion: true, ct, signature: new ElectronicSignature
+        {
+            NoteId = note.Id,
+            SignerUserId = actor.UserId,
+            SignerName = note.SignatureName ?? "",
+            Credentials = note.SignatureCredentials,
+            Role = actor.Role.ToString(),
+            Meaning = note.AmendsNoteId is not null ? SignatureMeaning.Amendment : SignatureMeaning.Author,
+            SignedAt = note.SignedAt.Value,
+            DisplayTimeZone = organization.Timezone,
+            ContentHash = note.SignatureHash,
+            IpAddress = ipAddress,
+        });
         await _audit.RecordAuditEventAsync(actor.UserId, pendingCosign ? "note.submitted_for_cosign" : "note.signed",
             nameof(ClinicalNote), note.Id, organization.Id, patientId: note.PatientId,
             metadata: new { noteType = note.NoteType.ToString(), status = note.Status.ToString() }, ct: ct);
@@ -250,6 +282,7 @@ public class ClinicalNoteService : IClinicalNoteService
             throw new ForbiddenException("You are not permitted to lock this note.");
         }
 
+        RecordStatusChange(note, note.Status, NoteStatus.Locked, actor.UserId);
         note.Status = NoteStatus.Locked;
         note.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
@@ -305,7 +338,7 @@ public class ClinicalNoteService : IClinicalNoteService
             .Select(g => new FunctionalGoalDto(
                 g.Id, g.PatientId, g.AuthorId, g.FunctionalLimitation, g.FunctionalTask, g.Term,
                 g.BaselineValue, g.TargetValue, g.CurrentValue, g.Unit, g.MeasurementMethod,
-                g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt))
+                g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt, g.PlanOfCareId))
             .ToListAsync(ct);
 
         var lastNote = await _db.ClinicalNotes
@@ -379,18 +412,41 @@ public class ClinicalNoteService : IClinicalNoteService
         await VerifySignerAsync(note, actor, password, "cosign", ct);
         var amendedOriginal = await LoadAmendedOriginalAsync(note, ct);
 
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        var cosigner = await _db.Users.FirstOrDefaultAsync(u => u.Id == actor.UserId, ct);
         note.CosignedById = actor.UserId;
         note.CosignedAt = DateTimeOffset.UtcNow;
+        RecordStatusChange(note, note.Status, NoteStatus.Signed, actor.UserId);
         note.Status = NoteStatus.Signed;
         note.UpdatedAt = DateTimeOffset.UtcNow;
+        await ApplyFinalSignatureEffectsAsync(note, ct);
         if (amendedOriginal is not null)
         {
+            RecordStatusChange(amendedOriginal, amendedOriginal.Status, NoteStatus.Amended, actor.UserId, note.AmendmentReason);
             amendedOriginal.Status = NoteStatus.Amended;
             amendedOriginal.UpdatedAt = DateTimeOffset.UtcNow;
         }
+        foreach (var request in await _db.NoteCosignRequests.Where(r => r.NoteId == note.Id && r.Status == CosignRequestStatus.Pending).ToListAsync(ct))
+        {
+            request.Status = CosignRequestStatus.Cosigned;
+            request.ResolvedAt = note.CosignedAt;
+            request.ResolvedById = actor.UserId;
+        }
+        _db.ElectronicSignatures.Add(new ElectronicSignature
+        {
+            NoteId = note.Id,
+            SignerUserId = actor.UserId,
+            SignerName = DisplayName(cosigner, actor.UserId),
+            Credentials = cosigner?.Credential,
+            Role = actor.Role.ToString(),
+            Meaning = SignatureMeaning.Cosign,
+            SignedAt = note.CosignedAt.Value,
+            DisplayTimeZone = organization.Timezone,
+            NoteVersionNumber = await LatestVersionNumberAsync(note.Id, ct),
+            ContentHash = note.SignatureHash,
+        });
         await _db.SaveChangesAsync(ct);
 
-        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
         await _audit.RecordAuditEventAsync(actor.UserId, "note.cosigned", nameof(ClinicalNote), note.Id, organization.Id,
             patientId: note.PatientId, metadata: new { noteType = note.NoteType.ToString() }, ct: ct);
         await AuditAmendmentAsync(note, amendedOriginal, actor, organization, ct);
@@ -588,8 +644,28 @@ public class ClinicalNoteService : IClinicalNoteService
             DurationWeeks = original.DurationWeeks,
             ReassessmentDue = original.ReassessmentDue,
             CosignRequired = organization.PtaCosignRequired && actor.Role == UserRole.Assistant,
+            TemplateVersionId = original.TemplateVersionId,
+            PeriodStart = original.PeriodStart,
+            PeriodEnd = original.PeriodEnd,
         };
+        await LinkEncounterAsync(amendment, actor, ct);
+        foreach (var value in await _db.ClinicalNoteFieldValues.AsNoTracking().Where(v => v.NoteId == original.Id).ToListAsync(ct))
+        {
+            _db.ClinicalNoteFieldValues.Add(new ClinicalNoteFieldValue
+            {
+                NoteId = amendment.Id,
+                FieldId = value.FieldId,
+                FieldKey = value.FieldKey,
+                ValueText = value.ValueText,
+                ValueNumber = value.ValueNumber,
+                ValueDate = value.ValueDate,
+                ValueTime = value.ValueTime,
+                ValueBool = value.ValueBool,
+                ValueJson = value.ValueJson,
+            });
+        }
         _db.ClinicalNotes.Add(amendment);
+        RecordStatusChange(amendment, null, NoteStatus.Draft, actor.UserId, reason);
         var interventions = await _db.NoteInterventions.Where(i => i.NoteId == original.Id).ToListAsync(ct);
         foreach (var i in interventions)
         {
@@ -681,6 +757,33 @@ public class ClinicalNoteService : IClinicalNoteService
                 n.NoteType, n.Status, n.ServiceDate, n.TherapistId, n.AmendsNoteId)).ToList());
     }
 
+    public async Task<NoteHistoryDto> GetNoteHistoryAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var note = await GetAsync(noteId, actor, ct);
+        var signatures = await _db.ElectronicSignatures.AsNoTracking().Where(s => s.NoteId == note.Id)
+            .OrderBy(s => s.SignedAt).ToListAsync(ct);
+        var changes = await _db.ClinicalNoteStatusChanges.AsNoTracking().Where(c => c.NoteId == note.Id)
+            .OrderBy(c => c.CreatedAt).ToListAsync(ct);
+        var names = await NamesAsync(changes.Select(c => c.ChangedById), ct);
+        return new NoteHistoryDto(
+            signatures.Select(s => new ElectronicSignatureDto(s.Id, s.SignerUserId, s.SignerName, s.Credentials, s.Role, s.Meaning,
+                s.SignedAt, s.DisplayTimeZone, s.NoteVersionNumber)).ToList(),
+            changes.Select(c => new NoteStatusChangeDto(c.Id, c.FromStatus, c.ToStatus, c.ChangedById,
+                names.GetValueOrDefault(c.ChangedById), c.Reason, c.CreatedAt)).ToList());
+    }
+
+    public async Task<IReadOnlyList<PlanOfCareDto>> ListPlansOfCareAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, ct: ct);
+        var plans = await _db.PlansOfCare.AsNoTracking().Where(p => p.PatientId == patient.Id).ToListAsync(ct);
+        return plans.OrderByDescending(p => p.StartDate).ThenByDescending(p => p.CreatedAt).Select(ToPlanOfCareDto).ToList();
+    }
+
+    internal static PlanOfCareDto ToPlanOfCareDto(PlanOfCare p) => new(
+        p.Id, p.PatientId, p.SourceNoteId, p.PreviousPlanOfCareId, p.Status, p.StartDate, p.EndDate, p.FrequencyPerWeek, p.DurationWeeks,
+        p.TreatmentDiagnosis, p.Prognosis, p.RehabPotential, p.PlannedInterventions, p.HomeProgram, p.PatientEducation, p.Referrals,
+        p.CertifiedDate, p.CertifyingProviderId, p.DischargeReason, p.DischargeNoteId);
+
     /// <summary>The original a signing amendment supersedes -- which must
     /// still be Signed (it may have been locked meanwhile).</summary>
     private async Task<ClinicalNote?> LoadAmendedOriginalAsync(ClinicalNote note, CancellationToken ct)
@@ -701,6 +804,57 @@ public class ClinicalNoteService : IClinicalNoteService
         await _audit.RecordAuditEventAsync(actor.UserId, "note.amended", nameof(ClinicalNote), original.Id, organization.Id,
             patientId: note.PatientId, metadata: new { amendmentNoteId = note.Id }, ct: ct);
     }
+
+    /// <summary>Appends a status-history row (saved with the caller's next SaveChanges).</summary>
+    private void RecordStatusChange(ClinicalNote note, NoteStatus? from, NoteStatus to, Guid actorId, string? reason = null) =>
+        _db.ClinicalNoteStatusChanges.Add(new ClinicalNoteStatusChange
+        {
+            NoteId = note.Id,
+            FromStatus = from,
+            ToStatus = to,
+            ChangedById = actorId,
+            Reason = reason,
+        });
+
+    /// <summary>Connects a new note to its encounter: the appointment's
+    /// treating provider (or the author's own provider record) and the
+    /// patient's active plan of care.</summary>
+    private async Task LinkEncounterAsync(ClinicalNote note, ICurrentUser actor, CancellationToken ct)
+    {
+        if (note.AppointmentId is Guid appointmentId)
+        {
+            note.TreatingProviderId = await _db.Appointments.Where(a => a.Id == appointmentId && a.PatientId == note.PatientId)
+                .Select(a => a.ProviderId).FirstOrDefaultAsync(ct);
+        }
+        note.TreatingProviderId ??= await _db.Providers.Where(p => p.UserId == actor.UserId)
+            .Select(p => (Guid?)p.Id).FirstOrDefaultAsync(ct);
+        var plan = await _db.PlansOfCare.AsNoTracking()
+            .Where(p => p.PatientId == note.PatientId && p.Status == PlanOfCareStatus.Active)
+            .OrderByDescending(p => p.StartDate).FirstOrDefaultAsync(ct);
+        note.PlanOfCareId = plan?.Id;
+        // Notes that restate the plan start from the current one (reviewed and edited before signing).
+        if (plan is not null && note.NoteType is NoteType.Progress or NoteType.ReEvaluation or NoteType.Recertification)
+        {
+            note.PlanOfCareStart ??= plan.StartDate;
+            note.PlanOfCareEnd ??= plan.EndDate;
+            note.FrequencyPerWeek ??= plan.FrequencyPerWeek;
+            note.DurationWeeks ??= plan.DurationWeeks;
+        }
+    }
+
+    private async Task<Guid?> AppointmentTypeIdAsync(Guid? appointmentId, CancellationToken ct) =>
+        appointmentId is Guid id
+            ? await _db.Appointments.Where(a => a.Id == id).Select(a => a.AppointmentTypeId).FirstOrDefaultAsync(ct)
+            : null;
+
+    /// <summary>The supervising PT's user for an assistant's note, when known.</summary>
+    private async Task<Guid?> SupervisorUserIdAsync(ClinicalNote note, CancellationToken ct) =>
+        note.SupervisingProviderId is Guid supervisor
+            ? await _db.Providers.Where(p => p.Id == supervisor).Select(p => p.UserId).FirstOrDefaultAsync(ct)
+            : null;
+
+    private async Task<int> LatestVersionNumberAsync(Guid noteId, CancellationToken ct) =>
+        await _db.ClinicalNoteVersions.Where(v => v.NoteId == noteId).Select(v => (int?)v.VersionNumber).MaxAsync(ct) ?? 0;
 
     private async Task<Dictionary<Guid, string>> NamesAsync(IEnumerable<Guid> userIds, CancellationToken ct)
     {
@@ -737,14 +891,17 @@ public class ClinicalNoteService : IClinicalNoteService
     /// hashing library, no keyed HMAC) since this is an integrity check
     /// against accidental/out-of-band corruption, not a cryptographic
     /// signature meant to resist a determined attacker with DB access.</summary>
-    private static string ComputeContentHash(ClinicalNote note)
+    private static string ComputeContentHash(ClinicalNote note, IReadOnlyList<ClinicalNoteFieldValue> values)
     {
+        var fieldValues = string.Join('\u001E', values.OrderBy(v => v.FieldKey, StringComparer.Ordinal).Select(v =>
+            string.Join('\u001D', v.FieldKey, v.ValueText, v.ValueNumber, v.ValueDate, v.ValueTime, v.ValueBool, v.ValueJson)));
         var canonical = string.Join('\u001F',
             note.Id, note.PatientId, note.TherapistId, note.NoteType, note.ServiceDate,
             note.Subjective, note.Objective, note.Interventions, note.Assessment, note.Plan,
             note.DiagnosisSnapshot, note.PrecautionsSnapshot,
             note.SignatureName, note.SignatureCredentials, note.SignedAt, note.SignatureIpAddress,
-            note.SubjectiveDetailsJson, note.ObjectiveMeasurementsJson, note.AmendsNoteId, note.AmendmentReason);
+            note.SubjectiveDetailsJson, note.ObjectiveMeasurementsJson, note.AmendsNoteId, note.AmendmentReason,
+            note.TemplateVersionId, fieldValues);
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
@@ -753,7 +910,8 @@ public class ClinicalNoteService : IClinicalNoteService
     /// snapshot in the same SaveChanges call -- Id is already assigned
     /// client-side (BaseEntity's default), so the FK is valid even though
     /// neither row has hit the database yet.</summary>
-    private async Task SaveWithVersionSnapshotAsync(ClinicalNote note, Guid savedById, bool isSignedVersion, CancellationToken ct)
+    private async Task<int> SaveWithVersionSnapshotAsync(ClinicalNote note, Guid savedById, bool isSignedVersion, CancellationToken ct,
+        ElectronicSignature? signature = null)
     {
         var previousVersionNumber = await _db.ClinicalNoteVersions
             .Where(v => v.NoteId == note.Id).Select(v => (int?)v.VersionNumber).MaxAsync(ct) ?? 0;
@@ -776,6 +934,9 @@ public class ClinicalNoteService : IClinicalNoteService
             note.SubjectiveDetailsJson,
             note.ObjectiveMeasurementsJson,
             note.AmendmentReason,
+            note.TemplateVersionId,
+            FieldValues = (await CurrentFieldValuesAsync(note.Id, ct)).OrderBy(v => v.FieldKey)
+                .Select(v => new { v.FieldKey, v.ValueText, v.ValueNumber, v.ValueDate, v.ValueTime, v.ValueBool, v.ValueJson }),
         };
         _db.ClinicalNoteVersions.Add(new ClinicalNoteVersion
         {
@@ -785,8 +946,15 @@ public class ClinicalNoteService : IClinicalNoteService
             SavedById = savedById,
             IsSignedVersion = isSignedVersion,
         });
+        if (signature is not null)
+        {
+            // The signature names the exact saved version it signs.
+            signature.NoteVersionNumber = previousVersionNumber + 1;
+            _db.ElectronicSignatures.Add(signature);
+        }
 
         await _db.SaveChangesAsync(ct);
+        return previousVersionNumber + 1;
     }
 
     /// <summary>A signed note closes the loop on its appointment — never

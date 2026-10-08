@@ -390,9 +390,27 @@ export const pageHelp: Record<string, PageHelp> = {
       <>
         <p>The note for one visit: record what the patient reports, your examination findings and measurements, outcome scores, the treatment you gave and how the patient responded, progress on goals, then your assessment and plan — and sign.</p>
         <Note>Everything saves automatically as you work (“Saving… / Draft · saved 2:41 PM”). Signed notes open read-only.</Note>
+        <Note>The note’s sections and fields come from its documentation template (shown in the header). Until any field is filled in, you can switch to another template — for example a specialty evaluation.</Note>
       </>
     ),
     sections: [
+      {
+        id: "header",
+        title: "Header",
+        body: (
+          <>
+            <Term name="Visit">The visit’s number in the current plan of care, and the visit type from the schedule.</Term>
+            <Term name="Allergies / Precautions">Shown in red when the patient has any.</Term>
+            <Term name="Changed elsewhere">If someone else saved the note after you opened it, your next change isn’t saved over theirs. Reload the latest version and re-enter your change.</Term>
+            <Term name="Required fields">Fields marked * must be filled in before signing; some appear only after a particular answer (for example red-flag details).</Term>
+          </>
+        ),
+      },
+      {
+        id: "plan-of-care",
+        title: "Evaluations and the plan of care",
+        body: <Term name="Plan of care">Signing an evaluation, re-evaluation or recertification creates the patient’s plan of care from its certification dates, frequency, duration, diagnosis, prognosis and planned interventions. A previous plan is kept as superseded. Goals added during the evaluation join the new plan.</Term>,
+      },
       {
         id: "subjective",
         title: "Subjective",
@@ -459,6 +477,44 @@ export const pageHelp: Record<string, PageHelp> = {
             <Term name="Lock note">Administrators and directors: closes the note to further addenda and amendments (for example when billing has closed).</Term>
             <Term name="Print / PDF">Opens the note as a printable document with the signature block; choose “Save as PDF” in the print dialog for a PDF.</Term>
             <Term name="Version history">Every saved version of the note, including each autosave and the signed version, with who saved it and when.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
+  templates: {
+    title: "Documentation Templates",
+    intro: (
+      <>
+        <p>The forms clinical notes are written with: which sections and fields a note has, which are required, and their choices and rules.</p>
+        <Note>Editing a template’s fields saves a new version. Notes already written keep the version they used, so changing a template never changes past documentation.</Note>
+      </>
+    ),
+    sections: [
+      {
+        id: "list",
+        title: "Template list",
+        body: (
+          <>
+            <Term name="System / Clinic">System templates come with PhysioTrac and can’t be changed — use Copy to make your clinic’s own version. Clinic templates are yours to edit.</Term>
+            <Term name="★ Favorites">Your favorites are listed first and are suggested first when you start a note.</Term>
+            <Term name="Activate / Deactivate">An inactive template is no longer offered for new notes; notes written with it are unaffected.</Term>
+          </>
+        ),
+      },
+      {
+        id: "editor",
+        title: "Editing a template",
+        body: (
+          <>
+            <Term name="Sections">Group fields under a title. A section can include a clinical component (measurements, interventions, goals, body chart…), whose data is recorded in its own structured form.</Term>
+            <Term name="Fields">Choose the type (text, number, date, time, checkbox, radio, select, multiselect, measurement, pain scale, table, signature), whether it’s required to sign, help text, choices and limits.</Term>
+            <Term name="Store in the note’s">Puts a text field in the note’s Subjective, Objective, Assessment, Plan or Treatment summary.</Term>
+            <Term name="Show only when">Makes a field conditional: it appears only when another field has a given answer. A hidden field is never required.</Term>
+            <Term name="Suggest for these appointment types">The template is offered first for those visits.</Term>
+            <Term name="Preview">Try the form as it will appear on a note.</Term>
+            <Term name="Version history">Every version, who published it, what changed, and how many notes use it.</Term>
           </>
         ),
       },
@@ -702,6 +758,7 @@ export function helpKeyFor(pathname: string): string {
   if (pathname.startsWith("/admin/patients")) return "admin-patients";
   if (pathname.startsWith("/admin/users")) return "users";
   if (pathname.startsWith("/admin/logs")) return "logs";
+  if (pathname.startsWith("/admin/templates")) return "templates";
   if (pathname.startsWith("/admin/locations")) return "locations";
   if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/change-password")) return "change-password";

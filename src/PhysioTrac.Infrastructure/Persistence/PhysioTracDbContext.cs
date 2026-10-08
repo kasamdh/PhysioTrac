@@ -34,6 +34,17 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<ClinicalNoteVersion> ClinicalNoteVersions => Set<ClinicalNoteVersion>();
     public DbSet<ClinicalNoteTemplate> ClinicalNoteTemplates => Set<ClinicalNoteTemplate>();
     public DbSet<NoteIntervention> NoteInterventions => Set<NoteIntervention>();
+    public DbSet<ClinicalNoteTemplateVersion> ClinicalNoteTemplateVersions => Set<ClinicalNoteTemplateVersion>();
+    public DbSet<ClinicalNoteTemplateSection> ClinicalNoteTemplateSections => Set<ClinicalNoteTemplateSection>();
+    public DbSet<ClinicalNoteTemplateField> ClinicalNoteTemplateFields => Set<ClinicalNoteTemplateField>();
+    public DbSet<ClinicalNoteTemplateAppointmentType> ClinicalNoteTemplateAppointmentTypes => Set<ClinicalNoteTemplateAppointmentType>();
+    public DbSet<ProviderFavorite> ProviderFavorites => Set<ProviderFavorite>();
+    public DbSet<ClinicalNoteFieldValue> ClinicalNoteFieldValues => Set<ClinicalNoteFieldValue>();
+    public DbSet<ClinicalNoteStatusChange> ClinicalNoteStatusChanges => Set<ClinicalNoteStatusChange>();
+    public DbSet<ElectronicSignature> ElectronicSignatures => Set<ElectronicSignature>();
+    public DbSet<NoteCosignRequest> NoteCosignRequests => Set<NoteCosignRequest>();
+    public DbSet<NoteAttachment> NoteAttachments => Set<NoteAttachment>();
+    public DbSet<PlanOfCare> PlansOfCare => Set<PlanOfCare>();
     public DbSet<FunctionalGoal> FunctionalGoals => Set<FunctionalGoal>();
     public DbSet<OutcomeScore> OutcomeScores => Set<OutcomeScore>();
     public DbSet<Waitlist> Waitlists => Set<Waitlist>();
@@ -355,6 +366,161 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.HasOne(n => n.AmendsNote).WithMany()
                 .HasForeignKey(n => n.AmendsNoteId).OnDelete(DeleteBehavior.Restrict);
             e.Property(n => n.AmendmentReason).HasMaxLength(1000);
+
+            // Documentation foundation: provider, template-version and
+            // plan-of-care links, all Restrict -- clinical records are never
+            // removed by deleting something they point at.
+            e.HasIndex(n => new { n.TreatingProviderId, n.ServiceDate });
+            e.HasIndex(n => new { n.Status, n.ServiceDate });
+            e.HasIndex(n => n.PlanOfCareId);
+            e.HasOne(n => n.TreatingProvider).WithMany()
+                .HasForeignKey(n => n.TreatingProviderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(n => n.SupervisingProvider).WithMany()
+                .HasForeignKey(n => n.SupervisingProviderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(n => n.TemplateVersion).WithMany()
+                .HasForeignKey(n => n.TemplateVersionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(n => n.PlanOfCare).WithMany()
+                .HasForeignKey(n => n.PlanOfCareId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(n => n.ReturnReason).HasMaxLength(1000);
+            e.Property(n => n.VoidReason).HasMaxLength(1000);
+        });
+
+        builder.Entity<ClinicalNoteTemplateVersion>(e =>
+        {
+            e.HasIndex(v => new { v.TemplateId, v.VersionNumber }).IsUnique();
+            e.Property(v => v.ChangeSummary).HasMaxLength(500);
+            e.HasOne(v => v.Template).WithMany(t => t.Versions)
+                .HasForeignKey(v => v.TemplateId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ClinicalNoteTemplateSection>(e =>
+        {
+            e.HasIndex(s => new { s.VersionId, s.Key }).IsUnique();
+            e.HasIndex(s => new { s.VersionId, s.DisplayOrder });
+            e.Property(s => s.Key).HasMaxLength(80);
+            e.Property(s => s.Title).HasMaxLength(200);
+            e.Property(s => s.HelpText).HasMaxLength(1000);
+            e.Property(s => s.Component).HasMaxLength(40);
+            e.HasOne(s => s.Version).WithMany(v => v.Sections)
+                .HasForeignKey(s => s.VersionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ClinicalNoteTemplateField>(e =>
+        {
+            e.HasIndex(f => new { f.VersionId, f.Key }).IsUnique();
+            e.HasIndex(f => new { f.SectionId, f.DisplayOrder });
+            e.Property(f => f.Key).HasMaxLength(80);
+            e.Property(f => f.Label).HasMaxLength(200);
+            e.Property(f => f.FieldType).HasConversion<string>().HasMaxLength(30);
+            e.Property(f => f.HelpText).HasMaxLength(1000);
+            e.Property(f => f.Placeholder).HasMaxLength(200);
+            e.Property(f => f.Unit).HasMaxLength(30);
+            e.Property(f => f.NoteColumn).HasMaxLength(30);
+            e.Property(f => f.ConfigJson).HasMaxLength(4000);
+            e.Property(f => f.ValidationJson).HasMaxLength(1000);
+            e.Property(f => f.ConditionJson).HasMaxLength(1000);
+            e.HasOne(f => f.Version).WithMany(v => v.Fields)
+                .HasForeignKey(f => f.VersionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(f => f.Section).WithMany(s => s.Fields)
+                .HasForeignKey(f => f.SectionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ClinicalNoteTemplateAppointmentType>(e =>
+        {
+            e.HasIndex(a => new { a.TemplateId, a.AppointmentTypeId }).IsUnique();
+            e.HasIndex(a => a.AppointmentTypeId);
+            e.HasOne(a => a.Template).WithMany(t => t.AppointmentTypes)
+                .HasForeignKey(a => a.TemplateId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(a => a.AppointmentType).WithMany()
+                .HasForeignKey(a => a.AppointmentTypeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ProviderFavorite>(e =>
+        {
+            e.HasIndex(f => new { f.UserId, f.ItemType, f.ItemId }).IsUnique();
+            e.Property(f => f.ItemType).HasConversion<string>().HasMaxLength(30);
+        });
+
+        builder.Entity<ClinicalNoteFieldValue>(e =>
+        {
+            e.HasIndex(v => new { v.NoteId, v.FieldKey }).IsUnique();
+            e.HasIndex(v => v.FieldId);
+            e.Property(v => v.FieldKey).HasMaxLength(80);
+            e.Property(v => v.ValueNumber).HasPrecision(18, 4);
+            e.HasOne(v => v.Note).WithMany(n => n.FieldValues)
+                .HasForeignKey(v => v.NoteId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(v => v.Field).WithMany()
+                .HasForeignKey(v => v.FieldId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ClinicalNoteStatusChange>(e =>
+        {
+            e.HasIndex(c => new { c.NoteId, c.CreatedAt });
+            e.Property(c => c.FromStatus).HasConversion<string>().HasMaxLength(30);
+            e.Property(c => c.ToStatus).HasConversion<string>().HasMaxLength(30);
+            e.Property(c => c.Reason).HasMaxLength(1000);
+            e.HasOne(c => c.Note).WithMany(n => n.StatusChanges)
+                .HasForeignKey(c => c.NoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ElectronicSignature>(e =>
+        {
+            e.HasIndex(s => new { s.NoteId, s.SignedAt });
+            e.HasIndex(s => s.SignerUserId);
+            e.Property(s => s.Meaning).HasConversion<string>().HasMaxLength(20);
+            e.Property(s => s.SignerName).HasMaxLength(200);
+            e.Property(s => s.Credentials).HasMaxLength(100);
+            e.Property(s => s.Role).HasMaxLength(30);
+            e.Property(s => s.DisplayTimeZone).HasMaxLength(64);
+            e.Property(s => s.ContentHash).HasMaxLength(64);
+            e.Property(s => s.IpAddress).HasMaxLength(64);
+            e.Property(s => s.Method).HasMaxLength(20);
+            e.HasOne(s => s.Note).WithMany(n => n.Signatures)
+                .HasForeignKey(s => s.NoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<NoteCosignRequest>(e =>
+        {
+            e.HasIndex(r => r.NoteId);
+            e.HasIndex(r => new { r.Status, r.SupervisorUserId });
+            e.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(r => r.ResolutionComment).HasMaxLength(1000);
+            e.HasOne(r => r.Note).WithMany()
+                .HasForeignKey(r => r.NoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<NoteAttachment>(e =>
+        {
+            e.HasIndex(a => new { a.NoteId, a.PatientDocumentId }).IsUnique();
+            e.Property(a => a.Caption).HasMaxLength(300);
+            e.HasOne(a => a.Note).WithMany()
+                .HasForeignKey(a => a.NoteId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(a => a.PatientDocument).WithMany()
+                .HasForeignKey(a => a.PatientDocumentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<PlanOfCare>(e =>
+        {
+            e.HasIndex(p => new { p.PatientId, p.Status });
+            e.HasIndex(p => new { p.Status, p.EndDate });
+            e.HasIndex(p => p.SourceNoteId);
+            e.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.DischargeReason).HasConversion<string>().HasMaxLength(30);
+            e.Property(p => p.TreatmentDiagnosis).HasMaxLength(2000);
+            e.Property(p => p.Prognosis).HasMaxLength(2000);
+            e.Property(p => p.RehabPotential).HasMaxLength(500);
+            e.Property(p => p.PlannedInterventions).HasMaxLength(4000);
+            e.Property(p => p.HomeProgram).HasMaxLength(4000);
+            e.Property(p => p.PatientEducation).HasMaxLength(4000);
+            e.Property(p => p.Referrals).HasMaxLength(2000);
+            e.HasOne(p => p.Patient).WithMany()
+                .HasForeignKey(p => p.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.SourceNote).WithMany()
+                .HasForeignKey(p => p.SourceNoteId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.PreviousPlanOfCare).WithMany()
+                .HasForeignKey(p => p.PreviousPlanOfCareId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.CertifyingProvider).WithMany()
+                .HasForeignKey(p => p.CertifyingProviderId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<NoteAddendum>(e =>
@@ -380,6 +546,10 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(t => t.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(t => t.LocationDetail).WithMany()
                 .HasForeignKey(t => t.LocationId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(t => t.Specialty).HasConversion<string>().HasMaxLength(30);
+            e.Property(t => t.TemplateKey).HasMaxLength(80);
+            e.Property(t => t.Description).HasMaxLength(1000);
+            e.HasIndex(t => t.TemplateKey);
         });
 
         builder.Entity<NoteIntervention>(e =>
@@ -708,6 +878,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     {
         EnforceAuditEventAppendOnly();
         EnforceSignedNoteImmutability();
+        EnforceClinicalAppendOnly();
+        EnforceNoteContentLockedAfterSigning();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -715,7 +887,65 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     {
         EnforceAuditEventAppendOnly();
         EnforceSignedNoteImmutability();
+        EnforceClinicalAppendOnly();
+        EnforceNoteContentLockedAfterSigning();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>Signatures, status history and published template versions
+    /// (with their sections and fields) are history: never changed or
+    /// deleted once written.</summary>
+    private void EnforceClinicalAppendOnly()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Modified or EntityState.Deleted)) continue;
+            var message = entry.Entity switch
+            {
+                ElectronicSignature => "Electronic signatures cannot be changed or deleted.",
+                ClinicalNoteStatusChange => "Note status history cannot be changed or deleted.",
+                ClinicalNoteTemplateVersion or ClinicalNoteTemplateSection or ClinicalNoteTemplateField =>
+                    "A published template version cannot be changed. Publish a new version instead.",
+                _ => null,
+            };
+            if (message is not null) throw new InvalidOperationException(message);
+        }
+    }
+
+    /// <summary>The content rows of a note (template field values,
+    /// interventions, attachments -- anything INoteOwned) can only be added,
+    /// changed or removed while the note is a Draft or Returned for
+    /// correction. Judged by the note's status BEFORE this save, so signing
+    /// and the last content save can't race each other.</summary>
+    private void EnforceNoteContentLockedAfterSigning()
+    {
+        var noteIds = ChangeTracker.Entries()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted && e.Entity is Domain.Common.INoteOwned)
+            .Select(e => ((Domain.Common.INoteOwned)e.Entity).NoteId)
+            .ToHashSet();
+        if (noteIds.Count == 0) return;
+
+        var statuses = new Dictionary<Guid, Domain.Enums.NoteStatus>();
+        foreach (var noteEntry in ChangeTracker.Entries<Domain.Entities.ClinicalNote>().Where(e => noteIds.Contains(e.Entity.Id)))
+        {
+            // A note being created in this same save starts as a draft.
+            statuses[noteEntry.Entity.Id] = noteEntry.State == EntityState.Added
+                ? Domain.Enums.NoteStatus.Draft
+                : (Domain.Enums.NoteStatus)noteEntry.OriginalValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
+        }
+        var unknown = noteIds.Where(id => !statuses.ContainsKey(id)).ToList();
+        if (unknown.Count > 0)
+        {
+            foreach (var row in ClinicalNotes.AsNoTracking().Where(n => unknown.Contains(n.Id)).Select(n => new { n.Id, n.Status }).ToList())
+            {
+                statuses[row.Id] = row.Status;
+            }
+        }
+
+        if (statuses.Values.Any(s => s is not (Domain.Enums.NoteStatus.Draft or Domain.Enums.NoteStatus.ReturnedForCorrection)))
+        {
+            throw new InvalidOperationException("Signed notes are immutable. Create an addendum or amendment instead.");
+        }
     }
 
     private void EnforceAuditEventAppendOnly()
@@ -738,9 +968,21 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     {
         foreach (var entry in ChangeTracker.Entries<Domain.Entities.ClinicalNote>())
         {
+            if (entry.State == EntityState.Deleted)
+            {
+                // Only an untouched draft may ever be removed; anything that
+                // was submitted or signed is part of the record (void it instead).
+                var deletedStatus = (Domain.Enums.NoteStatus)entry.OriginalValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
+                if (deletedStatus != Domain.Enums.NoteStatus.Draft)
+                {
+                    throw new InvalidOperationException("Clinical notes that were submitted or signed can't be deleted. Void the note instead.");
+                }
+                continue;
+            }
             if (entry.State != EntityState.Modified) continue;
             var originalStatus = (Domain.Enums.NoteStatus)entry.OriginalValues[nameof(Domain.Entities.ClinicalNote.Status)]!;
-            if (originalStatus is not (Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked or Domain.Enums.NoteStatus.Amended)) continue;
+            if (originalStatus is not (Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked
+                or Domain.Enums.NoteStatus.Amended or Domain.Enums.NoteStatus.Voided)) continue;
 
             // Three legitimate writes to an already-signed row:
             // 1. Locking it (ClinicalNoteService.LockNoteAsync) -- touches
@@ -763,13 +1005,22 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             var modifiedNames = entry.Properties.Where(p => p.IsModified).Select(p => p.Metadata.Name).ToHashSet();
 
             var isLockWrite = isLockTransition &&
-                modifiedNames.All(n => n is nameof(Domain.Entities.ClinicalNote.Status) or nameof(Domain.Entities.ClinicalNote.UpdatedAt));
-            var isCertificationWrite = modifiedNames.All(n => n is
+                modifiedNames.All(n => n is nameof(Domain.Entities.ClinicalNote.Status) or nameof(Domain.Entities.ClinicalNote.UpdatedAt)
+                    or nameof(Domain.Entities.ClinicalNote.UpdatedById));
+            var isCertificationWrite = originalStatus != Domain.Enums.NoteStatus.Voided && modifiedNames.All(n => n is
                 nameof(Domain.Entities.ClinicalNote.PlanOfCareCertifiedDate)
                 or nameof(Domain.Entities.ClinicalNote.PlanOfCareCertifyingProviderId)
-                or nameof(Domain.Entities.ClinicalNote.UpdatedAt));
+                or nameof(Domain.Entities.ClinicalNote.UpdatedAt)
+                or nameof(Domain.Entities.ClinicalNote.UpdatedById));
+            // 4. Voiding it (ClinicalNoteService.VoidNoteAsync) -- Signed or
+            //    Locked -> Voided, touching only the void fields.
+            var isVoidWrite = originalStatus is Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked &&
+                newStatus == Domain.Enums.NoteStatus.Voided &&
+                modifiedNames.All(n => n is nameof(Domain.Entities.ClinicalNote.Status) or nameof(Domain.Entities.ClinicalNote.UpdatedAt)
+                    or nameof(Domain.Entities.ClinicalNote.UpdatedById) or nameof(Domain.Entities.ClinicalNote.VoidReason)
+                    or nameof(Domain.Entities.ClinicalNote.VoidedAt) or nameof(Domain.Entities.ClinicalNote.VoidedById));
 
-            if (!isLockWrite && !isCertificationWrite)
+            if (!isLockWrite && !isCertificationWrite && !isVoidWrite)
             {
                 throw new InvalidOperationException("Signed notes are immutable. Create an addendum instead.");
             }

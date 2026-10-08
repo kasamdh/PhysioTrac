@@ -132,7 +132,8 @@ body {
     @apply -ml-px border border-[#c4c4c4] bg-gradient-to-b from-white to-[#e9e9e9] px-4 py-2 text-sm whitespace-nowrap text-[#333] first:ml-0 first:rounded-l last:rounded-r hover:to-[#dcdcdc] focus:relative focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40;
   }
   .seg-btn[aria-pressed="true"],
-  .seg-btn[aria-selected="true"] {
+  .seg-btn[aria-selected="true"],
+  .seg-btn[aria-checked="true"] {
     @apply relative border-primary-deep bg-none bg-primary text-white;
   }
   .toolbar-label {

@@ -12,14 +12,34 @@ export const NoteTypeLabels: Record<number, string> = {
   4: "Progress note",
   5: "Re-evaluation",
   6: "Discharge summary",
+  7: "Handoff",
+  8: "Plan of care",
+  9: "Dry needling treatment",
+  10: "Pelvic health evaluation",
+  11: "Recertification",
+  12: "Consultation",
+  13: "Communication",
+  14: "Missed visit",
+  15: "Addendum",
 };
+
+/** Note types documentation templates are written for, in menu order. */
+export const TEMPLATE_NOTE_TYPES = [0, 1, 4, 5, 11, 6, 12, 13, 14, 15];
 
 /** Note types whose signing requires plan-of-care details (NoteComplianceEvaluator). */
 export const needsPlanOfCare = (t: NoteType) =>
   t === NoteType.Evaluation || t === NoteType.Progress || t === NoteType.ReEvaluation;
 
 // Mirrors PhysioTrac.Domain.Enums.NoteStatus.
-export const NoteStatus = { Draft: 0, ReviewRequired: 1, Signed: 2, Amended: 3, Locked: 4 } as const;
+export const NoteStatus = {
+  Draft: 0,
+  ReviewRequired: 1,
+  Signed: 2,
+  Amended: 3,
+  Locked: 4,
+  ReturnedForCorrection: 5,
+  Voided: 6,
+} as const;
 export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
 
 export const NoteStatusLabels: Record<number, string> = {
@@ -28,6 +48,8 @@ export const NoteStatusLabels: Record<number, string> = {
   2: "Signed",
   3: "Amended",
   4: "Signed · locked",
+  5: "Returned for correction",
+  6: "Voided",
 };
 
 // Matches PhysioTrac.Api.Controllers.WorkflowProviderDto.

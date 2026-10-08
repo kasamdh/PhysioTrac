@@ -29,9 +29,12 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<EntityChangeAuditInterceptor>();
+        services.AddScoped<UserStampInterceptor>();
         services.AddDbContext<PhysioTracDbContext>((serviceProvider, options) =>
             options.UseSqlServer(configuration.GetConnectionString("Default"))
-                .AddInterceptors(serviceProvider.GetRequiredService<EntityChangeAuditInterceptor>()));
+                .AddInterceptors(
+                    serviceProvider.GetRequiredService<UserStampInterceptor>(),
+                    serviceProvider.GetRequiredService<EntityChangeAuditInterceptor>()));
         services.AddMemoryCache();
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUserAccessor>();
@@ -53,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<IProviderAvailabilityService, ProviderAvailabilityService>();
         services.AddScoped<IReminderService, NoOpReminderService>();
         services.AddScoped<IClinicalNoteService, ClinicalNoteService>();
+        services.AddScoped<IDocumentationTemplateService, DocumentationTemplateService>();
         services.AddScoped<ISignatureVerifier, PasswordSignatureVerifier>();
         services.AddScoped<IClinicalTemplateService, ClinicalTemplateService>();
         services.AddScoped<IFunctionalGoalService, FunctionalGoalService>();
