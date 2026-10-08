@@ -372,7 +372,11 @@ describe("Encounter workspace", () => {
     await waitFor(() => expect(sign).toBeEnabled());
     await userEvent.click(sign);
     await waitFor(() =>
-      expect(chartApi.signChartNote).toHaveBeenCalledWith("n1", "Secret!1"),
+      expect(chartApi.signChartNote).toHaveBeenCalledWith(
+        "n1",
+        "Secret!1",
+        expect.any(Number),
+      ),
     );
     expect(api.saveEncounter).toHaveBeenCalled();
     expect(

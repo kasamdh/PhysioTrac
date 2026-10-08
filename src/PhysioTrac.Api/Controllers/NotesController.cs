@@ -111,8 +111,13 @@ public class NotesController : ControllerBase
         try
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var note = await _notes.SignNoteAsync(id, request.AttestationConfirmed, ipAddress, _currentUser, request.Password, HttpContext.RequestAborted);
+            var note = await _notes.SignNoteAsync(id, request.AttestationConfirmed, ipAddress, _currentUser, request.Password,
+                request.SaveVersion, HttpContext.RequestAborted);
             return Ok(ToDto(note));
+        }
+        catch (EncounterConflictException ex)
+        {
+            return Conflict(new { detail = ex.Message, code = "EDIT_CONFLICT", saveVersion = ex.CurrentSaveVersion, savedAt = ex.SavedAt, savedByName = ex.SavedByName });
         }
         catch (SignatureVerificationException ex) { return UnprocessableEntity(new { detail = ex.Message, code = "SIGNATURE_PASSWORD" }); }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -169,6 +174,46 @@ public class NotesController : ControllerBase
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
+    /// <summary>A supervising PT starts reviewing a submitted note.</summary>
+    [HttpPost("{id:guid}/review/start")]
+    public async Task<IActionResult> StartReview(Guid id)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.StartReviewAsync(id, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
+    /// <summary>A supervising PT returns a submitted note for correction (reason required).</summary>
+    [HttpPost("{id:guid}/return")]
+    public async Task<IActionResult> Return(Guid id, [FromBody] ReturnNoteRequest request)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.ReturnForCorrectionAsync(id, request.Reason, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Voids a note with a reason; a signed note also needs the voider's password.</summary>
+    [HttpPost("{id:guid}/void")]
+    public async Task<IActionResult> Void(Guid id, [FromBody] VoidNoteRequest request)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.VoidNoteAsync(id, request, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (SignatureVerificationException ex) { return UnprocessableEntity(new { detail = ex.Message, code = "SIGNATURE_PASSWORD" }); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/addenda")]
@@ -457,7 +502,8 @@ public class NotesController : ControllerBase
 }
 
 /// <param name="Password">The signer re-enters their own password (step-up).</param>
-public record SignNoteRequest(bool AttestationConfirmed, string? Password = null);
+/// <param name="SaveVersion">The version the signer reviewed; refused (409) if the note was saved since.</param>
+public record SignNoteRequest(bool AttestationConfirmed, string? Password = null, int? SaveVersion = null);
 
 /// <param name="Password">The cosigner re-enters their own password (step-up).</param>
 public record CosignNoteRequest(string? Password = null);

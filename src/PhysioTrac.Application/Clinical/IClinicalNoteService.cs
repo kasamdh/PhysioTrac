@@ -50,7 +50,17 @@ public interface IClinicalNoteService
     /// ClinicalNoteVersion snapshot.</summary>
     /// <param name="password">The signer's own password (step-up); a missing or
     /// wrong one throws <see cref="SignatureVerificationException"/>.</param>
-    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, string? password = null, CancellationToken ct = default);
+    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, string? password = null,
+        int? expectedSaveVersion = null, CancellationToken ct = default);
+
+    /// <summary>A supervising PT starts reviewing a submitted note (ReviewRequired -> InReview).</summary>
+    Task<ClinicalNote> StartReviewAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>A supervising PT returns a submitted note to its author with a reason.</summary>
+    Task<ClinicalNote> ReturnForCorrectionAsync(Guid noteId, string reason, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Voids a note with a reason (password for a signed note).</summary>
+    Task<ClinicalNote> VoidNoteAsync(Guid noteId, VoidNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>A further, manual step past Signed that additionally blocks
     /// new addenda -- see NoteStatus.Locked's own doc comment.</summary>

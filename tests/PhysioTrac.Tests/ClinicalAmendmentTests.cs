@@ -154,7 +154,7 @@ public class ClinicalAmendmentTests
         await c.Notes.CreateAddendumAsync(signed.Id, new CreateAddendumRequest("Late entry", "Called patient."), c.Therapist);
 
         var forAuthor = await c.Notes.GetNoteRecordAsync(signed.Id, c.Therapist);
-        Assert.Equal(new NoteActionsDto(false, false, false, true, true, false), forAuthor.Actions);
+        Assert.Equal(new NoteActionsDto(false, false, false, true, true, false, CanVoid: true, VoidNeedsPassword: true), forAuthor.Actions);
         Assert.Equal("Late entry", Assert.Single(forAuthor.Addenda).Reason);
         Assert.True((await c.Notes.GetNoteRecordAsync(signed.Id, c.Admin)).Actions.CanLock);
 

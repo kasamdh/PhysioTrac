@@ -73,6 +73,8 @@ public enum PlanOfCareStatus
     /// <summary>Closed by a signed discharge summary.</summary>
     Discharged,
     Expired,
+    /// <summary>Its source note was voided.</summary>
+    Voided,
 }
 
 public enum DischargeReason

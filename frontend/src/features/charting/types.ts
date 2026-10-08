@@ -65,6 +65,10 @@ export interface ChartNote {
   signedAt: string | null;
   cosignRequired: boolean;
   cosignedAt?: string | null;
+  documentationStatus?: number;
+  returnReason?: string | null;
+  voidReason?: string | null;
+  voidedAt?: string | null;
   subjectiveDetailsJson: string;
   objectiveMeasurementsJson: string;
   /** Set on a formal amendment: the signed note it corrects. */
@@ -81,6 +85,13 @@ export interface NoteActions {
   canAddAddendum: boolean;
   canAmend: boolean;
   canLock: boolean;
+  canStartReview?: boolean;
+  canReturn?: boolean;
+  canVoid?: boolean;
+  /** Signing sends the note to a PT for cosignature. */
+  signSubmitsForCosign?: boolean;
+  /** Voiding re-confirms the voider's password (a signed note). */
+  voidNeedsPassword?: boolean;
 }
 
 // Matches PhysioTrac.Application.Clinical.NoteAddendumDto.

@@ -187,17 +187,23 @@ public partial class ClinicalNoteService : IClinicalNoteService
             .ToListAsync(ct);
     }
 
-    public async Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, string? password = null, CancellationToken ct = default)
+    public async Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, string? password = null,
+        int? expectedSaveVersion = null, CancellationToken ct = default)
     {
         var note = await LoadNoteInOrgAsync(noteId, actor, ct);
         if (!CanFinalizeNote(actor, note))
         {
             throw new ForbiddenException("You are not permitted to finalize this note.");
         }
+        if (!note.IsEditable)
+        {
+            throw new InvalidOperationException("Only a draft or a note returned for correction can be signed.");
+        }
         if (!attestationConfirmed)
         {
             throw new InvalidOperationException("Confirm therapist review and attestation before finalizing this note.");
         }
+        await RequireSaveVersionAsync(note, expectedSaveVersion, ct);
         await VerifySignerAsync(note, actor, password, "sign", ct);
 
         var blockers = (await ComplianceAsync(note, ct)).Where(f => f.FinalizationBlocker).ToList();
@@ -216,9 +222,15 @@ public partial class ClinicalNoteService : IClinicalNoteService
         note.SignedAt = DateTimeOffset.UtcNow;
         note.SignatureIpAddress = ipAddress;
         note.FinalizationAttestation = true;
-        var pendingCosign = note.CosignRequired && actor.Role == UserRole.Assistant;
+        // The system decides whether a PT must cosign: always for PT-only
+        // note types written by an assistant, otherwise the organization's
+        // policy (snapshotted on the note when it was created).
+        var cosignReason = LifecycleRules.CosignReason(actor.Role, note.NoteType, note.CosignRequired);
+        var pendingCosign = cosignReason is not null;
+        if (pendingCosign) note.CosignRequired = true;
         var previousStatus = note.Status;
         note.Status = pendingCosign ? NoteStatus.ReviewRequired : NoteStatus.Signed;
+        note.ReturnReason = null;
         if (pendingCosign) note.SubmittedAt = DateTimeOffset.UtcNow;
         note.UpdatedAt = DateTimeOffset.UtcNow;
         // Computed after every other field above is set, so the hash covers
@@ -265,7 +277,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         });
         await _audit.RecordAuditEventAsync(actor.UserId, pendingCosign ? "note.submitted_for_cosign" : "note.signed",
             nameof(ClinicalNote), note.Id, organization.Id, patientId: note.PatientId,
-            metadata: new { noteType = note.NoteType.ToString(), status = note.Status.ToString() }, ct: ct);
+            metadata: new { noteType = note.NoteType.ToString(), status = note.Status.ToString(), cosignReason }, ct: ct);
 
         if (note.Status == NoteStatus.Signed)
         {
@@ -409,7 +421,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         {
             throw new ForbiddenException("You are not permitted to cosign this note.");
         }
-        if (note.Status != NoteStatus.ReviewRequired)
+        if (!LifecycleRules.IsAwaitingReview(note.Status))
         {
             throw new InvalidOperationException("Only a note awaiting cosign can be cosigned.");
         }
@@ -561,7 +573,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         {
             throw new ForbiddenException("You are not permitted to edit this note.");
         }
-        if (note.IsSigned || note.Status == NoteStatus.ReviewRequired)
+        if (!note.IsEditable)
         {
             throw new InvalidOperationException("Interventions cannot be changed once the note is signed.");
         }
@@ -611,7 +623,8 @@ public partial class ClinicalNoteService : IClinicalNoteService
 
         // One open amendment at a time: reopening "Amend" continues it.
         var open = await _db.ClinicalNotes.FirstOrDefaultAsync(n => n.AmendsNoteId == original.Id &&
-            (n.Status == NoteStatus.Draft || n.Status == NoteStatus.ReviewRequired), ct);
+            (n.Status == NoteStatus.Draft || n.Status == NoteStatus.ReviewRequired || n.Status == NoteStatus.InReview ||
+             n.Status == NoteStatus.ReturnedForCorrection), ct);
         if (open is not null) return open;
 
         var reason = request.Reason?.Trim() ?? "";
@@ -730,12 +743,17 @@ public partial class ClinicalNoteService : IClinicalNoteService
             addenda.Select(a => a.AuthorId).Append(note.TherapistId).Concat(note.CosignedById is Guid c ? [c] : []), ct);
 
         var actions = new NoteActionsDto(
-            CanEdit: CanEditNote(actor, note) && note.Status == NoteStatus.Draft,
-            CanSign: note.Status == NoteStatus.Draft && CanFinalizeNote(actor, note),
-            CanCosign: note.Status == NoteStatus.ReviewRequired && CanCosignNote(actor, note),
+            CanEdit: CanEditNote(actor, note) && note.IsEditable,
+            CanSign: note.IsEditable && CanFinalizeNote(actor, note),
+            CanCosign: LifecycleRules.IsAwaitingReview(note.Status) && CanCosignNote(actor, note),
             CanAddAddendum: CanCreateAddendum(actor, note),
             CanAmend: CanAmendNote(actor, note),
-            CanLock: CanLockNote(actor, note));
+            CanLock: CanLockNote(actor, note),
+            CanStartReview: note.Status == NoteStatus.ReviewRequired && CanCosignNote(actor, note),
+            CanReturn: LifecycleRules.IsAwaitingReview(note.Status) && CanCosignNote(actor, note),
+            CanVoid: CanVoidNote(actor, note),
+            SignSubmitsForCosign: LifecycleRules.CosignReason(actor.Role, note.NoteType, note.CosignRequired) is not null,
+            VoidNeedsPassword: note.IsSigned);
 
         return new NoteRecordDto(
             actions,
@@ -763,7 +781,8 @@ public partial class ClinicalNoteService : IClinicalNoteService
         var mine = await (
             from n in _db.ClinicalNotes
             join p in patients on n.PatientId equals p.Id
-            where n.TherapistId == actor.UserId && (n.Status == NoteStatus.Draft || n.Status == NoteStatus.ReviewRequired)
+            where n.TherapistId == actor.UserId && (n.Status == NoteStatus.Draft || n.Status == NoteStatus.ReviewRequired ||
+                n.Status == NoteStatus.InReview || n.Status == NoteStatus.ReturnedForCorrection)
             select new { n.Id, n.PatientId, p.FirstName, p.LastName, p.MedicalRecordNumber, n.NoteType, n.Status, n.ServiceDate, n.TherapistId, n.AmendsNoteId })
             .Take(200).ToListAsync(ct);
 
@@ -771,7 +790,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         var toCosign = !mayCosign ? [] : await (
             from n in _db.ClinicalNotes
             join p in patients on n.PatientId equals p.Id
-            where n.Status == NoteStatus.ReviewRequired && n.TherapistId != actor.UserId
+            where (n.Status == NoteStatus.ReviewRequired || n.Status == NoteStatus.InReview) && n.TherapistId != actor.UserId
             select new { n.Id, n.PatientId, p.FirstName, p.LastName, p.MedicalRecordNumber, n.NoteType, n.Status, n.ServiceDate, n.TherapistId, n.AmendsNoteId })
             .Take(200).ToListAsync(ct);
 
@@ -797,7 +816,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         var names = await NamesAsync(changes.Select(c => c.ChangedById), ct);
         return new NoteHistoryDto(
             signatures.Select(s => new ElectronicSignatureDto(s.Id, s.SignerUserId, s.SignerName, s.Credentials, s.Role, s.Meaning,
-                s.SignedAt, s.DisplayTimeZone, s.NoteVersionNumber)).ToList(),
+                s.SignedAt, s.DisplayTimeZone, s.NoteVersionNumber, LocalTime(s.SignedAt, s.DisplayTimeZone))).ToList(),
             changes.Select(c => new NoteStatusChangeDto(c.Id, c.FromStatus, c.ToStatus, c.ChangedById,
                 names.GetValueOrDefault(c.ChangedById), c.Reason, c.CreatedAt)).ToList());
     }

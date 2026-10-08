@@ -12,6 +12,7 @@ import {
   signChartNote,
 } from "../charting/api";
 import { NoteRecordPanel } from "../charting/components/NoteRecordPanel";
+import { VoidNoteForm } from "../charting/components/LifecycleActions";
 import { parseObjective, parseSubjective } from "../charting/presets";
 import type { ObjectiveDetails, SubjectiveDetails } from "../charting/types";
 import { fetchTemplates } from "../templates/api";
@@ -24,6 +25,8 @@ import type {
   TemplateSection,
 } from "../templates/types";
 import {
+  DocumentationStatus,
+  DocumentationStatusLabels,
   NoteStatus,
   NoteStatusLabels,
   NoteTypeLabels,
@@ -595,7 +598,15 @@ function Workspace({
       <EncounterHeaderView
         encounter={encounter}
         readOnly={readOnly}
-        status={NoteStatusLabels[note.status] ?? ""}
+        status={
+          editable &&
+          missing.length === 0 &&
+          !(compliance.data ?? []).some((f) => f.finalizationBlocker)
+            ? DocumentationStatusLabels[DocumentationStatus.ReadyToSign]
+            : note.documentationStatus != null
+              ? (DocumentationStatusLabels[note.documentationStatus] ?? "")
+              : (NoteStatusLabels[note.status] ?? "")
+        }
         saveState={
           readOnly ? null : conflict ? (
             <span className="text-danger">Not saved — changed elsewhere</span>
@@ -662,6 +673,20 @@ function Workspace({
         </div>
       )}
 
+      {note.status === NoteStatus.ReturnedForCorrection &&
+        note.returnReason && (
+          <div
+            role="alert"
+            className="mb-4 rounded-md border border-warning bg-warning-light px-3 py-2 text-[#333]"
+          >
+            <p>
+              <strong>Returned for correction:</strong> {note.returnReason}
+            </p>
+            <p className="text-text-muted">
+              Correct the note, then sign it again to resubmit it.
+            </p>
+          </div>
+        )}
       {SUMMARY_NOTE_TYPES.has(note.noteType) && (
         <EpisodePanel
           noteId={note.id}
@@ -776,39 +801,50 @@ function Workspace({
           {!editable ? (
             <NoteRecordPanel note={note} record={record.data} />
           ) : (
-            <SignCard
-              noteId={note.id}
-              missing={missing}
-              blockers={(compliance.data ?? []).filter(
-                (f) =>
-                  f.finalizationBlocker && f.code !== "missing_required_fields",
+            <>
+              <SignCard
+                noteId={note.id}
+                missing={missing}
+                blockers={(compliance.data ?? []).filter(
+                  (f) =>
+                    f.finalizationBlocker &&
+                    f.code !== "missing_required_fields",
+                )}
+                canSign={
+                  canSignClinicalNotes(user) &&
+                  (record.data?.actions.canSign ?? true) &&
+                  !readOnly
+                }
+                isAmendment={!!note.amendsNoteId}
+                createsPlan={CREATES_PLAN.has(note.noteType)}
+                flush={async () =>
+                  body && !conflict
+                    ? (await save.mutateAsync(body)).saveVersion
+                    : saveVersion
+                }
+                submitsForCosign={!!record.data?.actions.signSubmitsForCosign}
+                onSigned={(status) => {
+                  showToast(
+                    status === NoteStatus.ReviewRequired
+                      ? "Note submitted for a supervising PT’s review."
+                      : "Note signed.",
+                  );
+                  void queryClient.invalidateQueries({
+                    queryKey: ["encounter", note.id],
+                  });
+                  void queryClient.invalidateQueries({ queryKey: ["chart"] });
+                  void queryClient.invalidateQueries({
+                    queryKey: ["workflow"],
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: ["patient", note.patientId],
+                  });
+                }}
+              />
+              {record.data && (
+                <VoidNoteForm noteId={note.id} actions={record.data.actions} />
               )}
-              canSign={
-                canSignClinicalNotes(user) &&
-                (record.data?.actions.canSign ?? true) &&
-                !readOnly
-              }
-              isAmendment={!!note.amendsNoteId}
-              createsPlan={CREATES_PLAN.has(note.noteType)}
-              flush={async () => {
-                if (body && !conflict) await save.mutateAsync(body);
-              }}
-              onSigned={(status) => {
-                showToast(
-                  status === NoteStatus.ReviewRequired
-                    ? "Note submitted — waiting for a PT’s cosign."
-                    : "Note signed.",
-                );
-                void queryClient.invalidateQueries({
-                  queryKey: ["encounter", note.id],
-                });
-                void queryClient.invalidateQueries({ queryKey: ["chart"] });
-                void queryClient.invalidateQueries({ queryKey: ["workflow"] });
-                void queryClient.invalidateQueries({
-                  queryKey: ["patient", note.patientId],
-                });
-              }}
-            />
+            </>
           )}
         </section>
       </div>
@@ -955,6 +991,7 @@ function SignCard({
   isAmendment,
   createsPlan,
   flush,
+  submitsForCosign,
   onSigned,
 }: {
   noteId: string;
@@ -963,15 +1000,17 @@ function SignCard({
   canSign: boolean;
   isAmendment: boolean;
   createsPlan: boolean;
-  flush: () => Promise<void>;
+  /** Saves pending changes; resolves to the saved version being signed. */
+  flush: () => Promise<number>;
+  submitsForCosign: boolean;
   onSigned: (status: number) => void;
 }) {
   const [attested, setAttested] = useState(false);
   const [password, setPassword] = useState("");
   const sign = useMutation({
     mutationFn: async () => {
-      await flush(); // never sign stale content
-      return signChartNote(noteId, password);
+      const version = await flush(); // never sign stale content
+      return signChartNote(noteId, password, version);
     },
     onSuccess: (n) => onSigned(n.status),
     onError: () => setPassword(""),
@@ -1034,14 +1073,20 @@ function SignCard({
         disabled={!ready || !attested || !password || sign.isPending}
         onClick={() => sign.mutate()}
       >
-        {sign.isPending ? "Signing…" : "Sign note"}
+        {sign.isPending
+          ? "Signing…"
+          : submitsForCosign
+            ? "Sign and submit for PT review"
+            : "Sign note"}
       </button>
       <p className="text-text-muted">
-        {isAmendment
-          ? "Signing this amendment replaces the original note in the record; the original stays viewable, marked Amended."
-          : createsPlan
-            ? "Signing locks the note and creates the patient’s plan of care from it."
-            : "Signing locks the note and completes the visit. Corrections after signing are made with an addendum or an amendment."}
+        {submitsForCosign
+          ? "Your signature submits the note to a supervising PT, who cosigns it or returns it to you for correction. You can’t edit it while it is with the PT."
+          : isAmendment
+            ? "Signing this amendment replaces the original note in the record; the original stays viewable, marked Amended."
+            : createsPlan
+              ? "Signing locks the note and creates the patient’s plan of care from it."
+              : "Signing locks the note and completes the visit. Corrections after signing are made with an addendum or an amendment."}
       </p>
     </div>
   );

@@ -87,10 +87,32 @@ export const recordOutcome = (body: {
 }) => apiRequest<OutcomeScore>("/api/v1/outcomes", { method: "POST", body });
 
 /** Signing re-confirms identity (Documentation Phase 0): the signer's password. */
-export const signChartNote = (id: string, password: string) =>
+export const signChartNote = (
+  id: string,
+  password: string,
+  saveVersion?: number,
+) =>
   apiRequest<ChartNote>(`/api/v1/notes/${id}/sign`, {
     method: "POST",
-    body: { attestationConfirmed: true, password },
+    body: { attestationConfirmed: true, password, saveVersion },
+  });
+
+/** A supervising PT starts reviewing a submitted note. */
+export const startNoteReview = (id: string) =>
+  apiRequest<ChartNote>(`/api/v1/notes/${id}/review/start`, { method: "POST" });
+
+/** A supervising PT returns a submitted note to its author. */
+export const returnNote = (id: string, reason: string) =>
+  apiRequest<ChartNote>(`/api/v1/notes/${id}/return`, {
+    method: "POST",
+    body: { reason },
+  });
+
+/** Voids a note (reason required; password for a signed note). */
+export const voidNote = (id: string, reason: string, password: string | null) =>
+  apiRequest<ChartNote>(`/api/v1/notes/${id}/void`, {
+    method: "POST",
+    body: { reason, password },
   });
 
 /** Who wrote/cosigned the note, its addenda and amendment link, and what

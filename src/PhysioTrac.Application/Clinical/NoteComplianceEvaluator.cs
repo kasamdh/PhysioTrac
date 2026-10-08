@@ -49,7 +49,7 @@ public static class NoteComplianceEvaluator
                 "Review outcome measures and update the plan of care before finalizing.", true));
         }
 
-        if (note.Status == NoteStatus.ReviewRequired && note.CosignRequired)
+        if (LifecycleRules.IsAwaitingReview(note.Status) && note.CosignRequired)
         {
             findings.Add(new ComplianceFinding("cosign_pending", "medium", "Supervising cosignature pending",
                 "A PT or clinical director must cosign this note before it is final."));

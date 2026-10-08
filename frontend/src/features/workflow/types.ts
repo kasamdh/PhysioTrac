@@ -39,17 +39,49 @@ export const NoteStatus = {
   Locked: 4,
   ReturnedForCorrection: 5,
   Voided: 6,
+  InReview: 7,
 } as const;
 export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
 
 export const NoteStatusLabels: Record<number, string> = {
   0: "Draft",
-  1: "Awaiting cosign",
+  1: "Cosign required",
   2: "Signed",
   3: "Amended",
   4: "Signed · locked",
   5: "Returned for correction",
   6: "Voided",
+  7: "In review",
+};
+
+// Mirrors PhysioTrac.Application.Clinical.DocumentationStatus: stored
+// statuses plus derived ones (not started, ready to sign, cosigned).
+export const DocumentationStatus = {
+  NotStarted: 0,
+  Draft: 1,
+  InReview: 2,
+  ReturnedForCorrection: 3,
+  ReadyToSign: 4,
+  Signed: 5,
+  CosignRequired: 6,
+  Cosigned: 7,
+  Amended: 8,
+  Locked: 9,
+  Voided: 10,
+} as const;
+
+export const DocumentationStatusLabels: Record<number, string> = {
+  0: "Not started",
+  1: "Draft",
+  2: "In review",
+  3: "Returned for correction",
+  4: "Ready to sign",
+  5: "Signed",
+  6: "Cosign required",
+  7: "Cosigned",
+  8: "Amended",
+  9: "Locked",
+  10: "Voided",
 };
 
 // Matches PhysioTrac.Api.Controllers.WorkflowProviderDto.

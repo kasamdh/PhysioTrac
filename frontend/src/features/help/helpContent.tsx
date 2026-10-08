@@ -520,8 +520,11 @@ export const pageHelp: Record<string, PageHelp> = {
         body: (
           <>
             <Term name="Before signing">Lists anything still required (for example Objective, Plan, or the plan of care on evaluations).</Term>
-            <Term name="Sign note">Tick the attestation and re-enter your password. Signing locks the note and completes the visit.</Term>
-            <Note>Only therapists, assistants and administrators can sign. A PTA’s note waits for a PT’s cosignature.</Note>
+            <Term name="Sign note">Tick the attestation and re-enter your password. Signing locks the note and completes the visit. If someone else saved the note after you loaded it, signing is refused so you never sign content you haven’t seen — reload and check it first.</Term>
+            <Term name="Sign and submit for PT review">For assistants: your signature submits the note to a supervising PT. The system decides when a PT must cosign — always for evaluations, re-evaluations, recertifications, progress notes, discharge summaries and plans of care, and for other notes when your organization requires it.</Term>
+            <Term name="Statuses">Draft → Ready to sign (nothing missing) → Signed. An assistant’s note goes Cosign required → In review → Cosigned, or Returned for correction. Signed notes can later be Amended, Locked or Voided.</Term>
+            <Term name="Returned for correction">The PT’s reason is shown at the top of the note. Correct it and sign again to resubmit; your earlier signature stays in the note’s history.</Term>
+            <Note>Only therapists, assistants and administrators can sign. Every signature records the signer, credentials, role, what the signature means, the date and time (UTC and your clinic’s time zone) and the exact version signed.</Note>
           </>
         ),
       },
@@ -530,7 +533,10 @@ export const pageHelp: Record<string, PageHelp> = {
         title: "After signing",
         body: (
           <>
-            <Term name="Cosign note">For a PTA’s note awaiting your cosignature: review it, re-enter your password and cosign. The visit then completes.</Term>
+            <Term name="Start review">For a PT: marks an assistant’s submitted note as in review, so others can see you have it.</Term>
+            <Term name="Cosign note">Review the note, re-enter your password and cosign. The visit then completes.</Term>
+            <Term name="Return for correction…">Sends the note back to the assistant with what needs correcting (required). It can be edited again and resubmitted.</Term>
+            <Term name="Void this note…">For a note that shouldn’t be part of the record, such as one written for the wrong patient. A reason is required; a signed note also needs your password, and only its author PT or an administrator can void it. The note is kept, marked Voided. A plan of care it created is voided and the plan it replaced becomes active again. Voiding can’t be undone.</Term>
             <Term name="+ Add addendum">Adds a dated late entry or clarification under the signed note, with a reason. The signed note itself doesn’t change.</Term>
             <Term name="Amend note">Corrects the signed note: enter the reason, and you get a copy of the note to edit and sign. Once the amendment is signed it replaces the original, which stays viewable marked “Amended”.</Term>
             <Term name="Lock note">Administrators and directors: closes the note to further addenda and amendments (for example when billing has closed).</Term>

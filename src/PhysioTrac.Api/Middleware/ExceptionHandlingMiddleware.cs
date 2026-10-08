@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 
 namespace PhysioTrac.Api.Middleware;
 
@@ -26,6 +27,19 @@ public class ExceptionHandlingMiddleware
         try
         {
             await _next(context);
+        }
+        catch (DbUpdateConcurrencyException) when (!context.Response.HasStarted)
+        {
+            // Two people changed the same row at once (BaseEntity.RowVersion):
+            // the second write is refused rather than overwriting the first.
+            context.Response.Clear();
+            context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                detail = "Someone else changed this record at the same time. Reload it and try again.",
+                code = "EDIT_CONFLICT",
+            });
         }
         catch (Exception ex) when (!context.RequestAborted.IsCancellationRequested)
         {

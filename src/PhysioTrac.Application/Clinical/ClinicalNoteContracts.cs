@@ -14,12 +14,13 @@ public record ClinicalNoteDto(
     Guid? AmendsNoteId = null, string? AmendmentReason = null,
     Guid? TreatingProviderId = null, Guid? SupervisingProviderId = null, Guid? TemplateVersionId = null, Guid? PlanOfCareId = null,
     DateOnly? PeriodStart = null, DateOnly? PeriodEnd = null, string? ReturnReason = null, string? VoidReason = null,
-    DateTimeOffset? PrefilledAt = null, DateTimeOffset? PrefillReviewedAt = null);
+    DateTimeOffset? PrefilledAt = null, DateTimeOffset? PrefillReviewedAt = null,
+    DocumentationStatus DocumentationStatus = DocumentationStatus.Draft, DateTimeOffset? VoidedAt = null);
 
 /// <summary>An electronic signature on a note, as recorded at signing.</summary>
 public record ElectronicSignatureDto(
     Guid Id, Guid SignerUserId, string SignerName, string? Credentials, string Role, SignatureMeaning Meaning,
-    DateTimeOffset SignedAt, string DisplayTimeZone, int NoteVersionNumber);
+    DateTimeOffset SignedAt, string DisplayTimeZone, int NoteVersionNumber, string? LocalSignedAt = null);
 
 public record NoteStatusChangeDto(Guid Id, NoteStatus? FromStatus, NoteStatus ToStatus, Guid ChangedById, string? ChangedByName, string? Reason, DateTimeOffset ChangedAt);
 
@@ -77,7 +78,12 @@ public record CreateAmendmentRequest(string Reason);
 
 /// <summary>What the current user may do with this note right now -- the
 /// service's own rules, so the UI never re-derives them.</summary>
-public record NoteActionsDto(bool CanEdit, bool CanSign, bool CanCosign, bool CanAddAddendum, bool CanAmend, bool CanLock);
+/// <summary>What the caller may do with a note now. SignSubmitsForCosign:
+/// the caller's signature sends it to a PT for cosignature. VoidNeedsPassword:
+/// voiding a signed note re-confirms the voider's identity.</summary>
+public record NoteActionsDto(bool CanEdit, bool CanSign, bool CanCosign, bool CanAddAddendum, bool CanAmend, bool CanLock,
+    bool CanStartReview = false, bool CanReturn = false, bool CanVoid = false, bool SignSubmitsForCosign = false,
+    bool VoidNeedsPassword = false);
 
 /// <summary>The note's legal record around its content: who wrote and
 /// cosigned it, its addenda, and its amendment links.</summary>
@@ -107,3 +113,8 @@ public record CreateInterventionRequest(string Description, string? BodyRegion, 
 /// <summary>Billing view of a note's interventions: total timed minutes and
 /// the units the organization's 8-minute-rule variant gives for them.</summary>
 public record InterventionSummaryDto(int TimedMinutes, int UntimedCount, int EstimatedTimedUnits, string RuleVariant);
+
+public record ReturnNoteRequest(string Reason);
+
+/// <param name="Password">Required to void a signed note (step-up).</param>
+public record VoidNoteRequest(string Reason, string? Password = null);

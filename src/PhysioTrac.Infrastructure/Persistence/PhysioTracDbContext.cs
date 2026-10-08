@@ -365,7 +365,7 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.HasIndex(n => new { n.Status, n.ReassessmentDue });
             e.HasIndex(n => n.AppointmentId).IsUnique();
             e.Property(n => n.NoteType).HasConversion<string>().HasMaxLength(30);
-            e.Property(n => n.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(n => n.Status).HasConversion<string>().HasMaxLength(30);
             e.HasOne(n => n.Patient).WithMany(p => p.Notes)
                 .HasForeignKey(n => n.PatientId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(n => n.Appointment).WithOne()
@@ -1217,12 +1217,14 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 or nameof(Domain.Entities.ClinicalNote.UpdatedAt)
                 or nameof(Domain.Entities.ClinicalNote.UpdatedById));
             // 4. Voiding it (ClinicalNoteService.VoidNoteAsync) -- Signed or
-            //    Locked -> Voided, touching only the void fields.
+            //    Locked -> Voided, touching only the void fields (and
+            //    releasing its appointment so the visit can be documented again).
             var isVoidWrite = originalStatus is Domain.Enums.NoteStatus.Signed or Domain.Enums.NoteStatus.Locked &&
                 newStatus == Domain.Enums.NoteStatus.Voided &&
                 modifiedNames.All(n => n is nameof(Domain.Entities.ClinicalNote.Status) or nameof(Domain.Entities.ClinicalNote.UpdatedAt)
                     or nameof(Domain.Entities.ClinicalNote.UpdatedById) or nameof(Domain.Entities.ClinicalNote.VoidReason)
-                    or nameof(Domain.Entities.ClinicalNote.VoidedAt) or nameof(Domain.Entities.ClinicalNote.VoidedById));
+                    or nameof(Domain.Entities.ClinicalNote.VoidedAt) or nameof(Domain.Entities.ClinicalNote.VoidedById)
+                    or nameof(Domain.Entities.ClinicalNote.AppointmentId));
 
             if (!isLockWrite && !isCertificationWrite && !isVoidWrite)
             {

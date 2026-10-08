@@ -43,6 +43,9 @@ public enum NoteStatus
     /// <summary>Withdrawn with a reason (e.g. documented on the wrong
     /// patient). Kept, never deleted; excluded from the active record.</summary>
     Voided,
+    /// <summary>A supervising PT has started reviewing a submitted
+    /// (ReviewRequired) note; they cosign it or return it for correction.</summary>
+    InReview,
 }
 
 public enum InterventionCategory

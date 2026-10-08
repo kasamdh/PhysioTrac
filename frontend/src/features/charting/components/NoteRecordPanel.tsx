@@ -6,6 +6,7 @@ import { AddendaList } from "../../documentation/NoteBody";
 import { NoteStatus } from "../../workflow/types";
 import { addAddendum, amendNote, cosignChartNote, lockNote } from "../api";
 import type { ChartNote, NoteRecord } from "../types";
+import { ReviewActions, VoidNoteForm } from "./LifecycleActions";
 import { VersionHistory } from "./VersionHistory";
 
 /** The legal record of a note that is no longer a draft: its signature,
@@ -85,16 +86,42 @@ export function NoteRecordPanel({
   const openAmendment =
     record?.amendmentNoteId &&
     (record.amendmentStatus === NoteStatus.Draft ||
-      record.amendmentStatus === NoteStatus.ReviewRequired);
+      record.amendmentStatus === NoteStatus.ReviewRequired ||
+      record.amendmentStatus === NoteStatus.InReview ||
+      record.amendmentStatus === NoteStatus.ReturnedForCorrection);
+  const when = (iso: string | null | undefined) =>
+    iso ? new Date(iso).toLocaleString("en-US") : "";
 
+  if (note.status === NoteStatus.Voided)
+    return (
+      <div className="space-y-4">
+        <p role="status" className="alert-error">
+          <strong>Voided</strong>
+          {note.voidedAt ? ` on ${when(note.voidedAt)}` : ""}
+          {note.voidReason ? ` — ${note.voidReason.replace(/\.$/, "")}` : ""}.
+          It is kept in the record but is not part of the patient’s active
+          documentation.
+        </p>
+        {!!record?.addenda.length && <AddendaList addenda={record.addenda} />}
+        <VersionHistory noteId={note.id} />
+      </div>
+    );
+
+  const underReview =
+    note.status === NoteStatus.ReviewRequired ||
+    note.status === NoteStatus.InReview;
   return (
     <div className="space-y-4">
-      <p className="rounded-md bg-success-light px-3 py-2 text-success">
-        {note.status === NoteStatus.ReviewRequired
-          ? "Signed — waiting for a supervising PT’s cosign"
-          : note.status === NoteStatus.Amended
-            ? "Signed, then amended"
-            : "Signed"}
+      <p
+        className={`rounded-md px-3 py-2 ${underReview ? "border border-warning bg-warning-light text-[#333]" : "bg-success-light text-success"}`}
+      >
+        {note.status === NoteStatus.InReview
+          ? "In review by a supervising PT — submitted"
+          : note.status === NoteStatus.ReviewRequired
+            ? "Submitted for a supervising PT’s review and cosign"
+            : note.status === NoteStatus.Amended
+              ? "Signed, then amended"
+              : "Signed"}
         {note.signatureName ? ` by ${note.signatureName}` : ""}
         {note.signatureCredentials ? `, ${note.signatureCredentials}` : ""}
         {note.signedAt
@@ -104,9 +131,11 @@ export function NoteRecordPanel({
         {record?.cosignedByName && note.cosignedAt
           ? ` Cosigned by ${record.cosignedByName} on ${new Date(note.cosignedAt).toLocaleString("en-US")}.`
           : ""}
-        {note.status === NoteStatus.Locked ? " Locked." : ""} Signed notes can’t
-        be changed.
+        {note.status === NoteStatus.Locked ? " Locked." : ""}{" "}
+        {underReview ? "Submitted notes" : "Signed notes"} can’t be changed.
       </p>
+
+      {actions && <ReviewActions noteId={note.id} actions={actions} />}
 
       {actions?.canCosign && (
         <form
@@ -318,6 +347,7 @@ export function NoteRecordPanel({
         </form>
       )}
 
+      {actions && <VoidNoteForm noteId={note.id} actions={actions} />}
       <VersionHistory noteId={note.id} />
     </div>
   );
