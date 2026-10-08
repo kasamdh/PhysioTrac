@@ -665,7 +665,8 @@ public partial class ClinicalNoteService
 
     // ------------------------------------------------------------------ open from the schedule
 
-    public async Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default)
+    public async Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default,
+        bool missedVisit = false)
     {
         _tenantAccess.RequireRole(actor, RoleSets.Clinical);
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
@@ -677,12 +678,16 @@ public partial class ClinicalNoteService
         var existing = await _db.ClinicalNotes.Where(n => n.AppointmentId == appointment.Id).Select(n => (Guid?)n.Id).FirstOrDefaultAsync(ct);
         if (existing is Guid noteId) return new AppointmentEncounterDto(noteId, false);
 
-        if (appointment.Status is AppointmentStatus.Cancelled or AppointmentStatus.NoShow)
+        var missed = appointment.Status is AppointmentStatus.Cancelled or AppointmentStatus.NoShow;
+        if (missed && !missedVisit)
             throw new InvalidOperationException("No treatment note is written for a cancelled or no-show visit. Document it with a missed-visit note.");
+        if (missedVisit && !missed)
+            throw new InvalidOperationException("Mark the visit cancelled or no-show before writing a missed-visit note.");
 
         var serviceDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(appointment.StartsAt, Tz(organization.Timezone)).DateTime);
         var note = await CreateDraftAsync(new CreateNoteRequest(
-            appointment.PatientId, EncounterRules.NoteTypeFor(appointment.Kind, appointment.AppointmentType?.DefaultNoteType),
+            appointment.PatientId,
+            missedVisit ? NoteType.MissedVisit : EncounterRules.NoteTypeFor(appointment.Kind, appointment.AppointmentType?.DefaultNoteType),
             serviceDate, appointment.Id, null, null, null, null, null, null, null, null, null, null), actor, ct);
         return new AppointmentEncounterDto(note.Id, true);
     }
@@ -738,6 +743,13 @@ public partial class ClinicalNoteService
         {
             findings.Insert(0, new ComplianceFinding("carry_forward_unreviewed", "high", "Carried-forward interventions need review",
                 $"{unreviewed} carried-forward entr{(unreviewed == 1 ? "y has" : "ies have")} not been marked reviewed.", true));
+        }
+        if (note.AppointmentId is Guid appointmentId && EpisodeRules.IsVisit(note.NoteType) &&
+            await _db.Appointments.AnyAsync(a => a.Id == appointmentId &&
+                (a.Status == AppointmentStatus.Cancelled || a.Status == AppointmentStatus.NoShow), ct))
+        {
+            findings.Insert(0, new ComplianceFinding("visit_cancelled", "high", "The visit was cancelled or a no-show",
+                "A treatment note isn't signed for a visit that didn't happen. Void this draft and write a missed-visit note instead.", true));
         }
         if (note.PrefilledAt is not null && note.PrefillReviewedAt is null)
         {

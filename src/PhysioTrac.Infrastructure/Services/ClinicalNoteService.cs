@@ -90,6 +90,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
 
         var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == request.PatientId && p.OrganizationId == organization.Id, ct)
             ?? throw new NotFoundException("Patient was not found.");
+        if (request.AppointmentId is Guid appointmentId) await RequireAppointmentFreeAsync(appointmentId, patient.Id, request.NoteType, ct);
 
         var note = new ClinicalNote
         {
@@ -889,6 +890,26 @@ public partial class ClinicalNoteService : IClinicalNoteService
             note.FrequencyPerWeek ??= plan.FrequencyPerWeek;
             note.DurationWeeks ??= plan.DurationWeeks;
         }
+    }
+
+    /// <summary>One note per visit: a second note for the same appointment is
+    /// refused (the existing note can be voided by its author or an
+    /// admin/director, which frees the visit). A cancelled or no-show visit
+    /// only takes a missed-visit or communication note.</summary>
+    private async Task RequireAppointmentFreeAsync(Guid appointmentId, Guid patientId, NoteType type, CancellationToken ct)
+    {
+        var appointment = await _db.Appointments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == appointmentId && a.PatientId == patientId, ct)
+            ?? throw new NotFoundException("The appointment was not found for this patient.");
+        var existing = await _db.ClinicalNotes.AsNoTracking().Where(n => n.AppointmentId == appointmentId)
+            .Select(n => new { n.NoteType, n.Status }).FirstOrDefaultAsync(ct);
+        if (existing is not null)
+        {
+            throw new InvalidOperationException(
+                $"This visit already has a note ({existing.NoteType}, {existing.Status}). Open that note instead; if it shouldn't stand, " +
+                "its author or an administrator can void it, which frees the visit for a new note.");
+        }
+        if (appointment.Status is AppointmentStatus.Cancelled or AppointmentStatus.NoShow && EpisodeRules.IsVisit(type))
+            throw new InvalidOperationException("No treatment note is written for a cancelled or no-show visit. Document it with a missed-visit note.");
     }
 
     private async Task<Guid?> AppointmentTypeIdAsync(Guid? appointmentId, CancellationToken ct) =>

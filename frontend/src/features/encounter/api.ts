@@ -99,9 +99,14 @@ export const approveGoal = (goalId: string) =>
   apiRequest<unknown>(`/api/v1/goals/${goalId}/approve`, { method: "POST" });
 
 /** The encounter for an appointment: its note, or a new draft (one per visit). */
-export const openAppointmentEncounter = (appointmentId: string) =>
+/** Opens the visit's note (creating it when there is none). For a
+ * cancelled / no-show visit, missedVisit opens a missed-visit note. */
+export const openAppointmentEncounter = (
+  appointmentId: string,
+  missedVisit = false,
+) =>
   apiRequest<{ noteId: string; created: boolean }>(
-    `/api/v1/notes/for-appointment/${appointmentId}`,
+    `/api/v1/notes/for-appointment/${appointmentId}${missedVisit ? "?missedVisit=true" : ""}`,
     { method: "POST" },
   );
 

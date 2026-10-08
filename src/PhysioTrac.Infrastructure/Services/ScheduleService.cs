@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Scheduling;
@@ -255,6 +256,12 @@ public class ScheduleService : IScheduleService
         var providers = await _db.Providers.Where(p => providerIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
         var locations = await _db.Locations.Where(l => locationIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct);
         var types = await _db.AppointmentTypes.Where(t => typeIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, ct);
+        var appointmentIds = appointments.Select(a => a.Id).ToList();
+        var notes = (await _db.ClinicalNotes.AsNoTracking()
+                .Where(n => n.AppointmentId != null && appointmentIds.Contains(n.AppointmentId.Value))
+                .Select(n => new { AppointmentId = n.AppointmentId!.Value, n.Id, n.Status, n.CosignedAt, n.NoteType })
+                .ToListAsync(ct))
+            .GroupBy(n => n.AppointmentId).ToDictionary(g => g.Key, g => g.First());
 
         return appointments.Select(a =>
         {
@@ -268,7 +275,11 @@ public class ScheduleService : IScheduleService
                 a.TherapistId, a.ProviderId, provider?.FullName, provider?.Credentials, provider?.Discipline,
                 a.LocationDetailId, location?.Name, a.AppointmentTypeId, type?.Name, type?.Color,
                 a.Kind, a.Status, a.StartsAt, a.EndsAt, (int)(a.EndsAt - a.StartsAt).TotalMinutes,
-                a.IsHomeVisit, a.ReasonForVisit, a.SeriesId);
+                a.IsHomeVisit, a.ReasonForVisit, a.SeriesId,
+                notes.TryGetValue(a.Id, out var note) ? note.Id : null,
+                note is not null ? LifecycleRules.For(note.Status, note.CosignedAt is not null)
+                    : a.Status is AppointmentStatus.Cancelled or AppointmentStatus.NoShow ? null : DocumentationStatus.NotStarted,
+                note?.NoteType);
         }).ToList();
     }
 

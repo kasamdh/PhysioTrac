@@ -58,7 +58,12 @@ public record ScheduleAppointmentDto(
     Guid TherapistId, Guid? ProviderId, string? ProviderName, string? ProviderCredentials, ProviderDiscipline? ProviderDiscipline,
     Guid? LocationId, string? LocationName, Guid? AppointmentTypeId, string? AppointmentTypeName, string? AppointmentTypeColor,
     AppointmentKind Kind, AppointmentStatus Status, DateTimeOffset StartsAt, DateTimeOffset EndsAt, int DurationMinutes,
-    bool IsHomeVisit, string? ReasonForVisit, Guid? SeriesId);
+    bool IsHomeVisit, string? ReasonForVisit, Guid? SeriesId,
+    // The visit's note and its documentation status (Not started when a
+    // visit that can be documented has no note yet; null for a cancelled or
+    // no-show visit without a missed-visit note).
+    Guid? NoteId = null, PhysioTrac.Application.Clinical.DocumentationStatus? DocumentationStatus = null,
+    NoteType? NoteType = null);
 
 public record ScheduleRangeDto(string Timezone, IReadOnlyList<ScheduleAppointmentDto> Appointments);
 

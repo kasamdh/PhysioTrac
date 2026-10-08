@@ -5,6 +5,7 @@ import { useToast } from "../../../components/Toast";
 import { useAuth } from "../../auth/AuthProvider";
 import { RoleSets, canAccess } from "../../auth/permissions";
 import { openAppointmentEncounter } from "../../encounter/api";
+import { DocumentationStatusLabels } from "../../workflow/types";
 import { transitionAppointment, type AppointmentAction } from "../api";
 import { isReschedulable, statusBadgeClass } from "../status";
 import { formatTime, toWallClock } from "../time";
@@ -184,6 +185,8 @@ export function AppointmentDetailsPanel({ appointment: a, timezone, canManage, c
             appointmentId={a.id}
             patientId={a.patientId}
             missed={a.status === AppointmentStatus.Cancelled || a.status === AppointmentStatus.NoShow}
+            noteId={a.noteId ?? null}
+            documentationStatus={a.documentationStatus ?? null}
           />
           {WEB_APP_URL && (
             <div className="flex flex-wrap gap-3 text-sm">
@@ -205,20 +208,45 @@ export function AppointmentDetailsPanel({ appointment: a, timezone, canManage, c
 
 /** Documentation for this visit: open (or start) its encounter, or the
  * patient's documentation. Clinical staff only. */
-function EncounterLinks({ appointmentId, patientId, missed }: { appointmentId: string; patientId: string; missed: boolean }) {
+function EncounterLinks({
+  appointmentId,
+  patientId,
+  missed,
+  noteId,
+  documentationStatus,
+}: {
+  appointmentId: string;
+  patientId: string;
+  missed: boolean;
+  noteId: string | null;
+  documentationStatus: number | null;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string | null>(null);
   const open = useMutation({
-    mutationFn: () => openAppointmentEncounter(appointmentId),
+    mutationFn: (missedVisit: boolean) => openAppointmentEncounter(appointmentId, missedVisit),
     onSuccess: (r) => navigate(`/chart/${r.noteId}`),
     onError: (e: Error) => setProblem(e.message),
   });
   if (!canAccess(user, RoleSets.Clinical)) return null;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {!missed && (
-        <button type="button" className="btn-primary" disabled={open.isPending} onClick={() => open.mutate()}>
+      {documentationStatus != null && (
+        <p className="w-full text-text-muted">
+          Documentation: <strong className="text-[#333]">{DocumentationStatusLabels[documentationStatus]}</strong>
+        </p>
+      )}
+      {noteId ? (
+        <Link className="btn-primary" to={`/chart/${noteId}`}>
+          Open note
+        </Link>
+      ) : missed ? (
+        <button type="button" className="btn-primary" disabled={open.isPending} onClick={() => open.mutate(true)}>
+          {open.isPending ? "Opening…" : "Write missed-visit note"}
+        </button>
+      ) : (
+        <button type="button" className="btn-primary" disabled={open.isPending} onClick={() => open.mutate(false)}>
           {open.isPending ? "Opening…" : "Open encounter"}
         </button>
       )}

@@ -326,6 +326,38 @@ export const pageHelp: Record<string, PageHelp> = {
     ],
   },
 
+  "documentation-dashboard": {
+    title: "Documentation Dashboard",
+    intro: <p>Documentation across the schedule: today’s visits and their notes, what still needs writing or signing, overdue work and upcoming deadlines. Only patients you may see are included.</p>,
+    sections: [
+      {
+        id: "filters",
+        title: "Filters",
+        body: (
+          <>
+            <Term name="Provider">Starts on your own patients when you are a provider; choose “All providers” or another provider to see theirs.</Term>
+            <Term name="Patient, note type, status">Narrow every list to one patient, one kind of note or one documentation status.</Term>
+            <Term name="From / To">Dates of service. Without “From”, unsigned notes of any age are listed; visits not started look back 30 days and recently signed notes 7 days.</Term>
+          </>
+        ),
+      },
+      {
+        id: "lists",
+        title: "The lists",
+        body: (
+          <>
+            <Term name="Summary tiles">The count in each list; select one to jump to it. Overdue turns red when anything is overdue.</Term>
+            <Term name="Notes not started">Visits that have started with no note yet — “Start note” opens the right note for the visit. A cancelled or no-show visit offers a missed-visit note instead.</Term>
+            <Term name="Ready to sign / Draft notes">Drafts with nothing missing are ready to sign; the others still have required fields or checks open.</Term>
+            <Term name="Requiring cosignature / Returned for correction">An assistant’s submitted notes waiting for a PT, and notes a PT sent back (with the reason).</Term>
+            <Term name="Overdue">Notes not signed by the end of the day after the visit, and visits with no note by then.</Term>
+            <Term name="Deadlines">Progress notes due at your clinic’s visit count (the 10th visit by default; listed two visits early), re-evaluations whose reassessment date is within a week, and plans of care whose certification ends within 30 days.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
   workflow: {
     title: "Workflow",
     intro: (
@@ -850,6 +882,7 @@ export function helpKeyFor(pathname: string): string {
   if (pathname.startsWith("/providers")) return "providers";
   if (pathname.startsWith("/billing")) return "billing";
   if (pathname.startsWith("/workflow")) return "workflow";
+  if (pathname.startsWith("/documentation")) return "documentation-dashboard";
   if (pathname.startsWith("/admin/patients")) return "admin-patients";
   if (pathname.startsWith("/admin/users")) return "users";
   if (pathname.startsWith("/admin/logs")) return "logs";

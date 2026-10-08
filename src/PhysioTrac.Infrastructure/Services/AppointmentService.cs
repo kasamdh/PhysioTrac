@@ -245,8 +245,30 @@ public class AppointmentService : IAppointmentService
         }
         await AuditOverrideAsync(overridden, request.OverrideReason, appointment, actor, organization.Id, ct);
 
+        await MoveDraftNoteAsync(appointment, organization, actor, ct);
+
         await _reminders.ScheduleReminderAsync(appointment.Id, appointment.StartsAt, ct);
         return appointment;
+    }
+
+    /// <summary>A draft note keeps following its visit: when the visit moves
+    /// to another day, the draft's date of service moves with it.</summary>
+    private async Task MoveDraftNoteAsync(Appointment appointment, Organization organization, ICurrentUser actor, CancellationToken ct)
+    {
+        var note = await _db.ClinicalNotes.FirstOrDefaultAsync(n => n.AppointmentId == appointment.Id &&
+            (n.Status == NoteStatus.Draft || n.Status == NoteStatus.ReturnedForCorrection), ct);
+        if (note is null) return;
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById(organization.Timezone); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.Utc; }
+        var newDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(appointment.StartsAt, zone).DateTime);
+        if (note.ServiceDate == newDate) return;
+        var previousDate = note.ServiceDate;
+        note.ServiceDate = newDate;
+        note.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.RecordAuditEventAsync(actor.UserId, "note.service_date_moved", nameof(ClinicalNote), note.Id, organization.Id,
+            patientId: note.PatientId, metadata: new { appointmentId = appointment.Id, previousDate, newDate }, ct: ct);
     }
 
     public async Task<MoveCheckDto> ValidateRescheduleAsync(Guid appointmentId, RescheduleAppointmentRequest request, ICurrentUser actor, CancellationToken ct = default)
@@ -296,6 +318,13 @@ public class AppointmentService : IAppointmentService
         if (appointment.Status is AppointmentStatus.Cancelled or AppointmentStatus.Completed or AppointmentStatus.NoShow or AppointmentStatus.InProgress)
         {
             throw new InvalidOperationException("This appointment can no longer be rescheduled.");
+        }
+        // Signed or submitted documentation describes the visit as it
+        // happened; it is never moved to another date.
+        if (await _db.ClinicalNotes.AnyAsync(n => n.AppointmentId == appointment.Id &&
+            n.Status != NoteStatus.Draft && n.Status != NoteStatus.ReturnedForCorrection && n.Status != NoteStatus.Voided, ct))
+        {
+            throw new InvalidOperationException("This visit's note is already signed or submitted, so the visit can't be moved.");
         }
         if (request.EndsAt <= request.StartsAt)
         {

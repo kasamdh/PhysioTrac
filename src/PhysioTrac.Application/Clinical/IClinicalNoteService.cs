@@ -141,7 +141,9 @@ public interface IClinicalNoteService
     /// <summary>The encounter for an appointment: its note, or a new draft of
     /// the visit's note type (one note per appointment). Refused for a
     /// cancelled or no-show visit -- no treatment is documented for it.</summary>
-    Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
+    /// <param name="missedVisit">For a cancelled or no-show visit: open a missed-visit note instead of a treatment note.</param>
+    Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default,
+        bool missedVisit = false);
 
     /// <summary>Every measurement on the patient's signed notes, oldest first (values exactly as recorded).</summary>
     Task<IReadOnlyList<PatientMeasurementDto>> GetMeasurementHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
@@ -160,6 +162,9 @@ public interface IClinicalNoteService
     Task<PrefillResultDto> PrefillAsync(Guid noteId, PrefillNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
 
     Task<ClinicalNote> ReviewPrefillAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The documentation dashboard for the caller's patients.</summary>
+    Task<DocumentationDashboardDto> GetDashboardAsync(DashboardFilter filter, ICurrentUser actor, CancellationToken ct = default);
 
     Task<EncounterStatusDto> GetEncounterStatusAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
 

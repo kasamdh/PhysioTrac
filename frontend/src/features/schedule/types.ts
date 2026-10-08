@@ -106,6 +106,11 @@ export interface ScheduleAppointment {
   isHomeVisit: boolean;
   reasonForVisit: string | null;
   seriesId: string | null;
+  /** The visit's note and documentation status (DocumentationStatus values);
+   * status is null for a cancelled / no-show visit without a missed-visit note. */
+  noteId?: string | null;
+  documentationStatus?: number | null;
+  noteType?: number | null;
 }
 
 export interface ScheduleRange {

@@ -1,4 +1,4 @@
-import { AppointmentKind, AppointmentStatus, ProviderDiscipline } from "./types";
+import { AppointmentKind, AppointmentStatus, ProviderDiscipline, type ScheduleAppointment } from "./types";
 
 /** Badge classes per status, from the shared brand tokens in index.css. */
 export const statusBadgeClass: Record<AppointmentStatus, string> = {
@@ -58,4 +58,27 @@ export const disciplineLabel: Record<ProviderDiscipline, string | null> = {
  * or finished can still be moved. */
 export function isReschedulable(status: AppointmentStatus): boolean {
   return status === AppointmentStatus.Scheduled || status === AppointmentStatus.Confirmed || status === AppointmentStatus.CheckedIn;
+}
+
+/** Short documentation labels for calendar cards (DocumentationStatus values). */
+const NOTE_TAGS: Record<number, string> = {
+  0: "No note",
+  1: "Note: draft",
+  2: "Note: in review",
+  3: "Note: returned",
+  4: "Note: draft",
+  5: "Signed",
+  6: "Note: cosign",
+  7: "Signed",
+  8: "Signed",
+  9: "Signed",
+};
+
+/** The visit's note status, once there's something to say: "No note" only
+ * for a visit that has started. */
+export function noteTag(a: Pick<ScheduleAppointment, "documentationStatus" | "startsAt">, now = Date.now()): string | null {
+  const status = a.documentationStatus;
+  if (status == null) return null;
+  if (status === 0 && new Date(a.startsAt).getTime() > now) return null;
+  return NOTE_TAGS[status] ?? null;
 }

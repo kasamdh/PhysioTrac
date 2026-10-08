@@ -338,11 +338,11 @@ public class NotesController : ControllerBase
     /// <summary>Opens the encounter for an appointment: its note, or a new
     /// draft of the visit's note type. 422 for a cancelled/no-show visit.</summary>
     [HttpPost("for-appointment/{appointmentId:guid}")]
-    public async Task<IActionResult> OpenForAppointment(Guid appointmentId)
+    public async Task<IActionResult> OpenForAppointment(Guid appointmentId, [FromQuery] bool missedVisit = false)
     {
         try
         {
-            return Ok(await _notes.OpenAppointmentEncounterAsync(appointmentId, _currentUser, HttpContext.RequestAborted));
+            return Ok(await _notes.OpenAppointmentEncounterAsync(appointmentId, _currentUser, HttpContext.RequestAborted, missedVisit));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }

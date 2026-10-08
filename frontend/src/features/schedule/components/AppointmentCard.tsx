@@ -1,4 +1,5 @@
 import type { EventProps } from "react-big-calendar";
+import { noteTag } from "../status";
 import { formatTime } from "../time";
 import { AppointmentKind, AppointmentStatusLabels, type ScheduleAppointment } from "../types";
 
@@ -21,11 +22,13 @@ export interface CalendarBlock {
 }
 
 function Tags({ a }: { a: ScheduleAppointment }) {
+  const note = noteTag(a);
   return (
     <>
       {a.kind === AppointmentKind.Evaluation && <span className="appt-tag">New</span>}
       {a.kind === AppointmentKind.Telehealth && <span className="appt-tag">Telehealth</span>}
       {a.isHomeVisit && <span className="appt-tag">Home</span>}
+      {note && <span className="appt-tag">{note}</span>}
     </>
   );
 }

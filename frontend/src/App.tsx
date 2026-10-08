@@ -27,6 +27,7 @@ import { TemplatesPage } from "./features/templates/pages/TemplatesPage";
 import { TemplateEditorPage } from "./features/templates/pages/TemplateEditorPage";
 import { SpecialTestsAdminPage } from "./features/encounter/measurements/SpecialTestsAdminPage";
 import { PatientDocumentationPage } from "./features/documentation/PatientDocumentationPage";
+import { DocumentationDashboardPage } from "./features/documentation/dashboard/DocumentationDashboardPage";
 
 export default function App() {
   return (
@@ -49,6 +50,7 @@ export default function App() {
                     <Route path="/schedule/hours" element={<ProviderHoursPage />} />
                     <Route path="/providers" element={<ProvidersPage />} />
                     <Route path="/workflow" element={<WorkflowPage />} />
+                    <Route path="/documentation" element={<DocumentationDashboardPage />} />
                     <Route path="/chart/:noteId" element={<EncounterPage />} />
                     <Route path="/patients/:patientId/documentation" element={<PatientDocumentationPage />} />
                     <Route path="/billing" element={<PlaceholderPage title="Billing" />} />
