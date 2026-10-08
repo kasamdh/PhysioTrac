@@ -9,6 +9,15 @@ import * as chartApi from "../charting/api";
 import { NoteStatus, NoteType } from "../workflow/types";
 import type { ChartNote } from "../charting/types";
 import { ToastProvider } from "../../components/Toast";
+import { useAuth } from "../auth/AuthProvider";
+import { UserRole } from "../auth/types";
+
+vi.mock("../auth/AuthProvider", () => ({ useAuth: vi.fn() }));
+vi.mock("../encounter/api", () => ({
+  createPatientNote: vi.fn(),
+  fetchEncounter: vi.fn().mockResolvedValue({ pain: null, bodyChart: [] }),
+  fetchPainHistory: vi.fn().mockResolvedValue([]),
+}));
 
 vi.mock("../../lib/apiClient", () => ({ apiRequest: vi.fn() }));
 vi.mock("../admin/api", () => ({ fetchPatientDetail: vi.fn() }));
@@ -66,6 +75,22 @@ const note = (
 });
 
 function setup() {
+  vi.mocked(useAuth).mockReturnValue({
+    user: {
+      id: "u1",
+      username: "t",
+      email: null,
+      role: UserRole.Therapist,
+      organizationId: "o",
+      isPlatformSuperAdmin: false,
+      mustChangePassword: false,
+    },
+    isLoading: false,
+    loginError: null,
+    isLoggingIn: false,
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  });
   vi.mocked(fetchPatientDetail).mockResolvedValue({
     id: "p1",
     medicalRecordNumber: "SM-1",

@@ -2,6 +2,7 @@ import { InterventionsPanel } from "../charting/components/InterventionsPanel";
 import { MeasurementTables } from "../charting/components/MeasurementTables";
 import { parseObjective, parseSubjective } from "../charting/presets";
 import type { ChartNote, NoteAddendum } from "../charting/types";
+import { NoteCharting } from "../encounter/PainSummary";
 
 /** A note's documented content, read-only: narrative, pain, measurements,
  * interventions with patient response, plan of care, and addenda. Shared by
@@ -24,6 +25,7 @@ export function NoteBody({
         <Field label="Reason for amendment" value={note.amendmentReason} />
       )}
       <Field label="Subjective" value={note.subjective} />
+      <NoteCharting noteId={note.id} />
       {(subj.painNow !== null || subj.painLocation) && (
         <p className="text-[#333]">
           Pain now {subj.painNow ?? "—"}/10 · best {subj.painBest ?? "—"} ·

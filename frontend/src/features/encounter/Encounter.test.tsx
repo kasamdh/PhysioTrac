@@ -15,6 +15,7 @@ import type { Encounter } from "./types";
 
 vi.mock("./api", () => ({
   fetchEncounter: vi.fn(),
+  fetchEncounterStatus: vi.fn(),
   saveEncounter: vi.fn(),
   changeNoteTemplate: vi.fn(),
   fetchPlansOfCare: vi.fn().mockResolvedValue([]),
@@ -109,11 +110,18 @@ const encounter = (over: Partial<Encounter> = {}): Encounter => ({
           },
         ],
       },
+      { key: "pain", title: "Pain", fields: [], component: "painAssessment" },
       {
         key: "bodyChart",
         title: "Body chart",
         fields: [],
         component: "bodyChart",
+      },
+      {
+        key: "tests",
+        title: "Special tests",
+        fields: [],
+        component: "specialTests",
       },
       { key: "goals", title: "Goals", fields: [], component: "goals" },
     ],
@@ -165,6 +173,13 @@ function setup(e: Encounter = encounter()) {
     signOut: vi.fn(),
   });
   vi.mocked(api.fetchEncounter).mockResolvedValue(e);
+  vi.mocked(api.fetchEncounterStatus).mockResolvedValue({
+    saveVersion: e.saveVersion,
+    savedAt: e.lastSavedAt,
+    savedByName: null,
+    savedById: null,
+    status: e.note.status,
+  });
   vi.mocked(chartApi.fetchCompliance).mockResolvedValue([]);
   vi.mocked(chartApi.fetchNoteRecord).mockResolvedValue({
     actions: {
@@ -216,12 +231,12 @@ describe("Encounter workspace", () => {
     expect(screen.getByText(/Avoid deep knee flexion/)).toBeInTheDocument();
     expect(screen.getByText("Initial Evaluation v3")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Subjective examination" }),
+      screen.getByRole("heading", { name: /Subjective examination/ }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Goals" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Goals/ })).toBeInTheDocument();
     // A section whose only content is a component not available yet is left out.
     expect(
-      screen.queryByRole("heading", { name: "Body chart" }),
+      screen.queryByRole("heading", { name: /Special tests/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -393,5 +408,76 @@ describe("Encounter workspace", () => {
     expect(
       await screen.findByText("Original charting screen"),
     ).toBeInTheDocument();
+  });
+
+  it("collapses sections, shows what each still needs, and saves on Ctrl+S", async () => {
+    vi.mocked(api.saveEncounter).mockResolvedValue({
+      saveVersion: 5,
+      savedAt: "2026-10-07T14:10:00Z",
+      savedByName: null,
+    });
+    setup();
+    const toggle = await screen.findByRole("button", {
+      name: "Subjective examination 2 required left",
+      expanded: true,
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByLabelText(/Primary complaint/)).not.toBeVisible();
+    await userEvent.click(toggle);
+
+    await userEvent.type(
+      screen.getByLabelText(/Primary complaint/),
+      "Knee pain",
+    );
+    await userEvent.type(
+      screen.getByLabelText(/History of present condition/),
+      "Fall",
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Subjective examination Complete",
+        expanded: true,
+      }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard("{Control>}s{/Control}");
+    expect(api.saveEncounter).toHaveBeenCalledTimes(1); // immediately, not after the autosave pause
+  });
+
+  it("warns when someone else saves the note while it is open", async () => {
+    setup();
+    // The note's latest save (7) is newer than the one this editor loaded (4).
+    vi.mocked(api.fetchEncounterStatus).mockResolvedValue({
+      saveVersion: 7,
+      savedAt: "2026-10-07T14:20:00Z",
+      savedByName: "Sam Lee",
+      savedById: "u2",
+      status: 0,
+    });
+    const banner = await screen.findByRole("status", {}, { timeout: 5000 });
+    expect(banner).toHaveTextContent(/Sam Lee saved this note/);
+    expect(
+      within(banner).getByRole("button", { name: "Reload the latest version" }),
+    ).toBeInTheDocument();
+  });
+
+  it("autosaves the structured pain assessment with the encounter", async () => {
+    vi.mocked(api.saveEncounter).mockResolvedValue({
+      saveVersion: 5,
+      savedAt: "2026-10-07T14:10:00Z",
+      savedByName: null,
+    });
+    setup();
+    const current = await screen.findByRole("radiogroup", {
+      name: /Current pain/,
+    });
+    await userEvent.click(within(current).getByRole("radio", { name: "5" }));
+    await waitFor(() => expect(api.saveEncounter).toHaveBeenCalled(), {
+      timeout: 4000,
+    });
+    const [, body] = vi.mocked(api.saveEncounter).mock.calls[0];
+    expect(body.pain).toMatchObject({ scale: 0, current: 5 });
+    expect(body.bodyChart).toBeUndefined(); // unchanged parts aren't sent
   });
 });

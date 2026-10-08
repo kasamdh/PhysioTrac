@@ -19,6 +19,11 @@ import {
 } from "../workflow/types";
 import { fetchNoteRecord } from "../charting/api";
 import { NoteBody } from "./NoteBody";
+import { fetchPainHistory } from "../encounter/api";
+import { formatRating } from "../encounter/pain";
+import { NewNoteButton } from "./NewNoteButton";
+import { useAuth } from "../auth/AuthProvider";
+import { RoleSets, canAccess } from "../auth/permissions";
 
 interface ProgressNoteStatus {
   isDue: boolean;
@@ -48,6 +53,7 @@ const isSigned = (s: number) =>
  * overview; each note opens in Clinical Charting. */
 export function PatientDocumentationPage() {
   const { patientId = "" } = useParams();
+  const { user } = useAuth();
   const patient = useQuery({
     queryKey: ["admin", "patient", patientId],
     queryFn: () => fetchPatientDetail(patientId),
@@ -69,6 +75,7 @@ export function PatientDocumentationPage() {
     queryFn: () => fetchProgressStatus(patientId),
   });
 
+  const canWrite = canAccess(user, RoleSets.Clinical);
   if (patient.isError)
     return <p className="alert-error">{patient.error.message}</p>;
   const p = patient.data;
@@ -78,19 +85,22 @@ export function PatientDocumentationPage() {
 
   return (
     <div className="space-y-5 pb-10">
-      <div>
-        <Link to="/patients" className="text-primary hover:underline">
-          ‹ Patients
-        </Link>
-        <h1 className="mt-1 text-2xl font-bold text-[#1565b8]">
-          {p ? `${p.fullName} — Documentation` : "Documentation"}
-        </h1>
-        {p && (
-          <p className="text-text-muted">
-            {p.medicalRecordNumber} · DOB {formatDate(p.dateOfBirth)} ({p.age})
-            {p.phone ? ` · ${p.phone}` : ""}
-          </p>
-        )}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <Link to="/patients" className="text-primary hover:underline">
+            ‹ Patients
+          </Link>
+          <h1 className="mt-1 text-2xl font-bold text-[#1565b8]">
+            {p ? `${p.fullName} — Documentation` : "Documentation"}
+          </h1>
+          {p && (
+            <p className="text-text-muted">
+              {p.medicalRecordNumber} · DOB {formatDate(p.dateOfBirth)} ({p.age}
+              ){p.phone ? ` · ${p.phone}` : ""}
+            </p>
+          )}
+        </div>
+        {p && canWrite && <NewNoteButton patientId={p.id} />}
       </div>
 
       {(p?.precautions || !!pullForward.data?.activeDiagnoses.length) && (
@@ -141,7 +151,7 @@ export function PatientDocumentationPage() {
       </div>
 
       <Section title="Pain & range-of-motion trend">
-        <Trends notes={signed} />
+        <Trends notes={signed} patientId={patientId} />
       </Section>
 
       <Section title="Outcome measures">
@@ -242,7 +252,17 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Pain (now) and each measured motion across the most recent signed visits. */
-function Trends({ notes }: { notes: ChartNote[] }) {
+function Trends({
+  notes,
+  patientId,
+}: {
+  notes: ChartNote[];
+  patientId: string;
+}) {
+  const history = useQuery({
+    queryKey: ["patient", patientId, "pain-history"],
+    queryFn: () => fetchPainHistory(patientId),
+  });
   const visits = [...notes].slice(0, 6).reverse(); // oldest -> newest, last 6
   if (visits.length === 0)
     return (
@@ -254,7 +274,10 @@ function Trends({ notes }: { notes: ChartNote[] }) {
   const pain = new Map<string, string>();
   for (const n of visits) {
     const s = parseSubjective(n.subjectiveDetailsJson);
-    if (s.painNow !== null) pain.set(n.id, `${s.painNow}/10`);
+    const structured = history.data?.find((h) => h.noteId === n.id);
+    if (structured?.current != null)
+      pain.set(n.id, formatRating(structured.scale, structured.current));
+    else if (s.painNow !== null) pain.set(n.id, `${s.painNow}/10`);
     for (const r of parseObjective(n.objectiveMeasurementsJson).rom) {
       if (!r.arom && !r.prom) continue;
       const label = `${r.joint} ${r.motion}${r.side ? ` (${r.side})` : ""}`;

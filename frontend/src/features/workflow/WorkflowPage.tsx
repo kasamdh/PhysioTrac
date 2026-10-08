@@ -9,7 +9,8 @@ import { RoleSets, canAccess } from "../auth/permissions";
 import { transitionAppointment, type AppointmentAction } from "../schedule/api";
 import { appointmentColors } from "../schedule/status";
 import { AppointmentStatus, AppointmentStatusLabels } from "../schedule/types";
-import { createVisitNote, fetchWorkflowToday } from "./api";
+import { openAppointmentEncounter } from "../encounter/api";
+import { fetchWorkflowToday } from "./api";
 import { NoteQueuesPanel } from "./NoteQueuesPanel";
 import { NoteStatus, NoteStatusLabels, type WorkflowAppointment } from "./types";
 
@@ -75,27 +76,9 @@ export function WorkflowPage() {
   });
   // Document = open this visit's note in Clinical Charting, creating its
   // draft first when the visit has none yet (one note per visit).
+  // The server decides the visit's note type and template, one note per visit.
   const openChart = useMutation({
-    mutationFn: async (a: WorkflowAppointment) => {
-      if (a.noteId) return a.noteId;
-      const created = await createVisitNote({
-        patientId: a.patientId,
-        appointmentId: a.appointmentId,
-        noteType: a.suggestedNoteType,
-        serviceDate: day.data!.date,
-        subjective: null,
-        objective: null,
-        interventions: null,
-        assessment: null,
-        plan: null,
-        planOfCareStart: null,
-        planOfCareEnd: null,
-        frequencyPerWeek: null,
-        durationWeeks: null,
-        reassessmentDue: null,
-      });
-      return created.id;
-    },
+    mutationFn: async (a: WorkflowAppointment) => a.noteId ?? (await openAppointmentEncounter(a.appointmentId)).noteId,
     onSuccess: (noteId) => navigate(`/chart/${noteId}`),
     onError: (e: Error) => showToast(e.message),
   });

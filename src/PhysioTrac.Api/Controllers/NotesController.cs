@@ -245,6 +245,44 @@ public class NotesController : ControllerBase
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
+    /// <summary>Opens the encounter for an appointment: its note, or a new
+    /// draft of the visit's note type. 422 for a cancelled/no-show visit.</summary>
+    [HttpPost("for-appointment/{appointmentId:guid}")]
+    public async Task<IActionResult> OpenForAppointment(Guid appointmentId)
+    {
+        try
+        {
+            return Ok(await _notes.OpenAppointmentEncounterAsync(appointmentId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Pain ratings from the patient's signed notes, oldest first.</summary>
+    [HttpGet("patient/{patientId:guid}/pain-history")]
+    public async Task<IActionResult> PainHistory(Guid patientId)
+    {
+        try
+        {
+            return Ok(await _notes.GetPainHistoryAsync(patientId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The note's latest save -- polled by the workspace to warn about another editor.</summary>
+    [HttpGet("{id:guid}/encounter/status")]
+    public async Task<IActionResult> EncounterStatus(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetEncounterStatusAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
     /// <summary>Switch a draft to another template (before any field is filled in).</summary>
     [HttpPut("{id:guid}/template")]
     public async Task<IActionResult> ChangeTemplate(Guid id, [FromBody] ChangeNoteTemplateRequest request)

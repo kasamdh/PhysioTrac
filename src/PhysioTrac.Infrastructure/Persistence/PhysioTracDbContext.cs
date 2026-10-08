@@ -45,6 +45,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<NoteCosignRequest> NoteCosignRequests => Set<NoteCosignRequest>();
     public DbSet<NoteAttachment> NoteAttachments => Set<NoteAttachment>();
     public DbSet<PlanOfCare> PlansOfCare => Set<PlanOfCare>();
+    public DbSet<PainAssessment> PainAssessments => Set<PainAssessment>();
+    public DbSet<BodyChartFinding> BodyChartFindings => Set<BodyChartFinding>();
     public DbSet<FunctionalGoal> FunctionalGoals => Set<FunctionalGoal>();
     public DbSet<OutcomeScore> OutcomeScores => Set<OutcomeScore>();
     public DbSet<Waitlist> Waitlists => Set<Waitlist>();
@@ -497,6 +499,47 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
                 .HasForeignKey(a => a.NoteId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(a => a.PatientDocument).WithMany()
                 .HasForeignKey(a => a.PatientDocumentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<PainAssessment>(e =>
+        {
+            e.HasIndex(p => p.NoteId).IsUnique();
+            e.HasIndex(p => p.PatientId);
+            e.Property(p => p.Scale).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Frequency).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Irritability).HasConversion<string>().HasMaxLength(20);
+            foreach (var rating in new[] { nameof(PainAssessment.Current), nameof(PainAssessment.Best), nameof(PainAssessment.Worst),
+                nameof(PainAssessment.BeforeTreatment), nameof(PainAssessment.AfterTreatment) })
+            {
+                e.Property(rating).HasPrecision(6, 2);
+            }
+            e.Property(p => p.Location).HasMaxLength(300);
+            e.Property(p => p.Qualities).HasMaxLength(300);
+            e.Property(p => p.Duration).HasMaxLength(200);
+            e.Property(p => p.AggravatingFactors).HasMaxLength(1000);
+            e.Property(p => p.EasingFactors).HasMaxLength(1000);
+            e.Property(p => p.DailyPattern).HasMaxLength(1000);
+            e.Property(p => p.SleepImpact).HasMaxLength(1000);
+            e.Property(p => p.FunctionalImpact).HasMaxLength(2000);
+            e.HasOne(p => p.Note).WithMany()
+                .HasForeignKey(p => p.NoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<BodyChartFinding>(e =>
+        {
+            e.HasIndex(f => new { f.NoteId, f.Order });
+            e.HasIndex(f => f.PatientId);
+            e.Property(f => f.View).HasConversion<string>().HasMaxLength(10);
+            e.Property(f => f.Side).HasConversion<string>().HasMaxLength(10);
+            e.Property(f => f.FindingType).HasConversion<string>().HasMaxLength(20);
+            e.Property(f => f.Region).HasMaxLength(40);
+            e.Property(f => f.X).HasPrecision(5, 4);
+            e.Property(f => f.Y).HasPrecision(5, 4);
+            e.Property(f => f.RadiatesTo).HasMaxLength(200);
+            e.Property(f => f.Annotation).HasMaxLength(200);
+            e.Property(f => f.Comment).HasMaxLength(1000);
+            e.HasOne(f => f.Note).WithMany()
+                .HasForeignKey(f => f.NoteId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<PlanOfCare>(e =>

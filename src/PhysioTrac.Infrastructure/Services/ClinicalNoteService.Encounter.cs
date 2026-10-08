@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Common;
+using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Domain.Entities;
 using PhysioTrac.Domain.Enums;
 
@@ -87,8 +88,12 @@ public partial class ClinicalNoteService
             diagnoses, allergies, patient.Precautions,
             plan?.Id, plan?.StartDate, plan?.EndDate);
 
+        var pain = await _db.PainAssessments.AsNoTracking().FirstOrDefaultAsync(p => p.NoteId == note.Id, ct);
+        var findings = await _db.BodyChartFindings.AsNoTracking().Where(f => f.NoteId == note.Id).OrderBy(f => f.Order).ToListAsync(ct);
+
         return new EncounterDto(ClinicalNoteMapper.ToDto(note), templateName, template, values, header,
-            latest?.VersionNumber ?? 0, latest?.CreatedAt ?? note.UpdatedAt, latest is null ? null : names.GetValueOrDefault(latest.SavedById));
+            latest?.VersionNumber ?? 0, latest?.CreatedAt ?? note.UpdatedAt, latest is null ? null : names.GetValueOrDefault(latest.SavedById),
+            pain is null ? null : ToPainDto(pain), findings.Select(ToFindingDto).ToList(), await PreviousChartingAsync(note, ct));
     }
 
     /// <summary>The visit's number in the patient's current episode: within
@@ -138,6 +143,9 @@ public partial class ClinicalNoteService
             note.SubjectiveDetailsJson = subjectiveJson;
         if (ChartJson.Normalize(request.ObjectiveMeasurementsJson, nameof(request.ObjectiveMeasurementsJson)) is string objectiveJson)
             note.ObjectiveMeasurementsJson = objectiveJson;
+
+        if (request.Pain is not null) await ApplyPainAsync(note, request.Pain, ct);
+        if (request.BodyChart is not null) await ApplyBodyChartAsync(note, request.BodyChart, ct);
 
         if (request.Values is { Count: > 0 } values)
         {
@@ -262,6 +270,148 @@ public partial class ClinicalNoteService
     private static TemplateFieldValueDto ToValueDto(ClinicalNoteFieldValue v) =>
         new(v.FieldKey, v.ValueText, v.ValueNumber, v.ValueDate, v.ValueTime, v.ValueBool, v.ValueJson);
 
+    // ------------------------------------------------------------------ pain and body chart
+
+    private async Task ApplyPainAsync(ClinicalNote note, PainAssessmentDto pain, CancellationToken ct)
+    {
+        var errors = PainRules.Validate(pain);
+        if (errors.Count > 0) throw new TemplateValidationException(errors);
+        var row = await _db.PainAssessments.FirstOrDefaultAsync(p => p.NoteId == note.Id, ct);
+        if (PainRules.IsEmpty(pain))
+        {
+            if (row is not null) _db.PainAssessments.Remove(row);
+            return;
+        }
+        if (row is null)
+        {
+            row = new PainAssessment { NoteId = note.Id, PatientId = note.PatientId };
+            _db.PainAssessments.Add(row);
+        }
+        row.Scale = pain.Scale;
+        row.Current = pain.Current;
+        row.Best = pain.Best;
+        row.Worst = pain.Worst;
+        row.BeforeTreatment = pain.BeforeTreatment;
+        row.AfterTreatment = pain.AfterTreatment;
+        row.Location = Clean(pain.Location);
+        row.Qualities = pain.Qualities is { Count: > 0 } q ? string.Join('|', q.Distinct()) : null;
+        row.Frequency = pain.Frequency;
+        row.Duration = Clean(pain.Duration);
+        row.Irritability = pain.Irritability;
+        row.AggravatingFactors = Clean(pain.AggravatingFactors);
+        row.EasingFactors = Clean(pain.EasingFactors);
+        row.DailyPattern = Clean(pain.DailyPattern);
+        row.SleepImpact = Clean(pain.SleepImpact);
+        row.FunctionalImpact = Clean(pain.FunctionalImpact);
+        row.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>Replaces the note's body chart with the given findings.</summary>
+    private async Task ApplyBodyChartAsync(ClinicalNote note, IReadOnlyList<BodyChartFindingDto> findings, CancellationToken ct)
+    {
+        var errors = PainRules.Validate(findings);
+        if (errors.Count > 0) throw new TemplateValidationException(errors);
+        _db.BodyChartFindings.RemoveRange(await _db.BodyChartFindings.Where(f => f.NoteId == note.Id).ToListAsync(ct));
+        foreach (var (f, i) in findings.Select((f, i) => (f, i)))
+        {
+            _db.BodyChartFindings.Add(new BodyChartFinding
+            {
+                NoteId = note.Id,
+                PatientId = note.PatientId,
+                View = f.View,
+                Region = f.Region,
+                Side = f.Side,
+                X = Math.Round(f.X, 4),
+                Y = Math.Round(f.Y, 4),
+                FindingType = f.FindingType,
+                Severity = f.Severity,
+                RadiatesTo = Clean(f.RadiatesTo),
+                Annotation = Clean(f.Annotation),
+                Comment = Clean(f.Comment),
+                Order = i,
+            });
+        }
+    }
+
+    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private static PainAssessmentDto ToPainDto(PainAssessment p) => new(
+        p.Scale, p.Current, p.Best, p.Worst, p.BeforeTreatment, p.AfterTreatment, p.Location,
+        p.Qualities?.Split('|', StringSplitOptions.RemoveEmptyEntries) ?? [], p.Frequency, p.Duration, p.Irritability,
+        p.AggravatingFactors, p.EasingFactors, p.DailyPattern, p.SleepImpact, p.FunctionalImpact);
+
+    private static BodyChartFindingDto ToFindingDto(BodyChartFinding f) =>
+        new(f.View, f.Region, f.Side, f.X, f.Y, f.FindingType, f.Severity, f.RadiatesTo, f.Annotation, f.Comment, f.Id);
+
+    /// <summary>Pain and body chart of the patient's most recent signed note
+    /// dated before this one (or the same day but written earlier).</summary>
+    private async Task<PreviousChartingDto?> PreviousChartingAsync(ClinicalNote note, CancellationToken ct)
+    {
+        var previous = await _db.ClinicalNotes.AsNoTracking()
+            .Where(n => n.PatientId == note.PatientId && n.Id != note.Id &&
+                (n.Status == NoteStatus.Signed || n.Status == NoteStatus.Locked) &&
+                (n.ServiceDate < note.ServiceDate || (n.ServiceDate == note.ServiceDate && n.CreatedAt < note.CreatedAt)) &&
+                (_db.PainAssessments.Any(p => p.NoteId == n.Id) || _db.BodyChartFindings.Any(f => f.NoteId == n.Id)))
+            .OrderByDescending(n => n.ServiceDate).ThenByDescending(n => n.CreatedAt)
+            .Select(n => new { n.Id, n.ServiceDate }).FirstOrDefaultAsync(ct);
+        if (previous is null) return null;
+        var pain = await _db.PainAssessments.AsNoTracking().FirstOrDefaultAsync(p => p.NoteId == previous.Id, ct);
+        var findings = await _db.BodyChartFindings.AsNoTracking().Where(f => f.NoteId == previous.Id).OrderBy(f => f.Order).ToListAsync(ct);
+        return new PreviousChartingDto(previous.Id, previous.ServiceDate, pain is null ? null : ToPainDto(pain), findings.Select(ToFindingDto).ToList());
+    }
+
+    public async Task<IReadOnlyList<PainHistoryPointDto>> GetPainHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var patient = await _tenantAccess.RequirePatientAccessAsync(actor, patientId, ct: ct);
+        var rows = await (from p in _db.PainAssessments.AsNoTracking()
+                          join n in _db.ClinicalNotes.AsNoTracking() on p.NoteId equals n.Id
+                          where p.PatientId == patient.Id && (n.Status == NoteStatus.Signed || n.Status == NoteStatus.Locked)
+                          select new { n.Id, n.ServiceDate, n.CreatedAt, p.Scale, p.Current, p.Worst, p.BeforeTreatment, p.AfterTreatment })
+            .ToListAsync(ct);
+        return rows.OrderBy(r => r.ServiceDate).ThenBy(r => r.CreatedAt)
+            .Select(r => new PainHistoryPointDto(r.Id, r.ServiceDate, r.Scale, r.Current, r.Worst, r.BeforeTreatment, r.AfterTreatment))
+            .ToList();
+    }
+
+    // ------------------------------------------------------------------ open from the schedule
+
+    public async Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        _tenantAccess.RequireRole(actor, RoleSets.Clinical);
+        var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
+        var appointment = await _db.Appointments.AsNoTracking().Include(a => a.AppointmentType).Include(a => a.Patient)
+            .FirstOrDefaultAsync(a => a.Id == appointmentId, ct);
+        if (appointment?.Patient is null || appointment.Patient.OrganizationId != organization.Id)
+            throw new NotFoundException("Appointment was not found.");
+
+        var existing = await _db.ClinicalNotes.Where(n => n.AppointmentId == appointment.Id).Select(n => (Guid?)n.Id).FirstOrDefaultAsync(ct);
+        if (existing is Guid noteId) return new AppointmentEncounterDto(noteId, false);
+
+        if (appointment.Status is AppointmentStatus.Cancelled or AppointmentStatus.NoShow)
+            throw new InvalidOperationException("No treatment note is written for a cancelled or no-show visit. Document it with a missed-visit note.");
+
+        var serviceDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(appointment.StartsAt, Tz(organization.Timezone)).DateTime);
+        var note = await CreateDraftAsync(new CreateNoteRequest(
+            appointment.PatientId, EncounterRules.NoteTypeFor(appointment.Kind, appointment.AppointmentType?.DefaultNoteType),
+            serviceDate, appointment.Id, null, null, null, null, null, null, null, null, null, null), actor, ct);
+        return new AppointmentEncounterDto(note.Id, true);
+    }
+
+    private static TimeZoneInfo Tz(string id)
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.Utc; }
+    }
+
+    public async Task<EncounterStatusDto> GetEncounterStatusAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default)
+    {
+        var note = await GetAsync(noteId, actor, ct);
+        var latest = await _db.ClinicalNoteVersions.AsNoTracking().Where(v => v.NoteId == note.Id)
+            .OrderByDescending(v => v.VersionNumber).Select(v => new { v.VersionNumber, v.CreatedAt, v.SavedById }).FirstOrDefaultAsync(ct);
+        var name = latest is null ? null : (await NamesAsync([latest.SavedById], ct)).GetValueOrDefault(latest.SavedById);
+        return new EncounterStatusDto(latest?.VersionNumber ?? 0, latest?.CreatedAt ?? note.UpdatedAt, name, latest?.SavedById, note.Status);
+    }
+
     // ------------------------------------------------------------------ template choice
 
     public async Task<ClinicalNote> ChangeTemplateAsync(Guid noteId, Guid templateId, ICurrentUser actor, CancellationToken ct = default)
@@ -313,6 +463,19 @@ public partial class ClinicalNoteService
             }
         }
         return findings;
+    }
+
+    private async Task<PainAssessment?> CurrentPainAsync(Guid noteId, CancellationToken ct)
+    {
+        await _db.PainAssessments.Where(p => p.NoteId == noteId).LoadAsync(ct);
+        return _db.PainAssessments.Local.FirstOrDefault(p => p.NoteId == noteId && _db.Entry(p).State != EntityState.Deleted);
+    }
+
+    private async Task<IReadOnlyList<BodyChartFinding>> CurrentFindingsAsync(Guid noteId, CancellationToken ct)
+    {
+        await _db.BodyChartFindings.Where(f => f.NoteId == noteId).LoadAsync(ct);
+        return _db.BodyChartFindings.Local
+            .Where(f => f.NoteId == noteId && _db.Entry(f).State != EntityState.Deleted).OrderBy(f => f.Order).ToList();
     }
 
     /// <summary>The note's field values including unsaved changes in this context.</summary>

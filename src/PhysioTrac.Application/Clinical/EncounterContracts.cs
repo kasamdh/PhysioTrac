@@ -22,7 +22,10 @@ public record EncounterDto(
     EncounterHeaderDto Header,
     int SaveVersion,
     DateTimeOffset LastSavedAt,
-    string? LastSavedByName);
+    string? LastSavedByName,
+    PainAssessmentDto? Pain = null,
+    IReadOnlyList<BodyChartFindingDto>? BodyChart = null,
+    PreviousChartingDto? Previous = null);
 
 /// <summary>An encounter save (autosave). <see cref="BaseSaveVersion"/> is
 /// the SaveVersion the editor last loaded or saved; if someone else saved
@@ -33,9 +36,35 @@ public record SaveEncounterRequest(
     int BaseSaveVersion,
     IReadOnlyList<TemplateFieldValueDto>? Values = null,
     string? Subjective = null, string? Objective = null, string? Interventions = null, string? Assessment = null, string? Plan = null,
-    string? SubjectiveDetailsJson = null, string? ObjectiveMeasurementsJson = null);
+    string? SubjectiveDetailsJson = null, string? ObjectiveMeasurementsJson = null,
+    // The pain assessment (replaces it; an empty one removes it) and the
+    // whole body chart (replaces every finding; an empty list clears it).
+    PainAssessmentDto? Pain = null,
+    IReadOnlyList<BodyChartFindingDto>? BodyChart = null);
 
 public record EncounterSaveResultDto(int SaveVersion, DateTimeOffset SavedAt, string? SavedByName);
+
+/// <summary>The latest save of a note, for spotting another editor's changes.</summary>
+public record EncounterStatusDto(int SaveVersion, DateTimeOffset SavedAt, string? SavedByName, Guid? SavedById, NoteStatus Status);
+
+/// <summary>The encounter opened for an appointment; Created = a new draft was started.</summary>
+public record AppointmentEncounterDto(Guid NoteId, bool Created);
+
+/// <summary>Which note documents a visit.</summary>
+public static class EncounterRules
+{
+    /// <summary>The note type a visit is documented with: the appointment
+    /// type's own setting, else from the kind of visit.</summary>
+    public static NoteType NoteTypeFor(AppointmentKind kind, NoteType? appointmentTypeDefault = null) =>
+        appointmentTypeDefault ?? kind switch
+        {
+            AppointmentKind.Evaluation => NoteType.Evaluation,
+            AppointmentKind.ReEvaluation => NoteType.ReEvaluation,
+            AppointmentKind.Progress => NoteType.Progress,
+            AppointmentKind.Discharge => NoteType.Discharge,
+            _ => NoteType.Daily,
+        };
+}
 
 /// <summary>Switch a draft's template (only while it has no template values yet).</summary>
 public record ChangeNoteTemplateRequest(Guid TemplateId);

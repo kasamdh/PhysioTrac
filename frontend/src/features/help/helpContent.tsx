@@ -375,6 +375,7 @@ export const pageHelp: Record<string, PageHelp> = {
             </Term>
             <Term name="Note column">Not started, Draft, Signed, or Awaiting cosign (a PTA note waiting for a PT’s cosignature; the visit completes once it is cosigned).</Term>
             <Term name="Patient documentation">In the ☰ menu: everything documented for that patient, across all visits.</Term>
+            <Term name="Open encounter (Schedule)">On the Schedule, an appointment’s details also open its encounter — the same note as Document here.</Term>
             <Term name="Your unfinished notes">Shown above the list when you have drafts from earlier visits, open amendments, or notes waiting for a cosign. Open one to finish it.</Term>
             <Term name="Waiting for your cosign">Assistants’ notes awaiting your cosignature.</Term>
           </>
@@ -401,8 +402,26 @@ export const pageHelp: Record<string, PageHelp> = {
           <>
             <Term name="Visit">The visit’s number in the current plan of care, and the visit type from the schedule.</Term>
             <Term name="Allergies / Precautions">Shown in red when the patient has any.</Term>
+            <Term name="Section bar">Jumps to a section. A number shows how many required fields are still empty there; ✓ means its required fields are done.</Term>
+            <Term name="▾ Section titles">Click (or press Enter on) a section title to collapse or expand it; Collapse all / Expand all does every section. The layout is remembered on this device.</Term>
+            <Term name="Ctrl+S">Saves right away instead of waiting for the automatic save.</Term>
+            <Term name="Saved by someone else">A yellow notice appears when another user saves the note while you have it open — reload before continuing.</Term>
             <Term name="Changed elsewhere">If someone else saved the note after you opened it, your next change isn’t saved over theirs. Reload the latest version and re-enter your change.</Term>
             <Term name="Required fields">Fields marked * must be filled in before signing; some appear only after a particular answer (for example red-flag details).</Term>
+          </>
+        ),
+      },
+      {
+        id: "pain-body-chart",
+        title: "Pain assessment and body chart",
+        body: (
+          <>
+            <Term name="Pain scale">Numeric 0–10, visual analog 0–100 mm, Wong-Baker faces, or verbal (none / mild / moderate / severe). Last visit’s rating shows beside each one when the same scale was used.</Term>
+            <Term name="Quality, frequency, irritability">Tap the words that apply; tap again to clear.</Term>
+            <Term name="Body chart">Choose what to mark (pain, numbness, tingling, burning, swelling, tenderness, incision, scar, radiating, other), then tap the front or back drawing. R and L show the patient’s right and left. Select a marker to drag it; edit its severity, radiation, annotation and comments in the table.</Term>
+            <Term name="Without the drawing">Every finding can be added and edited in the table with the keyboard (+ Add finding, then choose view, region and side).</Term>
+            <Term name="Show last visit’s findings">Overlays the last signed visit’s findings as dashed circles and lists them.</Term>
+            <Note>Findings are saved as data (region, side, point, type, severity), not as a picture, and are locked with the note when it is signed.</Note>
           </>
         ),
       },
@@ -542,6 +561,7 @@ export const pageHelp: Record<string, PageHelp> = {
           <>
             <Term name="▸ Date — note type">Click to expand the full note: pain, measurements, interventions with patient response, and the narrative.</Term>
             <Term name="Open note / Continue charting">Opens the note in Clinical Charting.</Term>
+            <Term name="+ New note">Starts a note that isn’t tied to an appointment — a phone call, consultation, missed visit or addendum.</Term>
           </>
         ),
       },

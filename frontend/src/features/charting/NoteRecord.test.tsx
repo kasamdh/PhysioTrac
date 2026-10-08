@@ -36,6 +36,42 @@ vi.mock("./api", () => ({
   lockNote: vi.fn(),
 }));
 vi.mock("../admin/api", () => ({ fetchPatientDetail: vi.fn() }));
+vi.mock("../encounter/api", () => ({
+  fetchEncounter: vi.fn().mockResolvedValue({
+    pain: {
+      scale: 0,
+      current: 6,
+      best: null,
+      worst: 8,
+      beforeTreatment: null,
+      afterTreatment: null,
+      location: "Right knee",
+      qualities: ["Aching"],
+      frequency: null,
+      duration: null,
+      irritability: null,
+      aggravatingFactors: null,
+      easingFactors: null,
+      dailyPattern: null,
+      sleepImpact: null,
+      functionalImpact: null,
+    },
+    bodyChart: [
+      {
+        view: 0,
+        region: "knee",
+        side: 1,
+        x: 0.43,
+        y: 0.65,
+        findingType: 0,
+        severity: 6,
+        radiatesTo: null,
+        annotation: null,
+        comment: null,
+      },
+    ],
+  }),
+}));
 vi.mock("../organizations/api", () => ({ fetchCurrentOrganization: vi.fn() }));
 vi.mock("../auth/AuthProvider", () => ({ useAuth: vi.fn() }));
 const navigateSpy = vi.fn();
@@ -320,6 +356,12 @@ describe("Signed note record", () => {
     expect(screen.getByText("Quinn Alvarez")).toBeInTheDocument();
     expect(screen.getByText("Knee sore")).toBeInTheDocument();
     expect(screen.getByText("Called patient.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Pain assessment (Numeric 0–10)"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Pain: right knee (front), severity 6/10"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Electronically signed by/)).toHaveTextContent(
       "Jamie Chen, PT, DPT",
     );

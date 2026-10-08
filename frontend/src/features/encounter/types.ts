@@ -38,6 +38,9 @@ export interface Encounter {
   saveVersion: number;
   lastSavedAt: string;
   lastSavedByName: string | null;
+  pain?: PainAssessment | null;
+  bodyChart?: BodyFinding[] | null;
+  previous?: PreviousCharting | null;
 }
 
 // Matches SaveEncounterRequest.
@@ -51,6 +54,8 @@ export interface SaveEncounterBody {
   plan?: string;
   subjectiveDetailsJson?: string;
   objectiveMeasurementsJson?: string;
+  pain?: PainAssessment;
+  bodyChart?: BodyFinding[];
 }
 
 export interface EncounterSaveResult {
@@ -109,4 +114,57 @@ export interface PatientMedication {
   dosage: string | null;
   frequency: string | null;
   isActive: boolean;
+}
+
+// Matches PhysioTrac.Application.Clinical.PainAssessmentDto.
+export interface PainAssessment {
+  scale: number; // 0 numeric 0-10, 1 visual analog 0-100, 2 faces, 3 verbal 0-3
+  current: number | null;
+  best: number | null;
+  worst: number | null;
+  beforeTreatment: number | null;
+  afterTreatment: number | null;
+  location: string | null;
+  qualities: string[];
+  frequency: number | null; // 0 constant, 1 intermittent, 2 occasional
+  duration: string | null;
+  irritability: number | null; // 0 low, 1 moderate, 2 high
+  aggravatingFactors: string | null;
+  easingFactors: string | null;
+  dailyPattern: string | null;
+  sleepImpact: string | null;
+  functionalImpact: string | null;
+}
+
+// Matches BodyChartFindingDto.
+export interface BodyFinding {
+  id?: string | null;
+  view: number;
+  region: string;
+  side: number;
+  x: number;
+  y: number;
+  findingType: number;
+  severity: number | null;
+  radiatesTo: string | null;
+  annotation: string | null;
+  comment: string | null;
+}
+
+// Matches PreviousChartingDto.
+export interface PreviousCharting {
+  noteId: string;
+  serviceDate: string;
+  pain: PainAssessment | null;
+  bodyChart: BodyFinding[];
+}
+
+export interface PainHistoryPoint {
+  noteId: string;
+  serviceDate: string;
+  scale: number;
+  current: number | null;
+  worst: number | null;
+  beforeTreatment: number | null;
+  afterTreatment: number | null;
 }

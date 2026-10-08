@@ -216,7 +216,7 @@ public static class SystemTemplates
                 Long("medicationChanges", "Medication changes"),
                 Radio("adverseEvents", "Adverse events since last visit", YesNo),
                 Long("adverseEventDetails", "Adverse event details").When("adverseEvents", "Yes").Req()),
-            Section("bodyChart", "Pain and body chart", "bodyChart", null),
+            Section("bodyChart", "Pain and body chart", "bodyChart", "Mark where symptoms are; last visit's findings can be shown for comparison."),
             Section("objective", "Objective measurements", "measurements", null,
                 Long("objectiveFindings", "Objective findings", "objective").Req()),
             Section("tests", "Tests and measures", "specialTests", null),

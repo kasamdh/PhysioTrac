@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhysioTrac.Application.Auth;
+using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Common;
 using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Domain.Enums;
@@ -85,6 +86,7 @@ public class WorkflowController : ControllerBase
                     Mrn = a.Patient.MedicalRecordNumber,
                     TypeName = a.AppointmentType != null ? a.AppointmentType.Name : null,
                     TypeColor = a.AppointmentType != null ? a.AppointmentType.Color : null,
+                    TypeNoteType = a.AppointmentType != null ? a.AppointmentType.DefaultNoteType : null,
                     LocationName = a.LocationDetail != null ? a.LocationDetail.Name : a.Location,
                 })
                 .ToListAsync(ct);
@@ -105,7 +107,7 @@ public class WorkflowController : ControllerBase
                         a.Id, a.StartsAt, a.EndsAt, a.Status, a.Kind, a.TypeName, a.TypeColor,
                         a.PatientId, $"{a.PatientFirst} {a.PatientLast}", a.Mrn,
                         a.ProviderId, a.ProviderId is Guid p && providerNames.TryGetValue(p, out var n) ? n : null,
-                        a.LocationName, NoteTypeFor(a.Kind),
+                        a.LocationName, NoteTypeFor(a.Kind, a.TypeNoteType),
                         note?.Id, note?.Status, note?.NoteType);
                 })
                 .ToList();
@@ -117,14 +119,7 @@ public class WorkflowController : ControllerBase
     }
 
     /// <summary>The note type a visit of this kind is documented with.</summary>
-    internal static NoteType NoteTypeFor(AppointmentKind kind) => kind switch
-    {
-        AppointmentKind.Evaluation => NoteType.Evaluation,
-        AppointmentKind.ReEvaluation => NoteType.ReEvaluation,
-        AppointmentKind.Progress => NoteType.Progress,
-        AppointmentKind.Discharge => NoteType.Discharge,
-        _ => NoteType.Daily,
-    };
+    internal static NoteType NoteTypeFor(AppointmentKind kind, NoteType? typeDefault = null) => EncounterRules.NoteTypeFor(kind, typeDefault);
 
     private static DateTimeOffset StartOfDayUtc(DateOnly day, TimeZoneInfo tz)
     {

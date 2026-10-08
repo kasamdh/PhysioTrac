@@ -1,6 +1,7 @@
 import { apiRequest } from "../../lib/apiClient";
 import type {
   DiagnosisCode,
+  PainHistoryPoint,
   Encounter,
   EncounterSaveResult,
   PatientAllergy,
@@ -96,3 +97,51 @@ export const createGoal = (body: NewGoal) =>
   apiRequest<unknown>("/api/v1/goals", { method: "POST", body });
 export const approveGoal = (goalId: string) =>
   apiRequest<unknown>(`/api/v1/goals/${goalId}/approve`, { method: "POST" });
+
+/** The encounter for an appointment: its note, or a new draft (one per visit). */
+export const openAppointmentEncounter = (appointmentId: string) =>
+  apiRequest<{ noteId: string; created: boolean }>(
+    `/api/v1/notes/for-appointment/${appointmentId}`,
+    { method: "POST" },
+  );
+
+export interface EncounterStatus {
+  saveVersion: number;
+  savedAt: string;
+  savedByName: string | null;
+  savedById: string | null;
+  status: number;
+}
+export const fetchEncounterStatus = (noteId: string) =>
+  apiRequest<EncounterStatus>(`/api/v1/notes/${noteId}/encounter/status`);
+
+/** A note not tied to an appointment (communication, consultation...). */
+export const createPatientNote = (
+  patientId: string,
+  noteType: number,
+  serviceDate: string,
+) =>
+  apiRequest<{ id: string }>("/api/v1/notes", {
+    method: "POST",
+    body: {
+      patientId,
+      noteType,
+      serviceDate,
+      appointmentId: null,
+      subjective: null,
+      objective: null,
+      interventions: null,
+      assessment: null,
+      plan: null,
+      planOfCareStart: null,
+      planOfCareEnd: null,
+      frequencyPerWeek: null,
+      durationWeeks: null,
+      reassessmentDue: null,
+    },
+  });
+
+export const fetchPainHistory = (patientId: string) =>
+  apiRequest<PainHistoryPoint[]>(
+    `/api/v1/notes/patient/${patientId}/pain-history`,
+  );

@@ -17,12 +17,12 @@ import { InterventionsPanel } from "../charting/components/InterventionsPanel";
 import { MeasurementTables } from "../charting/components/MeasurementTables";
 import { NoteRecordPanel } from "../charting/components/NoteRecordPanel";
 import { OutcomesPanel } from "../charting/components/OutcomesPanel";
-import { PainScale } from "../charting/components/PainScale";
 import { parseObjective, parseSubjective } from "../charting/presets";
 import type { ObjectiveDetails, SubjectiveDetails } from "../charting/types";
 import { fetchTemplates } from "../templates/api";
-import { missingRequired } from "../templates/rules";
+import { missingRequired, valueAsText } from "../templates/rules";
 import { TemplateSectionFields } from "../templates/TemplateForm";
+import { FieldType } from "../templates/types";
 import type {
   FieldValue,
   FieldValues,
@@ -33,19 +33,34 @@ import {
   NoteStatusLabels,
   NoteTypeLabels,
 } from "../workflow/types";
-import { changeNoteTemplate, fetchEncounter, saveEncounter } from "./api";
+import {
+  changeNoteTemplate,
+  fetchEncounter,
+  fetchEncounterStatus,
+  saveEncounter,
+} from "./api";
 import {
   AddGoalForm,
   DiagnosesPanel,
   MedicalHistoryPanel,
   PlanOfCarePanel,
 } from "./components/ClinicalPanels";
-import type { EditConflict, Encounter, SaveEncounterBody } from "./types";
+import type {
+  BodyFinding,
+  EditConflict,
+  Encounter,
+  PainAssessment,
+  SaveEncounterBody,
+} from "./types";
+import { BodyChart } from "./bodychart/BodyChart";
+import { PainAssessmentPanel } from "./PainAssessmentPanel";
+import { emptyPain } from "./pain";
 
 /** Clinical components the workspace can show; sections whose component
  * isn't available yet and that have no fields of their own are left out. */
 const AVAILABLE = new Set([
   "painAssessment",
+  "bodyChart",
   "measurements",
   "outcomes",
   "interventions",
@@ -170,13 +185,22 @@ function Workspace({
     valuesMap(encounter.values),
   );
   const [columns, setColumns] = useState<Columns>(initialColumns);
-  const [subj, setSubj] = useState<SubjectiveDetails>(() =>
+  // Older pain fields (kept unchanged; the pain assessment replaces them).
+  const [subj] = useState<SubjectiveDetails>(() =>
     parseSubjective(note.subjectiveDetailsJson),
   );
   const [obj, setObj] = useState<ObjectiveDetails>(() =>
     parseObjective(note.objectiveMeasurementsJson),
   );
+  const [pain, setPain] = useState<PainAssessment>(
+    () => encounter.pain ?? emptyPain(),
+  );
+  const [chart, setChart] = useState<BodyFinding[]>(
+    () => encounter.bodyChart ?? [],
+  );
   const [saved, setSaved] = useState(() => ({
+    pain: JSON.stringify(encounter.pain ?? emptyPain()),
+    chart: JSON.stringify(encounter.bodyChart ?? []),
     values: valuesMap(encounter.values),
     columns: initialColumns,
     subj: JSON.stringify(parseSubjective(note.subjectiveDetailsJson)),
@@ -202,8 +226,10 @@ function Workspace({
       b.subjectiveDetailsJson = JSON.stringify(subj);
     if (JSON.stringify(obj) !== saved.obj)
       b.objectiveMeasurementsJson = JSON.stringify(obj);
+    if (JSON.stringify(pain) !== saved.pain) b.pain = pain;
+    if (JSON.stringify(chart) !== saved.chart) b.bodyChart = chart;
     return Object.keys(b).length > 1 ? b : null;
-  }, [values, columns, subj, obj, saved, saveVersion]);
+  }, [values, columns, subj, obj, pain, chart, saved, saveVersion]);
   const dirty = body !== null;
 
   const save = useMutation({
@@ -225,6 +251,8 @@ function Workspace({
         },
         subj: b.subjectiveDetailsJson ?? s.subj,
         obj: b.objectiveMeasurementsJson ?? s.obj,
+        pain: b.pain ? JSON.stringify(b.pain) : s.pain,
+        chart: b.bodyChart ? JSON.stringify(b.bodyChart) : s.chart,
       }));
       void queryClient.invalidateQueries({
         queryKey: ["chart", "compliance", note.id],
@@ -258,6 +286,71 @@ function Workspace({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, readOnly]);
 
+  // Ctrl/Cmd+S saves now instead of waiting for the autosave pause.
+  useEffect(() => {
+    if (readOnly) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (body && !conflict && !save.isPending) save.mutate(body);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [body, conflict, readOnly, save]);
+
+  // Someone else saving while this editor is open is caught by the
+  // server on our next save (409); this check warns before typing more.
+  const status = useQuery({
+    queryKey: ["encounter-status", note.id],
+    queryFn: () => fetchEncounterStatus(note.id),
+    refetchInterval: 20_000,
+    enabled: !readOnly && !conflict,
+  });
+  const otherSave =
+    !conflict &&
+    !save.isPending &&
+    status.data &&
+    status.data.saveVersion > saveVersion
+      ? status.data
+      : null;
+
+  const storageKey = `encounter-collapsed:${encounter.template!.templateId}`;
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      return new Set<string>(
+        JSON.parse(localStorage.getItem(storageKey) ?? "[]"),
+      );
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const setCollapsedAndRemember = (next: Set<string>) => {
+    setCollapsed(next);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify([...next]));
+    } catch {
+      /* per-device convenience only */
+    }
+  };
+  const toggleSection = (key: string) => {
+    const next = new Set(collapsed);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setCollapsedAndRemember(next);
+  };
+  const goTo = (key: string) => {
+    if (collapsed.has(key)) toggleSection(key);
+    window.setTimeout(() => {
+      document
+        .getElementById(`enc-${key}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById(`enc-${key}-toggle`)
+        ?.focus({ preventScroll: true });
+    }, 0);
+  };
+
   const setValue = (v: FieldValue) => {
     setSaveErrors([]);
     setValues((p) => ({ ...p, [v.key]: v }));
@@ -278,39 +371,32 @@ function Workspace({
     switch (component) {
       case "painAssessment":
         return (
-          <div className="space-y-3">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <PainScale
-                label="Pain now"
-                value={subj.painNow}
-                readOnly={readOnly}
-                onChange={(v) => setSubj({ ...subj, painNow: v })}
-              />
-              <PainScale
-                label="Pain at best"
-                value={subj.painBest}
-                readOnly={readOnly}
-                onChange={(v) => setSubj({ ...subj, painBest: v })}
-              />
-              <PainScale
-                label="Pain at worst"
-                value={subj.painWorst}
-                readOnly={readOnly}
-                onChange={(v) => setSubj({ ...subj, painWorst: v })}
-              />
-            </div>
-            <label className="block max-w-xl">
-              <span className="font-bold text-[#333]">Pain location</span>
-              <input
-                className="field-input mt-1"
-                readOnly={readOnly}
-                value={subj.painLocation}
-                onChange={(e) =>
-                  setSubj({ ...subj, painLocation: e.target.value })
-                }
-              />
-            </label>
-          </div>
+          <PainAssessmentPanel
+            value={pain}
+            onChange={(next) => {
+              setSaveErrors([]);
+              setPain(next);
+            }}
+            readOnly={readOnly}
+            previous={encounter.previous?.pain}
+          />
+        );
+      case "bodyChart":
+        return (
+          <BodyChart
+            findings={chart}
+            onChange={(next) => {
+              setSaveErrors([]);
+              setChart(next);
+            }}
+            readOnly={readOnly}
+            previous={encounter.previous?.bodyChart}
+            previousDate={
+              encounter.previous
+                ? formatDate(encounter.previous.serviceDate)
+                : undefined
+            }
+          />
         );
       case "measurements":
         return (
@@ -362,6 +448,20 @@ function Workspace({
     (s) => s.fields.length > 0 || (s.component && AVAILABLE.has(s.component)),
   );
   const missing = missingRequired(allFields, values, columns);
+  const progressOf = (sec: TemplateSection): SectionProgress => {
+    const required = sec.fields.filter(
+      (f) => f.isRequired && f.fieldType !== FieldType.Signature,
+    );
+    const left = missingRequired(sec.fields, values, columns).length;
+    if (left > 0) return { state: "missing", left };
+    if (required.length > 0) return { state: "done", left: 0 };
+    const filled = sec.fields.some((f) =>
+      f.noteColumn
+        ? !!columns[f.noteColumn as keyof Columns]?.trim()
+        : valueAsText(values[f.key]) != null,
+    );
+    return { state: filled ? "filled" : "empty", left: 0 };
+  };
 
   return (
     <div className="pb-10">
@@ -407,6 +507,24 @@ function Workspace({
           </button>
         </div>
       )}
+      {otherSave && (
+        <div
+          role="status"
+          className="mb-4 rounded-md border border-warning bg-warning-light px-3 py-2 text-[#333]"
+        >
+          <p>
+            <strong>
+              {otherSave.savedByName ?? "Someone else"} saved this note
+            </strong>{" "}
+            at {time(otherSave.savedAt)} while you have it open. Reload to see
+            their changes before you continue — otherwise your next change won’t
+            be saved.
+          </p>
+          <button type="button" className="btn-primary mt-2" onClick={reload}>
+            Reload the latest version
+          </button>
+        </div>
+      )}
       {saveErrors.length > 0 && (
         <div role="alert" className="alert-error mb-4">
           <ul className="ml-5 list-disc">
@@ -421,24 +539,43 @@ function Workspace({
         aria-label="Note sections"
         className="sticky top-[72px] z-10 -mx-4 mb-4 overflow-x-auto bg-surface px-4 py-2 shadow-sm md:-mx-6 md:px-6"
       >
-        <div className="seg-group flex-nowrap">
-          {[
-            ...shown.map((s) => [s.key, s.title] as const),
-            ["sign", "Sign"] as const,
-          ].map(([key, title]) => (
+        <div className="flex items-center gap-2">
+          <div className="seg-group flex-nowrap">
+            {shown.map((sec) => {
+              const pr = progressOf(sec);
+              return (
+                <button
+                  key={sec.key}
+                  type="button"
+                  className="seg-btn"
+                  onClick={() => goTo(sec.key)}
+                >
+                  {sec.title}
+                  <ProgressMark progress={pr} compact />
+                </button>
+              );
+            })}
             <button
-              key={key}
               type="button"
               className="seg-btn"
-              onClick={() =>
-                document
-                  .getElementById(`enc-${key}`)
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
-              }
+              onClick={() => goTo("sign")}
             >
-              {title}
+              Sign
             </button>
-          ))}
+          </div>
+          <button
+            type="button"
+            className="btn-refresh shrink-0"
+            onClick={() =>
+              setCollapsedAndRemember(
+                collapsed.size === shown.length
+                  ? new Set()
+                  : new Set(shown.map((x) => x.key)),
+              )
+            }
+          >
+            {collapsed.size === shown.length ? "Expand all" : "Collapse all"}
+          </button>
         </div>
       </nav>
 
@@ -454,23 +591,38 @@ function Workspace({
               id={`enc-${s.key}-title`}
               className="text-2xl font-bold text-[#1565b8]"
             >
-              {s.title}
+              <button
+                id={`enc-${s.key}-toggle`}
+                type="button"
+                className="flex w-full flex-wrap items-center gap-x-3 text-left"
+                aria-expanded={!collapsed.has(s.key)}
+                aria-controls={`enc-${s.key}-body`}
+                onClick={() => toggleSection(s.key)}
+              >
+                <span aria-hidden="true" className="text-base text-text-muted">
+                  {collapsed.has(s.key) ? "▸" : "▾"}
+                </span>
+                {s.title}
+                <ProgressMark progress={progressOf(s)} />
+              </button>
             </h2>
-            <TemplateSectionFields
-              section={{
-                ...s,
-                component:
-                  s.component && AVAILABLE.has(s.component)
-                    ? s.component
-                    : null,
-              }}
-              values={values}
-              columns={columns}
-              readOnly={readOnly}
-              onChange={setValue}
-              onColumnChange={setColumn}
-              renderComponent={(c) => renderComponent(c)}
-            />
+            <div id={`enc-${s.key}-body`} hidden={collapsed.has(s.key)}>
+              <TemplateSectionFields
+                section={{
+                  ...s,
+                  component:
+                    s.component && AVAILABLE.has(s.component)
+                      ? s.component
+                      : null,
+                }}
+                values={values}
+                columns={columns}
+                readOnly={readOnly}
+                onChange={setValue}
+                onColumnChange={setColumn}
+                renderComponent={(c) => renderComponent(c)}
+              />
+            </div>
           </section>
         ))}
 
@@ -754,4 +906,54 @@ function SignCard({
       </p>
     </div>
   );
+}
+
+interface SectionProgress {
+  state: "done" | "missing" | "filled" | "empty";
+  left: number;
+}
+
+/** A section's completion: required fields all done, how many are left,
+ * or (no required fields) whether anything was entered. */
+function ProgressMark({
+  progress,
+  compact = false,
+}: {
+  progress: SectionProgress;
+  compact?: boolean;
+}) {
+  // Plain spaces between the parts keep the button's spoken name readable
+  // ("Subjective 2 required left"), not run together.
+  if (progress.state === "done")
+    return (
+      <>
+        {" "}
+        <span className="ml-2 text-base font-normal text-success">
+          <span aria-hidden="true">✓</span>{" "}
+          <span className={compact ? "sr-only" : ""}>
+            {compact ? "complete" : "Complete"}
+          </span>
+        </span>
+      </>
+    );
+  if (progress.state === "missing")
+    return (
+      <>
+        {" "}
+        <span className="ml-2 rounded-full bg-warning-light px-2 text-base font-normal text-[#7a4a00]">
+          {progress.left}{" "}
+          <span className={compact ? "sr-only" : ""}>required left</span>
+        </span>
+      </>
+    );
+  if (progress.state === "filled" && !compact)
+    return (
+      <>
+        {" "}
+        <span className="ml-2 text-base font-normal text-text-muted">
+          Entered
+        </span>
+      </>
+    );
+  return null;
 }

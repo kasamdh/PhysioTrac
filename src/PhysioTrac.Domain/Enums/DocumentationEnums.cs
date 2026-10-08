@@ -96,3 +96,59 @@ public enum FavoriteItemType
     InterventionGroup,
     OutcomeMeasure,
 }
+
+/// <summary>The scale a pain rating is recorded on.</summary>
+public enum PainScaleType
+{
+    /// <summary>0-10 numeric rating.</summary>
+    NumericRating,
+    /// <summary>0-100 mm visual analog scale.</summary>
+    VisualAnalog,
+    /// <summary>Wong-Baker faces: 0, 2, 4, 6, 8, 10.</summary>
+    Faces,
+    /// <summary>0 none, 1 mild, 2 moderate, 3 severe.</summary>
+    Verbal,
+}
+
+public enum PainFrequency
+{
+    Constant,
+    Intermittent,
+    Occasional,
+}
+
+public enum PainIrritability
+{
+    Low,
+    Moderate,
+    High,
+}
+
+public enum BodyView
+{
+    Front,
+    Back,
+}
+
+/// <summary>The patient's side (not the viewer's).</summary>
+public enum BodySide
+{
+    Left,
+    Right,
+    Bilateral,
+    Midline,
+}
+
+public enum BodyFindingType
+{
+    Pain,
+    Numbness,
+    Tingling,
+    Burning,
+    Swelling,
+    Tenderness,
+    Incision,
+    Scar,
+    Radiating,
+    Other,
+}

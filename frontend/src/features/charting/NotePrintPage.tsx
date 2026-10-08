@@ -10,6 +10,7 @@ import {
   NoteTypeLabels,
 } from "../workflow/types";
 import { fetchChartNote, fetchNoteRecord } from "./api";
+import { fetchEncounter } from "../encounter/api";
 
 const formatDate = (iso: string) => {
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -40,7 +41,17 @@ export function NotePrintPage() {
     queryFn: fetchCurrentOrganization,
   });
 
-  const ready = !!note.data && !!record.data && !!patient.data && !!org.data;
+  // The pain assessment and body chart print with the note; wait for them too.
+  const charting = useQuery({
+    queryKey: ["encounter", noteId],
+    queryFn: () => fetchEncounter(noteId),
+  });
+  const ready =
+    !!note.data &&
+    !!record.data &&
+    !!patient.data &&
+    !!org.data &&
+    !charting.isLoading;
   const printed = useRef(false);
   useEffect(() => {
     if (!ready || printed.current) return;

@@ -224,7 +224,8 @@ public partial class ClinicalNoteService : IClinicalNoteService
         // Computed after every other field above is set, so the hash covers
         // the exact content -- including the signature metadata itself --
         // that becomes immutable from this point on.
-        note.SignatureHash = ComputeContentHash(note, await CurrentFieldValuesAsync(note.Id, ct));
+        note.SignatureHash = ComputeContentHash(note, await CurrentFieldValuesAsync(note.Id, ct),
+            await CurrentPainAsync(note.Id, ct), await CurrentFindingsAsync(note.Id, ct));
         if (note.Status == NoteStatus.Signed) await ApplyFinalSignatureEffectsAsync(note, ct);
         // Same SaveChanges as the signature: the original is superseded
         // exactly when (and only if) its amendment becomes signed.
@@ -649,6 +650,20 @@ public partial class ClinicalNoteService : IClinicalNoteService
             PeriodEnd = original.PeriodEnd,
         };
         await LinkEncounterAsync(amendment, actor, ct);
+        if (await _db.PainAssessments.AsNoTracking().FirstOrDefaultAsync(p => p.NoteId == original.Id, ct) is { } originalPain)
+        {
+            originalPain.Id = Guid.NewGuid();
+            originalPain.NoteId = amendment.Id;
+            originalPain.RowVersion = [];
+            _db.PainAssessments.Add(originalPain);
+        }
+        foreach (var finding in await _db.BodyChartFindings.AsNoTracking().Where(f => f.NoteId == original.Id).ToListAsync(ct))
+        {
+            finding.Id = Guid.NewGuid();
+            finding.NoteId = amendment.Id;
+            finding.RowVersion = [];
+            _db.BodyChartFindings.Add(finding);
+        }
         foreach (var value in await _db.ClinicalNoteFieldValues.AsNoTracking().Where(v => v.NoteId == original.Id).ToListAsync(ct))
         {
             _db.ClinicalNoteFieldValues.Add(new ClinicalNoteFieldValue
@@ -891,8 +906,14 @@ public partial class ClinicalNoteService : IClinicalNoteService
     /// hashing library, no keyed HMAC) since this is an integrity check
     /// against accidental/out-of-band corruption, not a cryptographic
     /// signature meant to resist a determined attacker with DB access.</summary>
-    private static string ComputeContentHash(ClinicalNote note, IReadOnlyList<ClinicalNoteFieldValue> values)
+    private static string ComputeContentHash(ClinicalNote note, IReadOnlyList<ClinicalNoteFieldValue> values,
+        PainAssessment? pain = null, IReadOnlyList<BodyChartFinding>? findings = null)
     {
+        var charting = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Pain = pain is null ? null : ToPainDto(pain),
+            BodyChart = (findings ?? []).Select(f => ToFindingDto(f) with { Id = null }),
+        });
         var fieldValues = string.Join('\u001E', values.OrderBy(v => v.FieldKey, StringComparer.Ordinal).Select(v =>
             string.Join('\u001D', v.FieldKey, v.ValueText, v.ValueNumber, v.ValueDate, v.ValueTime, v.ValueBool, v.ValueJson)));
         var canonical = string.Join('\u001F',
@@ -901,7 +922,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
             note.DiagnosisSnapshot, note.PrecautionsSnapshot,
             note.SignatureName, note.SignatureCredentials, note.SignedAt, note.SignatureIpAddress,
             note.SubjectiveDetailsJson, note.ObjectiveMeasurementsJson, note.AmendsNoteId, note.AmendmentReason,
-            note.TemplateVersionId, fieldValues);
+            note.TemplateVersionId, fieldValues, charting);
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
@@ -937,6 +958,8 @@ public partial class ClinicalNoteService : IClinicalNoteService
             note.TemplateVersionId,
             FieldValues = (await CurrentFieldValuesAsync(note.Id, ct)).OrderBy(v => v.FieldKey)
                 .Select(v => new { v.FieldKey, v.ValueText, v.ValueNumber, v.ValueDate, v.ValueTime, v.ValueBool, v.ValueJson }),
+            Pain = (await CurrentPainAsync(note.Id, ct)) is { } pain ? ToPainDto(pain) : null,
+            BodyChart = (await CurrentFindingsAsync(note.Id, ct)).Select(ToFindingDto),
         };
         _db.ClinicalNoteVersions.Add(new ClinicalNoteVersion
         {

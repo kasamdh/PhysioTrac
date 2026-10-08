@@ -128,6 +128,17 @@ public interface IClinicalNoteService
     /// else saved since <see cref="SaveEncounterRequest.BaseSaveVersion"/>.</summary>
     Task<EncounterSaveResultDto> SaveEncounterAsync(Guid noteId, SaveEncounterRequest request, ICurrentUser actor, CancellationToken ct = default);
 
+    /// <summary>The encounter for an appointment: its note, or a new draft of
+    /// the visit's note type (one note per appointment). Refused for a
+    /// cancelled or no-show visit -- no treatment is documented for it.</summary>
+    Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Pain ratings from the patient's signed notes, oldest first.</summary>
+    Task<IReadOnlyList<PainHistoryPointDto>> GetPainHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The note's latest save (cheap; polled to warn about another editor).</summary>
+    Task<EncounterStatusDto> GetEncounterStatusAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
     /// <summary>Switches a draft to another template before any field is filled.</summary>
     Task<ClinicalNote> ChangeTemplateAsync(Guid noteId, Guid templateId, ICurrentUser actor, CancellationToken ct = default);
 

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "../../../components/Toast";
+import { useAuth } from "../../auth/AuthProvider";
+import { RoleSets, canAccess } from "../../auth/permissions";
+import { openAppointmentEncounter } from "../../encounter/api";
 import { transitionAppointment, type AppointmentAction } from "../api";
 import { isReschedulable, statusBadgeClass } from "../status";
 import { formatTime, toWallClock } from "../time";
@@ -176,6 +180,11 @@ export function AppointmentDetailsPanel({ appointment: a, timezone, canManage, c
               </button>
             )}
           </div>
+          <EncounterLinks
+            appointmentId={a.id}
+            patientId={a.patientId}
+            missed={a.status === AppointmentStatus.Cancelled || a.status === AppointmentStatus.NoShow}
+          />
           {WEB_APP_URL && (
             <div className="flex flex-wrap gap-3 text-sm">
               <a className="font-medium text-primary hover:text-primary-deep" href={`${WEB_APP_URL}/patients/${a.patientId}`} target="_blank" rel="noreferrer">
@@ -190,6 +199,33 @@ export function AppointmentDetailsPanel({ appointment: a, timezone, canManage, c
           )}
         </div>
       </aside>
+    </div>
+  );
+}
+
+/** Documentation for this visit: open (or start) its encounter, or the
+ * patient's documentation. Clinical staff only. */
+function EncounterLinks({ appointmentId, patientId, missed }: { appointmentId: string; patientId: string; missed: boolean }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [problem, setProblem] = useState<string | null>(null);
+  const open = useMutation({
+    mutationFn: () => openAppointmentEncounter(appointmentId),
+    onSuccess: (r) => navigate(`/chart/${r.noteId}`),
+    onError: (e: Error) => setProblem(e.message),
+  });
+  if (!canAccess(user, RoleSets.Clinical)) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {!missed && (
+        <button type="button" className="btn-primary" disabled={open.isPending} onClick={() => open.mutate()}>
+          {open.isPending ? "Opening…" : "Open encounter"}
+        </button>
+      )}
+      <Link className="btn-secondary" to={`/patients/${patientId}/documentation`}>
+        Patient documentation
+      </Link>
+      {problem && <p className="alert-error w-full">{problem}</p>}
     </div>
   );
 }
