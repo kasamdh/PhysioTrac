@@ -272,6 +272,8 @@ public static class AuditDescriber
         ["note.service_date_moved"] = "Moved a note's date of service with its visit",
         ["note.ai_draft_requested"] = "Asked AI to draft part of a note",
         ["note.ai_draft_inserted"] = "Inserted an AI draft into a note for review",
+        ["charges.pending_created"] = "Created pending charges from a signed note",
+        ["charges.pending_skipped"] = "Could not create pending charges from a signed note",
         ["patient_report.printed"] = "Printed a patient report",
         ["patient_report.exported"] = "Exported a patient report (PDF)",
         ["message.sent"] = "Sent a message",

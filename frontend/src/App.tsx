@@ -23,6 +23,7 @@ import { WorkflowPage } from "./features/workflow/WorkflowPage";
 import { LogsPage } from "./features/logs/LogsPage";
 import { EncounterPage } from "./features/encounter/EncounterPage";
 import { NotePrintPage } from "./features/charting/NotePrintPage";
+import { DocumentationSettingsPage } from "./features/admin/pages/DocumentationSettingsPage";
 import { PatientReportPrintPage } from "./features/printing/PatientReportPrintPage";
 import { TemplatesPage } from "./features/templates/pages/TemplatesPage";
 import { TemplateEditorPage } from "./features/templates/pages/TemplateEditorPage";
@@ -67,6 +68,7 @@ export default function App() {
                     <Route path="/admin/templates/new" element={<TemplateEditorPage />} />
                     <Route path="/admin/templates/:templateId" element={<TemplateEditorPage />} />
                     <Route path="/admin/special-tests" element={<SpecialTestsAdminPage />} />
+                    <Route path="/admin/documentation-settings" element={<DocumentationSettingsPage />} />
                   </Route>
                 </Route>
               </Routes>

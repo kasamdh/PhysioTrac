@@ -30,13 +30,18 @@ public partial class ClinicalNoteService : IClinicalNoteService
     private readonly ITenantAccessService _tenantAccess;
     private readonly IAuditService _audit;
     private readonly ISignatureVerifier _signatureVerifier;
+    private readonly IChargeService? _charges;
 
-    public ClinicalNoteService(PhysioTracDbContext db, ITenantAccessService tenantAccess, IAuditService audit, ISignatureVerifier signatureVerifier)
+    /// <param name="charges">Creates pending (Draft) charges when a note
+    /// becomes final; optional so tests that don't involve billing can omit it.</param>
+    public ClinicalNoteService(PhysioTracDbContext db, ITenantAccessService tenantAccess, IAuditService audit, ISignatureVerifier signatureVerifier,
+        IChargeService? charges = null)
     {
         _db = db;
         _tenantAccess = tenantAccess;
         _audit = audit;
         _signatureVerifier = signatureVerifier;
+        _charges = charges;
     }
 
     /// <summary>Admin/director, the author, and the clinical team (therapists
@@ -72,8 +77,11 @@ public partial class ClinicalNoteService : IClinicalNoteService
     /// <summary>Explicitly Status == Signed, not the broader IsSigned (which
     /// also covers Locked) -- a Locked note additionally blocks new
     /// addenda, the whole point of that further status.</summary>
+    /// <summary>The author, an admin/director, or the PT who cosigned the
+    /// note (a supervising PT may need to add a late entry to an assistant's
+    /// note). Amendments stay with the author or an admin/director.</summary>
     public bool CanCreateAddendum(ICurrentUser user, ClinicalNote note) =>
-        note.Status == NoteStatus.Signed && CanFinalizeNote(user, note);
+        note.Status == NoteStatus.Signed && (CanFinalizeNote(user, note) || (note.CosignedById == user.UserId && CanSignNotes(user.Role)));
 
     public bool CanLockNote(ICurrentUser user, ClinicalNote note) =>
         note.Status == NoteStatus.Signed && FinalizingRoles.Contains(user.Role);
@@ -291,6 +299,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
         {
             await AuditAmendmentAsync(note, amendedOriginal, actor, organization, ct);
             await CompleteLinkedAppointmentAsync(note, ct);
+            await CreatePendingChargesAsync(note, actor, organization, ct);
         }
         return note;
     }
@@ -394,8 +403,10 @@ public partial class ClinicalNoteService : IClinicalNoteService
 
         var dueByDayCount = lastProgressTriggeringNote?.ReassessmentDue is DateOnly due && due < today;
 
-        var visitsSince = 0;
-        if (organization.ProgressNoteDueVisitCount is int threshold)
+        // Same rule as the Documentation Dashboard: the organization's visit
+        // count, or the standard 10th visit when it sets none.
+        var threshold = organization.ProgressNoteDueVisitCount ?? DashboardRules.DefaultProgressVisitCount;
+        int visitsSince;
         {
             var sinceDate = lastProgressTriggeringNote?.ServiceDate ?? DateOnly.MinValue;
             var sinceCreatedAt = lastProgressTriggeringNote?.CreatedAt ?? DateTimeOffset.MinValue;
@@ -404,7 +415,7 @@ public partial class ClinicalNoteService : IClinicalNoteService
                 (n.NoteType == NoteType.Daily || n.NoteType == NoteType.Soap || n.NoteType == NoteType.HomeVisit) &&
                 (n.ServiceDate > sinceDate || (n.ServiceDate == sinceDate && n.CreatedAt > sinceCreatedAt)), ct);
         }
-        var dueByVisitCount = organization.ProgressNoteDueVisitCount is int t && visitsSince >= t;
+        var dueByVisitCount = visitsSince >= threshold;
 
         return new ProgressNoteStatusDto(
             dueByDayCount || dueByVisitCount, dueByDayCount, dueByVisitCount, visitsSince, lastProgressTriggeringNote?.ReassessmentDue);
@@ -477,7 +488,29 @@ public partial class ClinicalNoteService : IClinicalNoteService
         await AuditAmendmentAsync(note, amendedOriginal, actor, organization, ct);
 
         await CompleteLinkedAppointmentAsync(note, ct);
+        await CreatePendingChargesAsync(note, actor, organization, ct);
         return note;
+    }
+
+    /// <summary>A note just became final: pending (Draft) charges for
+    /// billing to review, when the organization has that on. The signature
+    /// stands whatever happens here; what was created or skipped is audited.</summary>
+    private async Task CreatePendingChargesAsync(ClinicalNote note, ICurrentUser actor, Organization organization, CancellationToken ct)
+    {
+        if (_charges is null) return;
+        PendingChargesResult result;
+        try
+        {
+            result = await _charges.CreatePendingChargesForSignedNoteAsync(note.Id, actor.UserId, ct);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotFoundException or DbUpdateException)
+        {
+            result = new PendingChargesResult(0, "Pending charges could not be created; generate them from billing.");
+        }
+        if (result.Created == 0 && result.Skipped is "Turned off for this organization." or "Charges already exist.") return;
+        await _audit.RecordAuditEventAsync(actor.UserId, result.Created > 0 ? "charges.pending_created" : "charges.pending_skipped",
+            nameof(ClinicalNote), note.Id, organization.Id, patientId: note.PatientId,
+            metadata: new { noteId = note.Id, created = result.Created, skipped = result.Skipped }, ct: ct);
     }
 
     public async Task<NoteAddendum> CreateAddendumAsync(Guid noteId, CreateAddendumRequest request, ICurrentUser actor, CancellationToken ct = default)

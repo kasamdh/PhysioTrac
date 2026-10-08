@@ -12,6 +12,7 @@ const commands: { to: string; label: string; allowed?: ReadonlySet<UserRole> }[]
   { to: "/admin/patients", label: "Patient List", allowed: RoleSets.Clinical },
   { to: "/admin/templates", label: "Documentation Templates", allowed: RoleSets.Clinical },
   { to: "/admin/special-tests", label: "Special Tests Library", allowed: RoleSets.Clinical },
+  { to: "/admin/documentation-settings", label: "Documentation Settings", allowed: RoleSets.Clinical },
   { to: "/admin/logs", label: "Logs", allowed: RoleSets.AuditLogReview },
 ];
 

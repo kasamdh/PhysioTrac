@@ -41,6 +41,11 @@ public class Organization : BaseEntity
     public int? ProgressNoteDueDays { get; set; }
     public int? ProgressNoteDueVisitCount { get; set; }
 
+    /// <summary>When a note becomes final (signed, or cosigned), create
+    /// Draft charges from its billable interventions for billing to review.
+    /// Charges are never submitted automatically.</summary>
+    public bool AutoCreatePendingCharges { get; set; } = true;
+
     /// <summary>Which timed-minutes-to-units table ChargeService.GenerateFromNoteAsync
     /// uses when computing a generated charge's recommended units -- see
     /// EightMinuteRuleVariant's own doc comment.</summary>

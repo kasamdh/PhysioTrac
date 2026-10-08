@@ -581,7 +581,7 @@ export const pageHelp: Record<string, PageHelp> = {
             <Term name="Cosign note">Review the note, re-enter your password and cosign. The visit then completes.</Term>
             <Term name="Return for correction…">Sends the note back to the assistant with what needs correcting (required). It can be edited again and resubmitted.</Term>
             <Term name="Void this note…">For a note that shouldn’t be part of the record, such as one written for the wrong patient. A reason is required; a signed note also needs your password, and only its author PT or an administrator can void it. The note is kept, marked Voided. A plan of care it created is voided and the plan it replaced becomes active again. Voiding can’t be undone.</Term>
-            <Term name="+ Add addendum">Adds a dated late entry or clarification under the signed note, with a reason. The signed note itself doesn’t change.</Term>
+            <Term name="+ Add addendum">Adds a dated late entry or clarification under the signed note, with a reason. The signed note itself doesn’t change. The note’s author, the PT who cosigned it, or an administrator or director can add one.</Term>
             <Term name="Amend note">Corrects the signed note: enter the reason, and you get a copy of the note to edit and sign. Once the amendment is signed it replaces the original, which stays viewable marked “Amended”.</Term>
             <Term name="Lock note">Administrators and directors: closes the note to further addenda and amendments (for example when billing has closed).</Term>
             <Term name="Print / PDF">Opens the note as a printable document with the signature block, and the clinic, patient, MRN and page numbers on every page. Use Print, or Save as PDF for a file. Times are shown in the clinic’s time zone. Every print and export is recorded in the audit log.</Term>
@@ -818,6 +818,32 @@ export const pageHelp: Record<string, PageHelp> = {
     ],
   },
 
+  "documentation-settings": {
+    title: "Documentation Settings",
+    intro: <p>Clinic-wide documentation rules. Administrators and directors can change them; others can view them.</p>,
+    sections: [
+      {
+        id: "progress",
+        title: "Progress notes",
+        body: (
+          <>
+            <Term name="Treatment visits before a progress note is due">After this many signed treatment visits since the evaluation or last progress note, the progress note shows as due on the Documentation Dashboard and in the patient’s documentation.</Term>
+            <Term name="Days before a progress note is due">Counted from the evaluation or last progress note. A progress note is due at whichever comes first. An empty visits box uses the standard 10th visit; an empty days box turns the day trigger off.</Term>
+          </>
+        ),
+      },
+      {
+        id: "signing",
+        title: "Signing",
+        body: (
+          <>
+            <Term name="Assistants’ notes need a PT cosignature">When on, an assistant’s signed note goes to a PT for review and cosign before it is final. Applies to notes started after the change. Evaluations, re-evaluations, recertifications, progress notes and discharges written by an assistant always need one.</Term>
+            <Term name="Create pending charges when a note is signed">When a note becomes final, Draft charges are created from its billable interventions for billing to review. Nothing is submitted automatically. An assistant’s note is charged when cosigned; an amendment doesn’t charge the visit again. If billing isn’t set up (for example a missing CPT mapping), the note is still signed and the Logs page records what was skipped.</Term>
+          </>
+        ),
+      },
+    ],
+  },
   locations: {
     title: "Locations",
     intro: <p>Your organization’s clinic locations. They appear in the schedule, patient records and provider hours.</p>,
@@ -910,6 +936,7 @@ export function helpKeyFor(pathname: string): string {
   if (pathname.startsWith("/admin/logs")) return "logs";
   if (pathname.startsWith("/admin/templates")) return "templates";
   if (pathname.startsWith("/admin/special-tests")) return "special-tests";
+  if (pathname.startsWith("/admin/documentation-settings")) return "documentation-settings";
   if (pathname.startsWith("/admin/locations")) return "locations";
   if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/change-password")) return "change-password";

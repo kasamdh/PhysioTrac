@@ -237,4 +237,24 @@ public class PtNoteTypesPhase5BTests
         Assert.False(status.DueByDayCount);
         Assert.False(status.DueByVisitCount);
     }
+
+    [Fact]
+    public async Task GetProgressNoteStatus_UsesTheStandardTenthVisit_WhenNoVisitCountIsConfigured()
+    {
+        var therapistUserId = Guid.NewGuid();
+        var (db, service, org, patient) = NewService(assignedTherapistId: therapistUserId);
+        var therapist = Therapist(org.Id, therapistUserId);
+
+        db.ClinicalNotes.Add(SignedNote(patient.Id, therapist.UserId, NoteType.Evaluation, DateOnly.FromDateTime(DateTime.Today.AddDays(-40))));
+        for (var i = 9; i >= 1; i--)
+            db.ClinicalNotes.Add(SignedNote(patient.Id, therapist.UserId, NoteType.Daily, DateOnly.FromDateTime(DateTime.Today.AddDays(-i * 3))));
+        await db.SaveChangesAsync();
+        Assert.False((await service.GetProgressNoteStatusAsync(patient.Id, therapist)).IsDue); // 9 visits
+
+        db.ClinicalNotes.Add(SignedNote(patient.Id, therapist.UserId, NoteType.Daily, DateOnly.FromDateTime(DateTime.Today)));
+        await db.SaveChangesAsync();
+        var status = await service.GetProgressNoteStatusAsync(patient.Id, therapist);
+        Assert.True(status.DueByVisitCount); // the 10th, as on the Documentation Dashboard
+        Assert.Equal(10, status.VisitsSinceLastProgressNote);
+    }
 }
