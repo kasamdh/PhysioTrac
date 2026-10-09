@@ -2,14 +2,23 @@ using PhysioTrac.Domain.Enums;
 
 namespace PhysioTrac.Application.Scheduling;
 
+/// <param name="UserId">The staff login this provider signs in with (null = none).</param>
 public record ProviderDto(
     Guid Id, string FirstName, string LastName, string FullName, string? Specialty, string? Credentials,
     string? NpiNumber, bool IsActive, bool OnlineBookingEnabled, IReadOnlyList<Guid> LocationIds,
-    ProviderDiscipline Discipline, bool HasLogin);
+    ProviderDiscipline Discipline, bool HasLogin, Guid? UserId = null);
 
-public record CreateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, Guid? UserId, IReadOnlyList<Guid>? LocationIds);
+public record CreateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, Guid? UserId, IReadOnlyList<Guid>? LocationIds,
+    ProviderDiscipline Discipline = ProviderDiscipline.Other, bool OnlineBookingEnabled = true);
 
-public record UpdateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, bool IsActive, IReadOnlyList<Guid>? LocationIds);
+/// <param name="Discipline">Null keeps the current discipline.</param>
+/// <param name="OnlineBookingEnabled">Null keeps the current setting.</param>
+/// <param name="UpdateLogin">When true, <paramref name="UserId"/> replaces the linked login (null unlinks it).</param>
+public record UpdateProviderRequest(string FirstName, string LastName, string? Specialty, string? Credentials, string? NpiNumber, bool IsActive, IReadOnlyList<Guid>? LocationIds,
+    ProviderDiscipline? Discipline = null, bool? OnlineBookingEnabled = null, bool UpdateLogin = false, Guid? UserId = null);
+
+/// <summary>A staff login that can be linked to a provider.</summary>
+public record LinkableUserDto(Guid Id, string Name, string UserName, string Role);
 
 public record AppointmentTypeDto(
     Guid Id, string Name, string? Description, int DefaultDurationMinutes, decimal? Price,

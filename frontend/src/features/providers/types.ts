@@ -22,4 +22,27 @@ export interface Provider {
   locationIds: string[];
   discipline: ProviderDiscipline;
   hasLogin: boolean;
+  /** The linked staff login (null = none). */
+  userId?: string | null;
+}
+
+// Matches CreateProviderRequest / UpdateProviderRequest (blank text -> null).
+export interface ProviderInput {
+  firstName: string;
+  lastName: string;
+  credentials: string | null;
+  specialty: string | null;
+  npiNumber: string | null;
+  discipline: ProviderDiscipline;
+  onlineBookingEnabled: boolean;
+  locationIds: string[];
+  userId: string | null;
+}
+
+// Matches LinkableUserDto.
+export interface LinkableUser {
+  id: string;
+  name: string;
+  userName: string;
+  role: string;
 }

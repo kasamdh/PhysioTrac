@@ -1,10 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { RowMenu } from "../../components/RowMenu";
 import { SegmentedButtons } from "../../components/SegmentedButtons";
+import { useToast } from "../../components/Toast";
 import { fetchLocations } from "../admin/api";
-import { fetchProviders } from "./api";
-import { DisciplineLabels, ProviderDiscipline } from "./types";
+import { useAuth } from "../auth/AuthProvider";
+import { RoleSets, canAccess } from "../auth/permissions";
+import { deleteProvider, fetchProviders, setProviderActive } from "./api";
+import { ProviderDialog } from "./ProviderDialog";
+import { DisciplineLabels, ProviderDiscipline, type Provider } from "./types";
 
 type DisciplineFilter = "all" | "pt" | "pta" | "other";
 type StatusFilter = "active" | "inactive" | "all";
@@ -15,8 +20,16 @@ const disciplineOf: Record<Exclude<DisciplineFilter, "all">, ProviderDiscipline>
   other: ProviderDiscipline.Other,
 };
 
-/** Every provider in the organization. Filters live in the URL. */
+/** Every provider in the organization: add, edit, deactivate and delete.
+ * Filters live in the URL. */
 export function ProvidersPage() {
+  const { user } = useAuth();
+  const canEdit = canAccess(user, RoleSets.Scheduling);
+  const canDelete = canAccess(user, RoleSets.OrganizationAdministration);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+  // null = closed, "new" = adding, otherwise the provider being edited.
+  const [editing, setEditing] = useState<Provider | "new" | null>(null);
   const [params, setParams] = useSearchParams();
   const discipline = (params.get("discipline") as DisciplineFilter | null) ?? "all";
   const status = (params.get("status") as StatusFilter | null) ?? "active";
@@ -38,6 +51,28 @@ export function ProvidersPage() {
   const locations = useQuery({ queryKey: ["admin", "locations", true], queryFn: () => fetchLocations(true) });
   const locationName = new Map((locations.data ?? []).map((l) => [l.id, l.name]));
 
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["providers"] });
+    // The schedule's provider list and calendars read providers too.
+    void queryClient.invalidateQueries({ queryKey: ["schedule"] });
+  };
+  const toggleActive = useMutation({
+    mutationFn: (p: Provider) => setProviderActive(p, !p.isActive),
+    onSuccess: (p) => {
+      showToast(`${p.fullName} ${p.isActive ? "reactivated" : "deactivated"}.`);
+      refresh();
+    },
+    onError: (e: Error) => showToast(e.message),
+  });
+  const remove = useMutation({
+    mutationFn: (p: Provider) => deleteProvider(p.id).then(() => p),
+    onSuccess: (p) => {
+      showToast(`${p.fullName} deleted.`);
+      refresh();
+    },
+    onError: (e: Error) => showToast(e.message),
+  });
+
   const term = search.trim().toLowerCase();
   const rows = (providers.data ?? []).filter(
     (p) =>
@@ -49,7 +84,28 @@ export function ProvidersPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold text-[#1565b8]">Providers</h1>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-[#1565b8]">Providers</h1>
+        {canEdit && (
+          <button type="button" className="btn-primary" onClick={() => setEditing("new")}>
+            + Add provider
+          </button>
+        )}
+      </div>
+
+      {editing && (
+        <ProviderDialog
+          key={editing === "new" ? "new" : editing.id}
+          existing={editing === "new" ? null : editing}
+          locations={locations.data ?? []}
+          onClose={() => setEditing(null)}
+          onSaved={(p, isNew) => {
+            showToast(`${p.fullName} ${isNew ? "added" : "saved"}.`);
+            setEditing(null);
+            refresh();
+          }}
+        />
+      )}
 
       <div className="list-toolbar">
         <SegmentedButtons
@@ -131,15 +187,58 @@ export function ProvidersPage() {
                     <RowMenu
                       label={`Actions for ${p.fullName}`}
                       items={[
+                        ...(canEdit ? [{ label: "Edit", onSelect: () => setEditing(p) }] : []),
                         { label: "View today's schedule", to: `/schedule?view=day&provider=${p.id}` },
                         { label: "Working hours & time off", to: `/schedule/hours?provider=${p.id}` },
+                        ...(canEdit
+                          ? [
+                              {
+                                label: p.isActive ? "Deactivate" : "Reactivate",
+                                danger: p.isActive,
+                                disabled: toggleActive.isPending,
+                                onSelect: () => {
+                                  if (
+                                    p.isActive &&
+                                    !window.confirm(
+                                      `Deactivate ${p.fullName}? They will no longer be offered for scheduling. Their history is kept.`,
+                                    )
+                                  )
+                                    return;
+                                  toggleActive.mutate(p);
+                                },
+                              },
+                            ]
+                          : []),
+                        ...(canDelete
+                          ? [
+                              {
+                                label: "Delete",
+                                danger: true,
+                                disabled: remove.isPending,
+                                onSelect: () => {
+                                  if (
+                                    window.confirm(
+                                      `Delete ${p.fullName}? Only a provider with no appointments, notes or charges can be deleted; otherwise deactivate them.`,
+                                    )
+                                  )
+                                    remove.mutate(p);
+                                },
+                              },
+                            ]
+                          : []),
                       ]}
                     />
                   </td>
                   <td data-label="Name">
-                    <Link to={`/schedule/hours?provider=${p.id}`} className="table-link">
-                      {p.fullName}
-                    </Link>
+                    {canEdit ? (
+                      <button type="button" className="table-link text-left" onClick={() => setEditing(p)}>
+                        {p.fullName}
+                      </button>
+                    ) : (
+                      <Link to={`/schedule/hours?provider=${p.id}`} className="table-link">
+                        {p.fullName}
+                      </Link>
+                    )}
                   </td>
                   <td data-label="Discipline">{DisciplineLabels[p.discipline]}</td>
                   <td data-label="Credentials">{p.credentials}</td>

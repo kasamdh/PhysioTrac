@@ -316,9 +316,22 @@ export const pageHelp: Record<string, PageHelp> = {
         title: "The list",
         body: (
           <>
-            <Term name="Name (blue)">Opens that provider’s working hours and time off.</Term>
-            <Term name="☰ menu">View today’s schedule, or Working hours &amp; time off.</Term>
+            <Term name="Name (blue)">Opens the Edit Provider window (for staff who can’t edit providers, their working hours and time off).</Term>
+            <Term name="☰ menu">Edit, View today’s schedule, Working hours &amp; time off, Deactivate or Reactivate, and Delete.</Term>
             <Term name="Login">Yes when the provider has their own PhysioTrac sign-in (needed to have patients assigned).</Term>
+          </>
+        ),
+      },
+      {
+        id: "add-edit",
+        title: "Adding, editing and removing",
+        body: (
+          <>
+            <Term name="+ Add provider">Opens the Add Provider window. First and last name are required (marked in red until filled). An NPI is 10 digits and can’t be used by two providers in your clinic.</Term>
+            <Term name="Discipline">PT, PTA or Other. A PTA can’t be booked for evaluations, re-evaluations or discharges.</Term>
+            <Term name="Login">The staff account this provider signs in with: a therapist, assistant, director or administrator in your clinic who isn’t already linked to another provider. Choose No login to unlink it.</Term>
+            <Term name="Deactivate">The provider is no longer offered for scheduling; their history is kept. Reactivate brings them back.</Term>
+            <Term name="Delete">Administrators and directors only, for a provider added by mistake. A provider with appointments, notes or charges can’t be deleted; deactivate them instead.</Term>
           </>
         ),
       },
