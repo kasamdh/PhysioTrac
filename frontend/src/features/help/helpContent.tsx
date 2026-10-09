@@ -831,6 +831,39 @@ export const pageHelp: Record<string, PageHelp> = {
     ],
   },
 
+  exercises: {
+    title: "Exercise Library",
+    intro: <p>Exercises for home exercise programs, with patient-friendly instructions, safety information and images.</p>,
+    sections: [
+      {
+        id: "find",
+        title: "Finding exercises",
+        body: (
+          <>
+            <Term name="Search">Matches the exercise name, target muscles, equipment and description.</Term>
+            <Term name="Filters">Body region, category, difficulty and equipment.</Term>
+            <Term name="View details">The full exercise: a large image and its numbered steps, instructions, precautions, contraindications and progressions.</Term>
+            <Term name="Needs clinical review">Starter exercises written without clinical sign-off. A clinician who may edit the exercise confirms it with Mark as reviewed.</Term>
+            <Term name="Platform / Clinic">Platform exercises are shared with every clinic and changed only by the platform. Clinic exercises belong to your clinic alone.</Term>
+          </>
+        ),
+      },
+      {
+        id: "images",
+        title: "Images",
+        body: (
+          <>
+            <Term name="Upload">Administrators, directors and therapists add images to their clinic’s exercises: JPEG, PNG or WebP up to 10 MB. Each image needs a description for people using screen readers.</Term>
+            <Term name="Which images">Use only images your clinic owns or is licensed to use, showing this exact exercise done correctly. Record where it came from under Source / licence.</Term>
+            <Term name="Steps">For a movement, upload the steps in order (starting position, movement, ending position). Move them with ↑ Up and ↓ Down.</Term>
+            <Term name="Replace / Remove">The old image is kept for programs that already used it, so a patient’s printed program never changes.</Term>
+            <Term name="Image pending approval">Shown where an exercise has no image yet.</Term>
+          </>
+        ),
+      },
+    ],
+  },
+
   "documentation-settings": {
     title: "Documentation Settings",
     intro: <p>Clinic-wide documentation rules. Administrators and directors can change them; others can view them.</p>,
@@ -950,6 +983,7 @@ export function helpKeyFor(pathname: string): string {
   if (pathname.startsWith("/admin/templates")) return "templates";
   if (pathname.startsWith("/admin/special-tests")) return "special-tests";
   if (pathname.startsWith("/admin/documentation-settings")) return "documentation-settings";
+  if (pathname.startsWith("/exercises")) return "exercises";
   if (pathname.startsWith("/admin/locations")) return "locations";
   if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/change-password")) return "change-password";

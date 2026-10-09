@@ -51,6 +51,8 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<SpecialTestDefinition> SpecialTestDefinitions => Set<SpecialTestDefinition>();
     public DbSet<SpecialTestResult> SpecialTestResults => Set<SpecialTestResult>();
     public DbSet<InterventionLibraryItem> InterventionLibraryItems => Set<InterventionLibraryItem>();
+    public DbSet<Exercise> Exercises => Set<Exercise>();
+    public DbSet<ExerciseMedia> ExerciseMedia => Set<ExerciseMedia>();
     public DbSet<InterventionGroup> InterventionGroups => Set<InterventionGroup>();
     public DbSet<InterventionGroupItem> InterventionGroupItems => Set<InterventionGroupItem>();
     public DbSet<FunctionalGoal> FunctionalGoals => Set<FunctionalGoal>();
@@ -690,6 +692,43 @@ public class PhysioTracDbContext : IdentityDbContext<ApplicationUser, IdentityRo
             e.Property(i => i.Modification).HasMaxLength(200);
             e.Property(i => i.PatientResponse).HasMaxLength(1000);
             e.Property(i => i.Comment).HasMaxLength(1000);
+        });
+
+        builder.Entity<Exercise>(e =>
+        {
+            // Codes are unique per clinic, and among platform exercises.
+            e.HasIndex(x => x.Code).IsUnique().HasFilter("[OrganizationId] IS NULL");
+            e.HasIndex(x => new { x.OrganizationId, x.Code }).IsUnique().HasFilter("[OrganizationId] IS NOT NULL");
+            e.HasIndex(x => new { x.OrganizationId, x.IsActive, x.BodyRegion });
+            e.Property(x => x.Code).HasMaxLength(80);
+            e.Property(x => x.Name).HasMaxLength(150);
+            e.Property(x => x.BodyRegion).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Difficulty).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Position).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Laterality).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.TargetMuscles).HasMaxLength(300);
+            e.Property(x => x.Equipment).HasMaxLength(300);
+            e.Property(x => x.VideoUrl).HasMaxLength(500);
+            foreach (var text in new[] { nameof(Exercise.PatientDescription), nameof(Exercise.ClinicalPurpose), nameof(Exercise.StartingPosition),
+                nameof(Exercise.EndingPosition), nameof(Exercise.BreathingInstructions), nameof(Exercise.CommonMistakes),
+                nameof(Exercise.SafetyPrecautions), nameof(Exercise.Contraindications), nameof(Exercise.Progressions), nameof(Exercise.Regressions) })
+                e.Property(text).HasMaxLength(2000);
+            e.Property(x => x.Instructions).HasMaxLength(4000);
+            e.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ExerciseMedia>(e =>
+        {
+            e.HasIndex(m => new { m.ExerciseId, m.RetiredAt, m.Sequence });
+            e.Property(m => m.StorageKey).HasMaxLength(200);
+            e.Property(m => m.ThumbnailStorageKey).HasMaxLength(200);
+            e.Property(m => m.ContentType).HasMaxLength(50);
+            e.Property(m => m.AltText).HasMaxLength(300);
+            e.Property(m => m.Caption).HasMaxLength(150);
+            e.Property(m => m.SourceAttribution).HasMaxLength(300);
+            e.Property(m => m.OriginalFileName).HasMaxLength(200);
+            e.HasOne(m => m.Exercise).WithMany(x => x.Media).HasForeignKey(m => m.ExerciseId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<InterventionLibraryItem>(e =>

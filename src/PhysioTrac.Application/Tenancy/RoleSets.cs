@@ -44,6 +44,14 @@ public static class RoleSets
         UserRole.Admin, UserRole.Director
     ]);
 
+    /// <summary>Adds and edits the clinic's own exercises and exercise
+    /// images (hep.manage_exercise_library / hep.manage_exercise_images).
+    /// Platform exercises are changed only by the platform super admin.</summary>
+    public static readonly IReadOnlySet<UserRole> ExerciseLibrary = new RoleSet(
+    [
+        UserRole.Admin, UserRole.Director, UserRole.Therapist
+    ]);
+
     /// <summary>May knowingly book outside a provider's availability, or
     /// double-book when the organization allows it, with a recorded reason
     /// (audited as schedule.conflict_override). PTs and PTAs have the same

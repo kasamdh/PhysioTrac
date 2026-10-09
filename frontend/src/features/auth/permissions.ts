@@ -17,6 +17,7 @@ export const RoleSets = {
     UserRole.Biller,
   ]),
   OrganizationAdministration: new Set<UserRole>([UserRole.Admin, UserRole.Director]),
+  ExerciseLibrary: new Set<UserRole>([UserRole.Admin, UserRole.Director, UserRole.Therapist]),
   AuditLogReview: new Set<UserRole>([UserRole.Admin, UserRole.Director, UserRole.Compliance]),
 } as const;
 

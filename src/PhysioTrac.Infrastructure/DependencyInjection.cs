@@ -84,6 +84,8 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IPlatformDashboardService, PlatformDashboardService>();
         services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddSingleton<IExerciseImageProcessor, PhysioTrac.Infrastructure.Media.SkiaExerciseImageProcessor>();
+        services.AddScoped<IExerciseLibraryService, ExerciseLibraryService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConsentService, ConsentService>();
         services.AddScoped<IConsentTemplateService, ConsentTemplateService>();

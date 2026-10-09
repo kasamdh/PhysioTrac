@@ -44,6 +44,10 @@ export function clearCsrfToken(): void {
   csrfToken = null;
 }
 
+/** Absolute address of an API resource (e.g. an image for an <img> tag;
+ * the session cookie goes with it, so access is still checked). */
+export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
+
 export interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
@@ -60,8 +64,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const method = options.method ?? "GET";
   const headers: Record<string, string> = {};
 
-  let body: string | undefined;
-  if (options.body !== undefined) {
+  let body: string | FormData | undefined;
+  if (options.body instanceof FormData) {
+    // File uploads: the browser sets the multipart boundary itself.
+    body = options.body;
+  } else if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(options.body);
   }

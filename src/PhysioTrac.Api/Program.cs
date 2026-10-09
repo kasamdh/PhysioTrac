@@ -232,6 +232,7 @@ if (app.Environment.IsDevelopment())
         await SystemTemplateSeeder.SeedAsync(db);
         await SpecialTestSeeder.SeedAsync(db);
         await InterventionLibrarySeeder.SeedAsync(db);
+        await ExerciseLibrarySeeder.SeedAsync(db);
     }
 }
 
