@@ -1,0 +1,401 @@
+@page "/locations"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using PhysioTrac.Application.Tenancy
+@using PhysioTrac.Domain.Entities
+@using PhysioTrac.Infrastructure.Persistence
+@inject ICurrentUser CurrentUser
+@inject ITenantAccessService TenantAccess
+@inject PhysioTracDbContext Db
+
+<PageTitle>Locations — PhysioTrac</PageTitle>
+
+<h1 class="mb-4 text-xl font-semibold text-text">Locations</h1>
+
+@if (_error is not null)
+{
+    <p class="alert-error">@_error</p>
+}
+else if (_locations is null)
+{
+    <p class="text-text-muted">Loading…</p>
+}
+else
+{
+    <div class="card">
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            @if (CanManage)
+            {
+                <button class="btn-primary" @onclick="StartNew">@(_editing is not null && _editingId is null ? "Cancel" : "New location")</button>
+            }
+            <label class="flex items-center gap-2 text-sm text-text-muted">
+                <input type="checkbox" checked="@_showInactive" @onchange="ToggleInactive" /> Show inactive
+            </label>
+        </div>
+
+        @if (_editing is not null)
+        {
+            <div class="mb-4 max-w-2xl rounded-lg border border-border bg-surface-muted p-4">
+                <h2 class="section-title">@(_editingId is null ? "New location" : $"Edit {_editing.Name}")</h2>
+                @if (_formError is not null)
+                {
+                    <p class="alert-error mb-3">@_formError</p>
+                }
+                <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                    <label class="field-label">Name * <input @bind="_editing.Name" class="field-input" maxlength="200" /></label>
+                    <label class="field-label">Phone <input @bind="_editing.Phone" class="field-input" /></label>
+                    <label class="field-label">Address line 1 <input @bind="_editing.AddressLine1" class="field-input" /></label>
+                    <label class="field-label">Address line 2 <input @bind="_editing.AddressLine2" class="field-input" /></label>
+                    <label class="field-label">City <input @bind="_editing.City" class="field-input" /></label>
+                    <label class="field-label">
+                        State *
+                        <select @bind="_editing.State" class="field-input">
+                            <option value="">Select state…</option>
+                            @foreach (var stateCode in StateCodes)
+                            {
+                                <option value="@stateCode">@stateCode</option>
+                            }
+                        </select>
+                    </label>
+                    <label class="field-label">ZIP code <input @bind="_editing.ZipCode" class="field-input" maxlength="10" /></label>
+                    <label class="field-label">
+                        Time zone *
+                        <select @bind="_editing.Timezone" class="field-input">
+                            @foreach (var (id, label) in TimeZones)
+                            {
+                                <option value="@id">@label</option>
+                            }
+                        </select>
+                    </label>
+                    <label class="field-label">NPI (organization) <input @bind="_editing.NpiNumber" class="field-input" maxlength="10" /></label>
+                    <label class="field-label">Tax ID <input @bind="_editing.TaxId" class="field-input" /></label>
+                </div>
+                <p class="mb-3 text-xs text-text-muted">
+                    The state decides which provider licenses count here; the time zone is what the schedule shows for this clinic.
+                </p>
+                <button class="btn-primary" @onclick="Save">Save</button>
+                <button class="btn-secondary ml-3" @onclick="CancelEdit">Cancel</button>
+            </div>
+        }
+
+        @if (_confirmDeactivate is not null)
+        {
+            <div class="mb-4 rounded-lg border border-danger bg-danger-light p-4 text-sm text-danger" role="alert">
+                <p class="font-semibold">Deactivate @_confirmDeactivate.Location.Name?</p>
+                <p class="mt-1">
+                    It stops being offered for new bookings and hours. Nothing is deleted, and it can be reactivated.
+                    @if (_confirmDeactivate.UpcomingAppointments > 0 || _confirmDeactivate.WeeklyHours > 0)
+                    {
+                        <span class="block mt-1">
+                            Still using it: @_confirmDeactivate.UpcomingAppointments upcoming appointment(s) and
+                            @_confirmDeactivate.WeeklyHours provider working-hour block(s) — move those first if the clinic is closing.
+                        </span>
+                    }
+                </p>
+                <div class="mt-3">
+                    <button class="link-danger" @onclick="ConfirmDeactivate">Yes, deactivate</button>
+                    <button class="btn-secondary ml-3" @onclick="() => _confirmDeactivate = null">Keep it active</button>
+                </div>
+            </div>
+        }
+
+        @if (_locations.Count == 0)
+        {
+            <p class="text-text-muted">No locations yet.</p>
+        }
+        else
+        {
+            <div class="overflow-hidden rounded-lg border border-border">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Address</th>
+                            <th>Phone</th>
+                            <th>Time zone</th>
+                            <th>Providers</th>
+                            <th>Status</th>
+                            @if (CanManage)
+                            {
+                                <th></th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var location in _locations)
+                        {
+                            <tr>
+                                <td class="font-medium text-text">@location.Name</td>
+                                <td>@Address(location)</td>
+                                <td>@(location.Phone ?? "—")</td>
+                                <td>@TimeZoneLabel(location.Timezone)</td>
+                                <td>@_providerCounts.GetValueOrDefault(location.Id)</td>
+                                <td><StatusPill Text="@(location.IsActive ? "Active" : "Inactive")" /></td>
+                                @if (CanManage)
+                                {
+                                    <td class="whitespace-nowrap">
+                                        <button class="btn-secondary" @onclick="() => StartEdit(location)">Edit</button>
+                                        @if (location.IsActive)
+                                        {
+                                            <button class="link-danger ml-3" @onclick="() => AskDeactivate(location)">Deactivate</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-secondary ml-3" @onclick="() => SetActive(location, true)">Reactivate</button>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private sealed class LocationForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? AddressLine1 { get; set; }
+        public string? AddressLine2 { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? ZipCode { get; set; }
+        public string? Phone { get; set; }
+        public string Timezone { get; set; } = "America/New_York";
+        public string? NpiNumber { get; set; }
+        public string? TaxId { get; set; }
+    }
+
+    private sealed record DeactivateCheck(Location Location, int UpcomingAppointments, int WeeklyHours);
+
+    /// <summary>US clinic time zones (IANA ids, which .NET resolves on
+    /// Windows and Linux alike).</summary>
+    private static readonly (string Id, string Label)[] TimeZones =
+    [
+        ("America/New_York", "Eastern"),
+        ("America/Chicago", "Central"),
+        ("America/Denver", "Mountain"),
+        ("America/Phoenix", "Arizona (no DST)"),
+        ("America/Los_Angeles", "Pacific"),
+        ("America/Anchorage", "Alaska"),
+        ("Pacific/Honolulu", "Hawaii"),
+    ];
+
+    /// <summary>USPS codes for the 50 states, DC, and territories -- the
+    /// same codes ProviderLicense.State uses, so the license check matches.</summary>
+    private static readonly string[] StateCodes =
+    [
+        "AK", "AL", "AR", "AS", "AZ", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "GU", "HI", "IA", "ID", "IL", "IN", "KS", "KY",
+        "LA", "MA", "MD", "ME", "MI", "MN", "MO", "MP", "MS", "MT", "NC", "ND", "NE", "NH", "NJ", "NM", "NV", "NY", "OH", "OK",
+        "OR", "PA", "PR", "RI", "SC", "SD", "TN", "TX", "UT", "VA", "VI", "VT", "WA", "WI", "WV", "WY",
+    ];
+
+    private List<Location>? _locations;
+    private Dictionary<Guid, int> _providerCounts = new();
+    private string? _error;
+    private string? _formError;
+    private bool _showInactive;
+    private LocationForm? _editing;
+    private Guid? _editingId;
+    private DeactivateCheck? _confirmDeactivate;
+    private Guid _organizationId;
+    private string _organizationTimezone = "America/New_York";
+
+    /// <summary>Same gate as the Api's LocationsController (Admin, Director).</summary>
+    private bool CanManage => RoleSets.OrganizationAdministration.Contains(CurrentUser.Role);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var organization = await TenantAccess.OrganizationRequiredAsync(CurrentUser);
+            _organizationId = organization.Id;
+            _organizationTimezone = organization.Timezone;
+            _locations = await Db.Locations
+                .Where(l => l.OrganizationId == organization.Id && (_showInactive || l.IsActive))
+                .OrderBy(l => l.Name)
+                .ToListAsync();
+            var ids = _locations.Select(l => l.Id).ToList();
+            _providerCounts = await Db.Providers
+                .Where(p => p.OrganizationId == organization.Id && p.IsActive)
+                .SelectMany(p => p.Locations.Where(l => ids.Contains(l.Id)).Select(l => l.Id))
+                .GroupBy(id => id)
+                .ToDictionaryAsync(g => g.Key, g => g.Count());
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ToggleInactive(ChangeEventArgs e)
+    {
+        _showInactive = e.Value is true;
+        await LoadAsync();
+    }
+
+    private void StartNew()
+    {
+        _formError = null;
+        _confirmDeactivate = null;
+        if (_editing is not null && _editingId is null)
+        {
+            _editing = null;
+            return;
+        }
+        _editingId = null;
+        _editing = new LocationForm { Timezone = TimeZones.Any(t => t.Id == _organizationTimezone) ? _organizationTimezone : "America/New_York" };
+    }
+
+    private void StartEdit(Location location)
+    {
+        _formError = null;
+        _confirmDeactivate = null;
+        _editingId = location.Id;
+        _editing = new LocationForm
+        {
+            Name = location.Name,
+            AddressLine1 = location.AddressLine1,
+            AddressLine2 = location.AddressLine2,
+            City = location.City,
+            State = location.State,
+            ZipCode = location.ZipCode,
+            Phone = location.Phone,
+            Timezone = location.Timezone,
+            NpiNumber = location.NpiNumber,
+            TaxId = location.TaxId,
+        };
+    }
+
+    private void CancelEdit()
+    {
+        _editing = null;
+        _editingId = null;
+        _formError = null;
+    }
+
+    private async Task Save()
+    {
+        _formError = null;
+        if (!RequireManage() || _editing is null) return;
+
+        var name = _editing.Name.Trim();
+        var state = Clean(_editing.State)?.ToUpperInvariant();
+        if (name.Length == 0)
+        {
+            _formError = "A location name is required.";
+            return;
+        }
+        if (state is null || !StateCodes.Contains(state))
+        {
+            _formError = "Choose the state -- provider licenses are checked against it.";
+            return;
+        }
+        if (!TimeZoneInfo.TryFindSystemTimeZoneById(_editing.Timezone, out _))
+        {
+            _formError = "Choose a valid time zone.";
+            return;
+        }
+        if (await Db.Locations.AnyAsync(l => l.OrganizationId == _organizationId && l.Id != _editingId && l.Name == name))
+        {
+            _formError = $"There's already a location named {name}.";
+            return;
+        }
+
+        var location = _editingId is Guid id
+            ? await Db.Locations.FirstOrDefaultAsync(l => l.Id == id && l.OrganizationId == _organizationId)
+            : new Location { OrganizationId = _organizationId };
+        if (location is null)
+        {
+            _formError = "That location no longer exists.";
+            return;
+        }
+
+        location.Name = name;
+        location.AddressLine1 = Clean(_editing.AddressLine1);
+        location.AddressLine2 = Clean(_editing.AddressLine2);
+        location.City = Clean(_editing.City);
+        location.State = state;
+        location.ZipCode = Clean(_editing.ZipCode);
+        location.Phone = Clean(_editing.Phone);
+        location.Timezone = _editing.Timezone;
+        location.NpiNumber = Clean(_editing.NpiNumber);
+        location.TaxId = Clean(_editing.TaxId);
+        if (_editingId is null)
+        {
+            Db.Locations.Add(location);
+        }
+        else
+        {
+            location.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        await Db.SaveChangesAsync();
+
+        CancelEdit();
+        await LoadAsync();
+    }
+
+    /// <summary>Deactivating is the only "delete": appointments, provider
+    /// hours, and history point at a location, so it's hidden from new use
+    /// rather than removed -- the same as the Api's PATCH .../deactivate.</summary>
+    private async Task AskDeactivate(Location location)
+    {
+        _editing = null;
+        var now = DateTimeOffset.UtcNow;
+        var upcoming = await Db.Appointments.CountAsync(a =>
+            a.LocationDetailId == location.Id && a.StartsAt > now &&
+            a.Status != AppointmentStatus.Cancelled && a.Status != AppointmentStatus.NoShow);
+        var hours = await Db.ProviderAvailabilities.CountAsync(a => a.LocationId == location.Id && a.Active);
+        _confirmDeactivate = new DeactivateCheck(location, upcoming, hours);
+    }
+
+    private async Task ConfirmDeactivate()
+    {
+        if (_confirmDeactivate is null) return;
+        await SetActive(_confirmDeactivate.Location, false);
+        _confirmDeactivate = null;
+    }
+
+    private async Task SetActive(Location location, bool active)
+    {
+        if (!RequireManage()) return;
+        var tracked = await Db.Locations.FirstOrDefaultAsync(l => l.Id == location.Id && l.OrganizationId == _organizationId);
+        if (tracked is null) return;
+        tracked.IsActive = active;
+        tracked.UpdatedAt = DateTimeOffset.UtcNow;
+        await Db.SaveChangesAsync();
+        await LoadAsync();
+    }
+
+    private bool RequireManage()
+    {
+        try
+        {
+            TenantAccess.RequireRole(CurrentUser, RoleSets.OrganizationAdministration);
+            return true;
+        }
+        catch (PhysioTrac.Application.Common.ForbiddenException ex)
+        {
+            _formError = ex.Message;
+            return false;
+        }
+    }
+
+    private static string Address(Location l)
+    {
+        var line = string.Join(", ", new[] { l.AddressLine1, l.AddressLine2, l.City }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var stateZip = string.Join(" ", new[] { l.State, l.ZipCode }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var full = string.Join(", ", new[] { line, stateZip }.Where(s => s.Length > 0));
+        return full.Length > 0 ? full : "—";
+    }
+
+    private static string TimeZoneLabel(string id) => TimeZones.FirstOrDefault(t => t.Id == id).Label ?? id;
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

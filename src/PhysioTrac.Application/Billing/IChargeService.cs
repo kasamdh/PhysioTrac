@@ -39,6 +39,12 @@ public interface IChargeService
     /// duplicates).</summary>
     Task<IReadOnlyList<Charge>> GenerateFromNoteAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
 
+    /// <summary>Called when a note becomes final: Draft charges for billing
+    /// to review, when the organization has that turned on. Never throws
+    /// over billing setup (a category without a CPT mapping is skipped and
+    /// reported) and never submits anything.</summary>
+    Task<PendingChargesResult> CreatePendingChargesForSignedNoteAsync(Guid noteId, Guid signedById, CancellationToken ct = default);
+
     /// <summary>The simpler, per-visit alternative to
     /// <see cref="GenerateFromNoteAsync"/>: bills a completed appointment as
     /// a single flat charge under its AppointmentType.DefaultCptCode, priced
@@ -54,3 +60,6 @@ public interface IChargeService
     /// charge would be priced at before generating it.</summary>
     Task<decimal?> ResolveFeeScheduleAmountAsync(string cptCode, Guid? locationId, ICurrentUser actor, CancellationToken ct = default);
 }
+
+/// <param name="Skipped">Why some or all charges were not created (null when none were skipped).</param>
+public record PendingChargesResult(int Created, string? Skipped);

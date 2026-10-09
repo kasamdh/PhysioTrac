@@ -135,14 +135,61 @@ public class PatientSearchAndLifecycleTests
     public async Task Delete_ByUnauthorizedRole_Returns403_AndLeavesThePatientAlone()
     {
         var (db, org, _, alpha, _) = await SeedAsync();
-        var therapist = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Therapist };
-        var controller = NewController(db, therapist);
+        var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
+        var controller = NewController(db, biller);
 
         var result = Assert.IsType<ObjectResult>(await controller.Delete(alpha.Id));
         Assert.Equal(403, result.StatusCode);
 
         var unchanged = await db.Patients.FindAsync(alpha.Id);
         Assert.False(unchanged!.IsDeleted);
+    }
+
+    private static UpdatePatientRequest RenameTo(string firstName) =>
+        new(firstName, "Anderson", null, null, null, null, null, null, null, null, null, PatientStatus.Active);
+
+    [Fact]
+    public async Task Update_BySchedulingRole_Succeeds()
+    {
+        var (db, org, _, alpha, _) = await SeedAsync();
+        var scheduler = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Scheduler };
+        var controller = NewController(db, scheduler);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.Update(alpha.Id, RenameTo("Alicia")));
+        var dto = Assert.IsType<PatientDetailDto>(result.Value);
+        Assert.Equal("Alicia", dto.FirstName);
+    }
+
+    [Theory]
+    [InlineData(UserRole.Biller)]
+    [InlineData(UserRole.Compliance)]
+    public async Task Update_ByNonSchedulingStaffRole_Returns403_AndLeavesThePatientAlone(UserRole role)
+    {
+        var (db, org, _, alpha, _) = await SeedAsync();
+        var user = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = role };
+        var controller = NewController(db, user);
+
+        var result = Assert.IsType<ObjectResult>(await controller.Update(alpha.Id, RenameTo("Changed")));
+        Assert.Equal(403, result.StatusCode);
+
+        var unchanged = await db.Patients.FindAsync(alpha.Id);
+        Assert.Equal("Alpha", unchanged!.FirstName);
+    }
+
+    [Fact]
+    public async Task Update_ByPatientPortalAccount_OnTheirOwnChart_Returns403()
+    {
+        var (db, org, _, alpha, _) = await SeedAsync();
+        var portalUser = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Patient };
+        alpha.PortalUserId = portalUser.UserId;
+        await db.SaveChangesAsync();
+        var controller = NewController(db, portalUser);
+
+        var result = Assert.IsType<ObjectResult>(await controller.Update(alpha.Id, RenameTo("Changed")));
+        Assert.Equal(403, result.StatusCode);
+
+        var unchanged = await db.Patients.FindAsync(alpha.Id);
+        Assert.Equal("Alpha", unchanged!.FirstName);
     }
 
     [Fact]
@@ -182,5 +229,97 @@ public class PatientSearchAndLifecycleTests
         Assert.Empty(timeline.Forms);
         Assert.Single(timeline.Documents);
         Assert.Empty(timeline.Appointments);
+    }
+
+    [Fact]
+    public async Task Create_TrimsNames_AndSavesThePatient()
+    {
+        var (db, org, admin, _, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+
+        var result = Assert.IsType<CreatedAtActionResult>(await controller.Create(
+            new CreatePatientRequest("  Nora ", " Quill  ", new DateOnly(1988, 4, 2), "919-555-0199", null, null, null, null, null, null, null, null)));
+
+        var dto = Assert.IsType<PatientDto>(result.Value);
+        Assert.Equal("Nora", dto.FirstName);
+        Assert.Equal("Quill", dto.LastName);
+        Assert.Equal(org.Id, (await db.Patients.SingleAsync(p => p.Id == dto.Id)).OrganizationId);
+    }
+
+    [Theory]
+    [InlineData("", "Quill", 1988)]
+    [InlineData("Nora", "  ", 1988)]
+    [InlineData("Nora", "Quill", 1850)]
+    public async Task Create_RejectsMissingNamesOrImplausibleBirthYear(string first, string last, int birthYear)
+    {
+        var (db, _, admin, _, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+
+        var result = await controller.Create(
+            new CreatePatientRequest(first, last, new DateOnly(birthYear, 1, 1), null, null, null, null, null, null, null, null, null));
+
+        Assert.IsType<UnprocessableEntityObjectResult>(result);
+        Assert.Equal(2, await db.Patients.CountAsync()); // only the seeded two
+    }
+
+    [Fact]
+    public async Task Update_CorrectsDateOfBirth_AndRejectsBlankNames()
+    {
+        var (db, _, admin, alpha, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+        UpdatePatientRequest Req(string first, DateOnly? dob) =>
+            new(first, "Anderson", null, null, null, null, null, null, null, null, null, PatientStatus.Active, dob);
+
+        Assert.IsType<OkObjectResult>(await controller.Update(alpha.Id, Req(" Alpha ", new DateOnly(1980, 2, 2))));
+        var saved = await db.Patients.SingleAsync(p => p.Id == alpha.Id);
+        Assert.Equal(new DateOnly(1980, 2, 2), saved.DateOfBirth);
+        Assert.Equal("Alpha", saved.FirstName);
+
+        Assert.IsType<OkObjectResult>(await controller.Update(alpha.Id, Req("Alpha", null))); // null keeps the date
+        Assert.Equal(new DateOnly(1980, 2, 2), (await db.Patients.SingleAsync(p => p.Id == alpha.Id)).DateOfBirth);
+
+        Assert.IsType<UnprocessableEntityObjectResult>(await controller.Update(alpha.Id, Req("  ", null)));
+    }
+
+    [Fact]
+    public async Task Directory_Deleted_ListsOnlySoftDeletedCharts_AndRestoreBringsThemBack()
+    {
+        var (db, _, admin, alpha, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+        Assert.IsType<NoContentResult>(await controller.Delete(alpha.Id));
+
+        var active = Assert.IsType<PagedPatientDirectoryDto>(Assert.IsType<OkObjectResult>(await controller.Directory()).Value);
+        Assert.DoesNotContain(active.Items, i => i.Id == alpha.Id);
+
+        var deleted = Assert.IsType<PagedPatientDirectoryDto>(Assert.IsType<OkObjectResult>(await controller.Directory(deleted: true)).Value);
+        Assert.Equal(alpha.Id, Assert.Single(deleted.Items).Id);
+
+        Assert.IsType<OkObjectResult>(await controller.Restore(alpha.Id));
+        var afterRestore = Assert.IsType<PagedPatientDirectoryDto>(Assert.IsType<OkObjectResult>(await controller.Directory(deleted: true)).Value);
+        Assert.Empty(afterRestore.Items);
+    }
+
+    [Fact]
+    public async Task Directory_Deleted_IsLimitedToRolesThatCanDeleteAndRestore()
+    {
+        var (db, org, _, _, _) = await SeedAsync();
+        var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
+
+        var result = await NewController(db, biller).Directory(deleted: true);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_RejectsFutureDateOfBirth()
+    {
+        var (db, _, admin, _, _) = await SeedAsync();
+        var controller = NewController(db, admin);
+        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+
+        var result = await controller.Create(
+            new CreatePatientRequest("Nora", "Quill", tomorrow, null, null, null, null, null, null, null, null, null));
+
+        Assert.IsType<UnprocessableEntityObjectResult>(result);
     }
 }

@@ -70,16 +70,17 @@ public class AppointmentSchedulingPhase4Tests
     {
         var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
-        var provider = new Provider { OrganizationId = org.Id, FirstName = "Jamie", LastName = "Chen" };
+        var provider = new Provider { OrganizationId = org.Id, FirstName = "Jamie", LastName = "Chen", Licenses = { TestTherapists.ValidLicense() } };
         db.Providers.Add(provider);
         await db.SaveChangesAsync();
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
-        await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30), providerId: provider.Id), actor);
+        await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30), providerId: provider.Id), actor);
 
-        var overlapping = Request(patient.Id, Guid.NewGuid(), start.AddMinutes(15), start.AddMinutes(45), providerId: provider.Id);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
-        Assert.Contains("provider", ex.Message, StringComparison.OrdinalIgnoreCase);
+        var overlapping = Request(patient.Id, TestTherapists.Add(db, org.Id), start.AddMinutes(15), start.AddMinutes(45), providerId: provider.Id);
+        var ex = await Assert.ThrowsAsync<SchedulingConflictException>(() => service.CreateAsync(overlapping, actor));
+        var doubleBooked = Assert.Single(ex.Violations, v => v.Code == SchedulingViolationCodes.DoubleBooked);
+        Assert.Contains("Jamie Chen", doubleBooked.Message);
     }
 
     [Fact]
@@ -87,16 +88,16 @@ public class AppointmentSchedulingPhase4Tests
     {
         var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
-        var providerA = new Provider { OrganizationId = org.Id, FirstName = "Jamie", LastName = "Chen" };
-        var providerB = new Provider { OrganizationId = org.Id, FirstName = "Priya", LastName = "Sharma" };
+        var providerA = new Provider { OrganizationId = org.Id, FirstName = "Jamie", LastName = "Chen", Licenses = { TestTherapists.ValidLicense() } };
+        var providerB = new Provider { OrganizationId = org.Id, FirstName = "Priya", LastName = "Sharma", Licenses = { TestTherapists.ValidLicense() } };
         db.Providers.AddRange(providerA, providerB);
         await db.SaveChangesAsync();
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
-        await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30), providerId: providerA.Id), actor);
+        await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30), providerId: providerA.Id), actor);
 
-        var overlapping = Request(patient.Id, Guid.NewGuid(), start.AddMinutes(15), start.AddMinutes(45), providerId: providerB.Id);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
+        var overlapping = Request(patient.Id, TestTherapists.Add(db, org.Id), start.AddMinutes(15), start.AddMinutes(45), providerId: providerB.Id);
+        var ex = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
         Assert.Contains("patient", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -109,13 +110,18 @@ public class AppointmentSchedulingPhase4Tests
         await db.SaveChangesAsync();
 
         var actor = Scheduler(org.Id);
-        var roomId = Guid.NewGuid();
+        var location = new Location { OrganizationId = org.Id, Name = "Main" };
+        var room = new Room { LocationId = location.Id, Name = "Gym" };
+        db.Locations.Add(location);
+        db.Rooms.Add(room);
+        await db.SaveChangesAsync();
+        var roomId = room.Id;
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
-        await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30), roomId: roomId), actor);
+        await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30), roomId: roomId), actor);
 
-        var overlapping = Request(otherPatient.Id, Guid.NewGuid(), start.AddMinutes(15), start.AddMinutes(45), roomId: roomId);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
+        var overlapping = Request(otherPatient.Id, TestTherapists.Add(db, org.Id), start.AddMinutes(15), start.AddMinutes(45), roomId: roomId);
+        var ex = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
         Assert.Contains("room", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -128,11 +134,16 @@ public class AppointmentSchedulingPhase4Tests
         await db.SaveChangesAsync();
 
         var actor = Scheduler(org.Id);
-        var roomId = Guid.NewGuid();
+        var location = new Location { OrganizationId = org.Id, Name = "Main" };
+        var room = new Room { LocationId = location.Id, Name = "Gym" };
+        db.Locations.Add(location);
+        db.Rooms.Add(room);
+        await db.SaveChangesAsync();
+        var roomId = room.Id;
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
-        await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30), roomId: roomId), actor);
-        var second = await service.CreateAsync(Request(otherPatient.Id, Guid.NewGuid(), start.AddMinutes(30), start.AddMinutes(60), roomId: roomId), actor);
+        await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30), roomId: roomId), actor);
+        var second = await service.CreateAsync(Request(otherPatient.Id, TestTherapists.Add(db, org.Id), start.AddMinutes(30), start.AddMinutes(60), roomId: roomId), actor);
 
         Assert.Equal(AppointmentStatus.Scheduled, second.Status);
     }
@@ -142,10 +153,10 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task StatusLifecycle_Scheduled_Confirmed_CheckedIn_Completed_RecordsFullHistory()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), actor);
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), actor);
 
         await service.ConfirmAsync(created.Id, actor);
         await service.CheckInAsync(created.Id, actor);
@@ -164,33 +175,33 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task Complete_WithoutCheckingInFirst_Throws()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), actor);
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), actor);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CompleteAsync(created.Id, actor));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CompleteAsync(created.Id, actor));
     }
 
     [Fact]
     public async Task MarkNoShow_AfterCheckIn_Throws_TheyClearlyDidShowUp()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), actor);
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), actor);
         await service.CheckInAsync(created.Id, actor);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.MarkNoShowAsync(created.Id, actor));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.MarkNoShowAsync(created.Id, actor));
     }
 
     [Fact]
     public async Task MarkNoShow_FromScheduled_Succeeds_AndCancelsTheReminder()
     {
-        var (_, service, reminders, org, patient) = NewService();
+        var (db, service, reminders, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), actor);
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), actor);
 
         var result = await service.MarkNoShowAsync(created.Id, actor);
 
@@ -203,10 +214,10 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task Reschedule_ToAnOpenSlot_Succeeds_AndSchedulesAFreshReminder()
     {
-        var (_, service, reminders, org, patient) = NewService();
+        var (db, service, reminders, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), actor);
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), actor);
         reminders.Scheduled.Clear();
 
         var newStart = start.AddDays(1);
@@ -221,13 +232,13 @@ public class AppointmentSchedulingPhase4Tests
     {
         var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
-        var therapistId = Guid.NewGuid();
+        var therapistId = TestTherapists.Add(db, org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1).Date;
 
         await service.CreateAsync(Request(patient.Id, therapistId, start.AddHours(3), start.AddHours(3).AddMinutes(30)), actor);
         var toMove = await service.CreateAsync(Request(patient.Id, therapistId, start, start.AddMinutes(30)), actor);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RescheduleAsync(
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.RescheduleAsync(
             toMove.Id, new RescheduleAppointmentRequest(start.AddHours(3).AddMinutes(10), start.AddHours(3).AddMinutes(40), null, null, null), actor));
 
         var unchanged = await db.Appointments.FindAsync(toMove.Id);
@@ -237,13 +248,13 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task Reschedule_ACancelledAppointment_Throws()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), actor);
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), actor);
         await service.CancelAsync(created.Id, actor);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RescheduleAsync(
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.RescheduleAsync(
             created.Id, new RescheduleAppointmentRequest(start.AddDays(1), start.AddDays(1).AddMinutes(30), null, null, null), actor));
     }
 
@@ -252,12 +263,12 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task CreateSeries_GeneratesTheRequestedOccurrenceCount_SpacedByTheInterval()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
         var firstStart = DateTimeOffset.UtcNow.AddDays(1).Date.AddHours(14);
 
         var series = await service.CreateSeriesAsync(new CreateAppointmentSeriesRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp,
+            patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null, AppointmentKind.FollowUp,
             firstStart, firstStart.AddMinutes(30), IntervalWeeks: 1, OccurrenceCount: 4, ReasonForVisit: null), actor);
 
         var loaded = await service.GetSeriesAsync(series.Id, actor);
@@ -273,16 +284,16 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task CreateSeries_WithOneConflictingOccurrence_RejectsTheWholeSeries_AndCreatesNoOccurrences()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
-        var therapistId = Guid.NewGuid();
+        var therapistId = TestTherapists.Add(db, org.Id);
         var firstStart = DateTimeOffset.UtcNow.AddDays(1).Date.AddHours(14);
 
         // Blocks the 3rd occurrence (firstStart + 14 days) for the same therapist.
         var thirdOccurrenceStart = firstStart.AddDays(14);
         await service.CreateAsync(Request(patient.Id, therapistId, thirdOccurrenceStart, thirdOccurrenceStart.AddMinutes(30)), actor);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateSeriesAsync(new CreateAppointmentSeriesRequest(
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CreateSeriesAsync(new CreateAppointmentSeriesRequest(
             patient.Id, therapistId, null, null, null, null, AppointmentKind.FollowUp,
             firstStart, firstStart.AddMinutes(30), IntervalWeeks: 1, OccurrenceCount: 4, ReasonForVisit: null), actor));
 
@@ -304,7 +315,7 @@ public class AppointmentSchedulingPhase4Tests
         var firstStart = DateTimeOffset.UtcNow.AddDays(-10);
 
         var series = await service.CreateSeriesAsync(new CreateAppointmentSeriesRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp,
+            patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null, AppointmentKind.FollowUp,
             firstStart, firstStart.AddMinutes(30), IntervalWeeks: 1, OccurrenceCount: 4, ReasonForVisit: null), actor);
 
         var loaded = await service.GetSeriesAsync(series.Id, actor);
@@ -339,7 +350,7 @@ public class AppointmentSchedulingPhase4Tests
 
         var otherOrgActor = Scheduler(otherOrg.Id);
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), Scheduler(org.Id));
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), Scheduler(org.Id));
 
         await Assert.ThrowsAsync<NotFoundException>(() => service.RescheduleAsync(
             created.Id, new RescheduleAppointmentRequest(start.AddDays(1), start.AddDays(1).AddMinutes(30), null, null, null), otherOrgActor));
@@ -354,7 +365,7 @@ public class AppointmentSchedulingPhase4Tests
         await db.SaveChangesAsync();
 
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), Scheduler(org.Id));
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), Scheduler(org.Id));
 
         await Assert.ThrowsAsync<NotFoundException>(() => service.GetStatusHistoryAsync(created.Id, Scheduler(otherOrg.Id)));
     }
@@ -362,19 +373,19 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task Create_ByBillerRole_Throws_NotInRoleSetsScheduling()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
         var start = DateTimeOffset.UtcNow.AddDays(1);
 
-        await Assert.ThrowsAsync<ForbiddenException>(() => service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), biller));
+        await Assert.ThrowsAsync<ForbiddenException>(() => service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), biller));
     }
 
     [Fact]
     public async Task Reschedule_ByBillerRole_Throws()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var start = DateTimeOffset.UtcNow.AddDays(1);
-        var created = await service.CreateAsync(Request(patient.Id, Guid.NewGuid(), start, start.AddMinutes(30)), Scheduler(org.Id));
+        var created = await service.CreateAsync(Request(patient.Id, TestTherapists.Add(db, org.Id), start, start.AddMinutes(30)), Scheduler(org.Id));
 
         var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
         await Assert.ThrowsAsync<ForbiddenException>(() => service.RescheduleAsync(
@@ -384,12 +395,12 @@ public class AppointmentSchedulingPhase4Tests
     [Fact]
     public async Task CreateSeries_ByBillerRole_Throws()
     {
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var biller = new TestCurrentUser { UserId = Guid.NewGuid(), OrganizationId = org.Id, Role = UserRole.Biller };
         var firstStart = DateTimeOffset.UtcNow.AddDays(1);
 
         await Assert.ThrowsAsync<ForbiddenException>(() => service.CreateSeriesAsync(new CreateAppointmentSeriesRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp,
+            patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null, AppointmentKind.FollowUp,
             firstStart, firstStart.AddMinutes(30), IntervalWeeks: 1, OccurrenceCount: 2, ReasonForVisit: null), biller));
     }
 
@@ -402,9 +413,9 @@ public class AppointmentSchedulingPhase4Tests
         // (as if one client is in a -05:00 zone and another -04:00) --
         // DateTimeOffset comparison must catch this as the same moment in
         // time, not silently treat differing offsets as different times.
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
-        var therapistId = Guid.NewGuid();
+        var therapistId = TestTherapists.Add(db, org.Id);
 
         var estStart = new DateTimeOffset(2026, 11, 15, 14, 0, 0, TimeSpan.FromHours(-5)); // 2:00 PM EST
         var edtEquivalentStart = estStart.ToOffset(TimeSpan.FromHours(-4)); // same instant, expressed as if EDT
@@ -412,7 +423,7 @@ public class AppointmentSchedulingPhase4Tests
         await service.CreateAsync(Request(patient.Id, therapistId, estStart, estStart.AddMinutes(30)), actor);
 
         var overlapping = Request(patient.Id, therapistId, edtEquivalentStart.AddMinutes(10), edtEquivalentStart.AddMinutes(40));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.CreateAsync(overlapping, actor));
     }
 
     [Fact]
@@ -423,14 +434,14 @@ public class AppointmentSchedulingPhase4Tests
         // ends 3:00 AM local" on that date is only 30 minutes of real
         // elapsed time, not 90 -- DateTimeOffset arithmetic must reflect
         // that, since the wall clock skips an hour but time itself doesn't.
-        var (_, service, _, org, patient) = NewService();
+        var (db, service, _, org, patient) = NewService();
         var actor = Scheduler(org.Id);
 
         var beforeSpringForward = new DateTimeOffset(2026, 3, 8, 1, 30, 0, TimeSpan.FromHours(-5)); // 1:30 AM EST
         var afterSpringForward = new DateTimeOffset(2026, 3, 8, 3, 0, 0, TimeSpan.FromHours(-4)); // 3:00 AM EDT
 
         var created = await service.CreateAsync(new CreateAppointmentRequest(
-            patient.Id, Guid.NewGuid(), null, null, null, null, AppointmentKind.FollowUp,
+            patient.Id, TestTherapists.Add(db, org.Id), null, null, null, null, AppointmentKind.FollowUp,
             beforeSpringForward, afterSpringForward, false, null), actor);
 
         Assert.Equal(TimeSpan.FromMinutes(30), created.EndsAt - created.StartsAt);

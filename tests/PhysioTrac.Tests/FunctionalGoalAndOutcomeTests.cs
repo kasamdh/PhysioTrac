@@ -47,7 +47,7 @@ public class FunctionalGoalAndOutcomeTests
         Assert.Equal(GoalStatus.Draft, goal.Status);
 
         var approved = await goals.ApproveAsync(goal.Id, therapist);
-        Assert.Equal(GoalStatus.Active, approved.Status);
+        Assert.Equal(GoalStatus.NotStarted, approved.Status);
         Assert.Equal(therapist.UserId, approved.ApprovedById);
     }
 
@@ -58,10 +58,12 @@ public class FunctionalGoalAndOutcomeTests
         var goal = await goals.CreateAsync(new CreateGoalRequest(
             patient.Id, "Limited reach", "Reach overhead shelf", GoalTerm.LongTerm, 0, 10, "reps", "Direct observation",
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)), "wording"), therapist);
+        await goals.ApproveAsync(goal.Id, therapist);
 
         var updated = await goals.UpdateProgressAsync(goal.Id, new UpdateGoalProgressRequest(5), therapist);
 
         Assert.Equal(50, updated.ProgressPercent);
+        Assert.Equal(GoalStatus.Active, updated.Status);
     }
 
     [Fact]

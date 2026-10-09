@@ -135,9 +135,7 @@ public class ChargeService : IChargeService
         _tenantAccess.RequireRole(actor, RoleSets.Billing);
         var organization = await _tenantAccess.OrganizationRequiredAsync(actor, ct);
 
-        var note = await _db.ClinicalNotes.Include(n => n.InterventionItems).Include(n => n.Patient).Include(n => n.Appointment)
-            .FirstOrDefaultAsync(n => n.Id == noteId, ct)
-            ?? throw new NotFoundException("Note was not found.");
+        var note = await LoadNoteForChargesAsync(noteId, ct);
         if (note.Patient is null || note.Patient.OrganizationId != organization.Id)
         {
             throw new NotFoundException("Note was not found.");
@@ -151,10 +149,60 @@ public class ChargeService : IChargeService
             throw new InvalidOperationException("Charges have already been generated for this note.");
         }
 
-        var provider = await _db.Providers.FirstOrDefaultAsync(p => p.UserId == note.TherapistId && p.OrganizationId == organization.Id, ct)
-            ?? throw new NotFoundException("The treating provider record was not found.");
+        var (generated, _) = await BuildChargesFromNoteAsync(note, organization, actor.UserId, strict: true, ct);
+        if (generated.Count == 0)
+        {
+            throw new InvalidOperationException("This note has no billable interventions to generate charges from.");
+        }
 
-        var locationId = note.Appointment?.LocationDetailId ?? note.Patient.PrimaryLocationId;
+        _db.Charges.AddRange(generated);
+        await _db.SaveChangesAsync(ct);
+        return generated;
+    }
+
+    public async Task<PendingChargesResult> CreatePendingChargesForSignedNoteAsync(Guid noteId, Guid signedById, CancellationToken ct = default)
+    {
+        var note = await LoadNoteForChargesAsync(noteId, ct);
+        var organization = await _db.Organizations.FirstAsync(o => o.Id == note.Patient!.OrganizationId, ct);
+        if (!organization.AutoCreatePendingCharges) return new PendingChargesResult(0, "Turned off for this organization.");
+        if (!note.IsSigned) return new PendingChargesResult(0, "The note is not final.");
+        // An amendment corrects a note that was already billed from; billing reviews the original's charges.
+        if (note.AmendsNoteId is not null) return new PendingChargesResult(0, "Amendment: charges stay with the original note.");
+        if (await _db.Charges.AnyAsync(c => c.ClinicalNoteId == note.Id, ct)) return new PendingChargesResult(0, "Charges already exist.");
+
+        var (generated, skipped) = await BuildChargesFromNoteAsync(note, organization, signedById, strict: false, ct);
+        if (generated.Count > 0)
+        {
+            _db.Charges.AddRange(generated);
+            await _db.SaveChangesAsync(ct);
+        }
+        return new PendingChargesResult(generated.Count,
+            skipped.Count > 0 ? string.Join(" ", skipped) : generated.Count == 0 ? "No billable interventions." : null);
+    }
+
+    private async Task<ClinicalNote> LoadNoteForChargesAsync(Guid noteId, CancellationToken ct) =>
+        await _db.ClinicalNotes.Include(n => n.InterventionItems).Include(n => n.Patient).Include(n => n.Appointment)
+            .FirstOrDefaultAsync(n => n.Id == noteId, ct)
+        ?? throw new NotFoundException("Note was not found.");
+
+    /// <summary>Draft charges for a signed note's billable interventions, one
+    /// per intervention category (units from the organization's 8-minute
+    /// rule). Strict: a missing provider or CPT mapping is an error. Not
+    /// strict (automatic at signing): that category is skipped and the
+    /// reason returned, so signing never fails over billing setup.</summary>
+    private async Task<(List<Charge> Charges, List<string> Skipped)> BuildChargesFromNoteAsync(ClinicalNote note, Organization organization,
+        Guid createdById, bool strict, CancellationToken ct)
+    {
+        var skipped = new List<string>();
+        var provider = await _db.Providers.FirstOrDefaultAsync(p => p.UserId == note.TherapistId && p.OrganizationId == organization.Id, ct);
+        if (provider is null)
+        {
+            if (strict) throw new NotFoundException("The treating provider record was not found.");
+            skipped.Add("The treating clinician has no provider record.");
+            return ([], skipped);
+        }
+
+        var locationId = note.Appointment?.LocationDetailId ?? note.Patient!.PrimaryLocationId;
         var diagnosisCodeIds = await _db.PatientDiagnoses
             .Where(d => d.PatientId == note.PatientId && d.ResolvedDate == null)
             .OrderByDescending(d => d.IsPrimary).Select(d => d.DiagnosisCodeId).Take(12).ToListAsync(ct);
@@ -166,9 +214,15 @@ public class ChargeService : IChargeService
         foreach (var group in groups)
         {
             var mapping = await _db.CptCodeMappings.FirstOrDefaultAsync(
-                m => m.OrganizationId == organization.Id && m.InterventionCategory == group.Key && m.IsActive, ct)
-                ?? throw new InvalidOperationException(
-                    $"No active CPT mapping is configured for {group.Key}. Configure one (see CptCodeMappingsController) before generating charges from this note.");
+                m => m.OrganizationId == organization.Id && m.InterventionCategory == group.Key && m.IsActive, ct);
+            if (mapping is null)
+            {
+                if (strict)
+                    throw new InvalidOperationException(
+                        $"No active CPT mapping is configured for {group.Key}. Configure one (see CptCodeMappingsController) before generating charges from this note.");
+                skipped.Add($"No CPT mapping for {group.Key}.");
+                continue;
+            }
 
             var timedMinutes = group.Where(i => i.IsTimed).Sum(i => i.Minutes);
             int units;
@@ -201,20 +255,12 @@ public class ChargeService : IChargeService
                 Minutes = minutesForCharge,
                 RecommendedUnits = minutesForCharge is not null ? units : null,
                 ChargeAmount = amount,
-                CreatedById = actor.UserId,
+                CreatedById = createdById,
             };
             foreach (var code in diagnosisCodes) charge.DiagnosisCodes.Add(code);
             generated.Add(charge);
         }
-
-        if (generated.Count == 0)
-        {
-            throw new InvalidOperationException("This note has no billable interventions to generate charges from.");
-        }
-
-        _db.Charges.AddRange(generated);
-        await _db.SaveChangesAsync(ct);
-        return generated;
+        return (generated, skipped);
     }
 
     public async Task<Charge> GenerateFromAppointmentAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default)

@@ -24,6 +24,9 @@ public interface IAppointmentService
 
     Task<Appointment> CheckInAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
 
+    /// <summary>"Start visit": CheckedIn -> InProgress.</summary>
+    Task<Appointment> StartVisitAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
+
     Task<Appointment> CompleteAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
 
     Task<Appointment> MarkNoShowAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
@@ -33,14 +36,29 @@ public interface IAppointmentService
     /// itself from the conflict query. Never changes Status.</summary>
     Task<Appointment> RescheduleAsync(Guid appointmentId, RescheduleAppointmentRequest request, ICurrentUser actor, CancellationToken ct = default);
 
+    /// <summary>Dry run of <see cref="RescheduleAsync"/> -- the exact same
+    /// permission, tenant, and scheduling-rule checks, reporting every
+    /// violation instead of throwing on the first, and saving nothing. Backs
+    /// the calendar's drag-and-drop "Move appointment?" confirmation; the
+    /// real move still re-runs every check.</summary>
+    Task<MoveCheckDto> ValidateRescheduleAsync(Guid appointmentId, RescheduleAppointmentRequest request, ICurrentUser actor, CancellationToken ct = default);
+
     Task<IReadOnlyList<AppointmentStatusHistory>> GetStatusHistoryAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>Generates every occurrence up front (not lazily) so each one
-    /// gets its own real conflict check before the series is committed --
-    /// all-or-nothing: if any occurrence conflicts, the whole series is
-    /// rejected and none of it is created, with the conflicting dates named
-    /// in the error so the caller can adjust and retry.</summary>
+    /// gets its own real conflict check before the series is committed.
+    /// The pattern is one or more weekdays (e.g. Mon/Wed for "2x weekly"),
+    /// every IntervalWeeks weeks, for OccurrenceCount visits or until
+    /// EndDate, at the same clinic-local time each day (DST-safe). By default
+    /// all-or-nothing: if any occurrence conflicts, none is created and the
+    /// conflicting dates are named. With SkipConflicting, only the clean
+    /// occurrences are booked.</summary>
     Task<AppointmentSeries> CreateSeriesAsync(CreateAppointmentSeriesRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Dry run of <see cref="CreateSeriesAsync"/>: every occurrence
+    /// the pattern generates, each with the scheduling rules it would break.
+    /// Lets the caller show "10 can be booked, 2 conflict" before committing.</summary>
+    Task<SeriesPreviewDto> PreviewSeriesAsync(CreateAppointmentSeriesRequest request, ICurrentUser actor, CancellationToken ct = default);
 
     Task<AppointmentSeries> GetSeriesAsync(Guid seriesId, ICurrentUser actor, CancellationToken ct = default);
 
@@ -50,12 +68,10 @@ public interface IAppointmentService
     /// actually cancelled.</summary>
     Task<int> CancelSeriesAsync(Guid seriesId, ICurrentUser actor, CancellationToken ct = default);
 
-    /// <summary>Appointments visible to this caller: the whole org for
-    /// Admin/Director/Scheduler, just this caller's own for Therapist/
-    /// Assistant — mirrors <c>ITenantAccessService.PatientsFor</c>'s caseload
-    /// narrowing, applied to the schedule instead of the chart list.
-    /// Optional providerId/locationDetailId filters back the calendar's own
-    /// filter controls.</summary>
+    /// <summary>Appointments visible to this caller: the whole organization
+    /// for every staff role (PTs and PTAs included), just their own chart's
+    /// for a Patient-role portal account. Optional providerId/
+    /// locationDetailId filters back the calendar's own filter controls.</summary>
     Task<IReadOnlyList<Appointment>> ListForRangeAsync(
         ICurrentUser actor, DateTimeOffset from, DateTimeOffset to,
         Guid? providerId = null, Guid? locationDetailId = null, CancellationToken ct = default);

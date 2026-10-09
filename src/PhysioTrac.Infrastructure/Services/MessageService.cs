@@ -77,4 +77,38 @@ public class MessageService : IMessageService
             await _db.SaveChangesAsync(ct);
         }
     }
+
+    public async Task<IReadOnlyList<MessageThreadSummary>> ListThreadsAsync(ICurrentUser actor, CancellationToken ct = default)
+    {
+        var patients = _tenantAccess.PatientsFor(actor);
+
+        // Grouped and sorted in memory: SQL-side ORDER BY over rows carrying
+        // nvarchar(max) bodies is slow on SQL Express's small memory grant.
+        var messages = await _db.Messages
+            .Where(m => patients.Any(p => p.Id == m.PatientId))
+            .Select(m => new { m.PatientId, m.Body, m.SentAt, m.SenderId, m.ReadAt })
+            .ToListAsync(ct);
+        if (messages.Count == 0) return [];
+
+        var patientIds = messages.Select(m => m.PatientId).Distinct().ToList();
+        var names = await patients.Where(p => patientIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.FirstName, p.LastName, p.MedicalRecordNumber })
+            .ToDictionaryAsync(p => p.Id, ct);
+
+        return messages
+            .GroupBy(m => m.PatientId)
+            .Where(g => names.ContainsKey(g.Key))
+            .Select(g =>
+            {
+                var last = g.MaxBy(m => m.SentAt)!;
+                var patient = names[g.Key];
+                var preview = last.Body.Length > 120 ? last.Body[..120] + "…" : last.Body;
+                return new MessageThreadSummary(
+                    g.Key, $"{patient.FirstName} {patient.LastName}", patient.MedicalRecordNumber,
+                    last.SentAt, preview, g.Count(),
+                    g.Count(m => m.ReadAt == null && m.SenderId != actor.UserId));
+            })
+            .OrderByDescending(t => t.LastMessageAt)
+            .ToList();
+    }
 }

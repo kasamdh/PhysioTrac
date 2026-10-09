@@ -51,7 +51,7 @@ public class OrganizationsController : ControllerBase
                 .Select(l => new LocationSummaryDto(l.Id, l.Name))
                 .ToListAsync(HttpContext.RequestAborted);
 
-            return Ok(new CurrentOrganizationDto(organization.Id, organization.Name, locations));
+            return Ok(new CurrentOrganizationDto(organization.Id, organization.Name, locations, organization.Timezone));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
@@ -128,6 +128,63 @@ public class OrganizationsController : ControllerBase
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
+    /// <summary>Documentation rules for the organization: PTA cosign,
+    /// when a progress note is due, and pending charges at signing.</summary>
+    [HttpGet("documentation-settings")]
+    public async Task<IActionResult> GetDocumentationSettings()
+    {
+        try
+        {
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+            return Ok(ToDocumentationSettings(organization));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+    }
+
+    [HttpPut("documentation-settings")]
+    public async Task<IActionResult> UpdateDocumentationSettings([FromBody] DocumentationSettingsDto request)
+    {
+        try
+        {
+            _tenantAccess.RequireRole(_currentUser, RoleSets.OrganizationAdministration);
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
+
+            var errors = new List<string>();
+            if (request.ProgressNoteDueVisitCount is < 1 or > 50) errors.Add("Visits before a progress note is due must be 1 to 50, or left empty.");
+            if (request.ProgressNoteDueDays is < 1 or > 365) errors.Add("Days before a progress note is due must be 1 to 365, or left empty.");
+            if (errors.Count > 0) return UnprocessableEntity(new { detail = string.Join(" ", errors), errors });
+
+            var changedFields = new List<string>();
+            void Track<T>(string name, T oldValue, T newValue)
+            {
+                if (!Equals(oldValue, newValue)) changedFields.Add(name);
+            }
+            Track(nameof(organization.PtaCosignRequired), organization.PtaCosignRequired, request.PtaCosignRequired);
+            Track(nameof(organization.ProgressNoteDueVisitCount), organization.ProgressNoteDueVisitCount, request.ProgressNoteDueVisitCount);
+            Track(nameof(organization.ProgressNoteDueDays), organization.ProgressNoteDueDays, request.ProgressNoteDueDays);
+            Track(nameof(organization.AutoCreatePendingCharges), organization.AutoCreatePendingCharges, request.AutoCreatePendingCharges);
+
+            organization.PtaCosignRequired = request.PtaCosignRequired;
+            organization.ProgressNoteDueVisitCount = request.ProgressNoteDueVisitCount;
+            organization.ProgressNoteDueDays = request.ProgressNoteDueDays;
+            organization.AutoCreatePendingCharges = request.AutoCreatePendingCharges;
+            organization.UpdatedAt = DateTimeOffset.UtcNow;
+            organization.UpdatedById = _currentUser.UserId;
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
+
+            if (changedFields.Count > 0)
+            {
+                await _audit.RecordAuditEventAsync(_currentUser.UserId, "entity.updated", nameof(Organization), organization.Id, organization.Id,
+                    metadata: new { changedProperties = changedFields }, ct: HttpContext.RequestAborted);
+            }
+            return Ok(ToDocumentationSettings(organization));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+    }
+
+    private static DocumentationSettingsDto ToDocumentationSettings(Organization o) =>
+        new(o.PtaCosignRequired, o.ProgressNoteDueVisitCount, o.ProgressNoteDueDays, o.AutoCreatePendingCharges);
+
     private static OrganizationProfileDto ToProfileDto(Organization o) => new(
         o.Id, o.Name, o.Timezone, o.NpiNumber, o.TaxId, o.AddressLine1, o.AddressLine2,
         o.City, o.State, o.ZipCode, o.SupportEmail, o.SupportPhone, o.PtaCosignRequired);
@@ -135,7 +192,8 @@ public class OrganizationsController : ControllerBase
 
 public record LocationSummaryDto(Guid Id, string Name);
 
-public record CurrentOrganizationDto(Guid Id, string Name, IReadOnlyList<LocationSummaryDto> Locations);
+/// <param name="Timezone">IANA zone used to display times (printouts, audit).</param>
+public record CurrentOrganizationDto(Guid Id, string Name, IReadOnlyList<LocationSummaryDto> Locations, string Timezone);
 
 public record OrganizationProfileDto(
     Guid Id, string Name, string Timezone, string? NpiNumber, string? TaxId,
@@ -146,3 +204,8 @@ public record UpdateOrganizationProfileRequest(
     string Name, string? Timezone, string? NpiNumber, string? TaxId,
     string? AddressLine1, string? AddressLine2, string? City, string? State, string? ZipCode,
     string? SupportEmail, string? SupportPhone, bool PtaCosignRequired);
+
+/// <param name="ProgressNoteDueVisitCount">Treatment visits after which a progress note is due (null = off).</param>
+/// <param name="ProgressNoteDueDays">Days after the evaluation or last progress note (null = off).</param>
+/// <param name="AutoCreatePendingCharges">Create Draft charges for billing review when a note becomes final.</param>
+public record DocumentationSettingsDto(bool PtaCosignRequired, int? ProgressNoteDueVisitCount, int? ProgressNoteDueDays, bool AutoCreatePendingCharges);

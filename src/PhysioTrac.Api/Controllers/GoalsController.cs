@@ -42,6 +42,32 @@ public class GoalsController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Edits a goal's definition; the previous version stays in its history.</summary>
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateGoalRequest request)
+    {
+        try
+        {
+            var goal = await _goals.UpdateAsync(id, request, _currentUser, HttpContext.RequestAborted);
+            return Ok(ToDto(goal));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    [HttpGet("{id:guid}/history")]
+    public async Task<IActionResult> History(Guid id)
+    {
+        try
+        {
+            return Ok(await _goals.HistoryAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/approve")]
@@ -67,10 +93,11 @@ public class GoalsController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
     private static FunctionalGoalDto ToDto(FunctionalGoal g) => new(
         g.Id, g.PatientId, g.AuthorId, g.FunctionalLimitation, g.FunctionalTask, g.Term,
         g.BaselineValue, g.TargetValue, g.CurrentValue, g.Unit, g.MeasurementMethod,
-        g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt);
+        g.TargetDate, g.Status, g.ProgressPercent, g.ApprovedById, g.ApprovedAt, g.PlanOfCareId, g.Comments, g.Version);
 }

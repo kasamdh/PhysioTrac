@@ -38,6 +38,7 @@ public class NotesController : ControllerBase
         try
         {
             var note = await _notes.GetAsync(id, _currentUser, HttpContext.RequestAborted);
+            await _notes.RecordNoteViewAsync(id, _currentUser, HttpContext.RequestAborted);
             return Ok(ToDto(note));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
@@ -54,6 +55,7 @@ public class NotesController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
     [HttpPut("{id:guid}")]
@@ -66,6 +68,7 @@ public class NotesController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
     [HttpGet("patient/{patientId:guid}/pull-forward")]
@@ -97,8 +100,7 @@ public class NotesController : ControllerBase
     {
         try
         {
-            var note = await _notes.GetAsync(id, _currentUser, HttpContext.RequestAborted);
-            return Ok(NoteComplianceEvaluator.Evaluate(note));
+            return Ok(await _notes.GetComplianceAsync(id, _currentUser, HttpContext.RequestAborted));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
@@ -110,9 +112,15 @@ public class NotesController : ControllerBase
         try
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var note = await _notes.SignNoteAsync(id, request.AttestationConfirmed, ipAddress, _currentUser, HttpContext.RequestAborted);
+            var note = await _notes.SignNoteAsync(id, request.AttestationConfirmed, ipAddress, _currentUser, request.Password,
+                request.SaveVersion, HttpContext.RequestAborted);
             return Ok(ToDto(note));
         }
+        catch (EncounterConflictException ex)
+        {
+            return Conflict(new { detail = ex.Message, code = "EDIT_CONFLICT", saveVersion = ex.CurrentSaveVersion, savedAt = ex.SavedAt, savedByName = ex.SavedByName });
+        }
+        catch (SignatureVerificationException ex) { return UnprocessableEntity(new { detail = ex.Message, code = "SIGNATURE_PASSWORD" }); }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
@@ -128,6 +136,7 @@ public class NotesController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/certify-poc")]
@@ -148,24 +157,106 @@ public class NotesController : ControllerBase
     {
         try
         {
-            var versions = await _notes.GetVersionHistoryAsync(id, _currentUser, HttpContext.RequestAborted);
-            return Ok(versions.Select(v => new ClinicalNoteVersionDto(v.Id, v.NoteId, v.VersionNumber, v.ContentJson, v.SavedById, v.IsSignedVersion, v.CreatedAt)));
+            return Ok(await _notes.GetVersionHistoryViewAsync(id, _currentUser, HttpContext.RequestAborted));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/cosign")]
-    public async Task<IActionResult> Cosign(Guid id)
+    public async Task<IActionResult> Cosign(Guid id, [FromBody] CosignNoteRequest? request)
     {
         try
         {
-            var note = await _notes.CosignNoteAsync(id, _currentUser, HttpContext.RequestAborted);
+            var note = await _notes.CosignNoteAsync(id, _currentUser, request?.Password, HttpContext.RequestAborted);
             return Ok(ToDto(note));
+        }
+        catch (SignatureVerificationException ex) { return UnprocessableEntity(new { detail = ex.Message, code = "SIGNATURE_PASSWORD" }); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Records a print or PDF export of the note before the browser
+    /// prints it; 403 for anyone who may not view the note.</summary>
+    [HttpPost("{id:guid}/output")]
+    public async Task<IActionResult> Output(Guid id, [FromBody] OutputRequest request)
+    {
+        try
+        {
+            await _notes.RecordNoteOutputAsync(id, request.Kind, _currentUser, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Records a print or export of a patient report (plan-of-care,
+    /// body-chart, measurements, goals, outcomes).</summary>
+    [HttpPost("patient/{patientId:guid}/report-output")]
+    public async Task<IActionResult> ReportOutput(Guid patientId, [FromBody] ReportOutputRequest request)
+    {
+        try
+        {
+            await _notes.RecordPatientReportOutputAsync(patientId, request.Report, request.Kind, _currentUser, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Body charts from the patient's signed notes, newest first.</summary>
+    [HttpGet("patient/{patientId:guid}/body-charts")]
+    public async Task<IActionResult> BodyCharts(Guid patientId)
+    {
+        try
+        {
+            return Ok(await _notes.GetBodyChartHistoryAsync(patientId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>A supervising PT starts reviewing a submitted note.</summary>
+    [HttpPost("{id:guid}/review/start")]
+    public async Task<IActionResult> StartReview(Guid id)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.StartReviewAsync(id, _currentUser, HttpContext.RequestAborted)));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+    }
+
+    /// <summary>A supervising PT returns a submitted note for correction (reason required).</summary>
+    [HttpPost("{id:guid}/return")]
+    public async Task<IActionResult> Return(Guid id, [FromBody] ReturnNoteRequest request)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.ReturnForCorrectionAsync(id, request.Reason, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Voids a note with a reason; a signed note also needs the voider's password.</summary>
+    [HttpPost("{id:guid}/void")]
+    public async Task<IActionResult> Void(Guid id, [FromBody] VoidNoteRequest request)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.VoidNoteAsync(id, request, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (SignatureVerificationException ex) { return UnprocessableEntity(new { detail = ex.Message, code = "SIGNATURE_PASSWORD" }); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
     [HttpPost("{id:guid}/addenda")]
@@ -179,7 +270,212 @@ public class NotesController : ControllerBase
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
         catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Starts (or continues) a formal amendment of a signed note;
+    /// returns the amendment draft to edit and sign.</summary>
+    [HttpPost("{id:guid}/amend")]
+    public async Task<IActionResult> Amend(Guid id, [FromBody] CreateAmendmentRequest request)
+    {
+        try
+        {
+            var amendment = await _notes.CreateAmendmentAsync(id, request, _currentUser, HttpContext.RequestAborted);
+            return Ok(ToDto(amendment));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>What the current user may do with the note, plus its author,
+    /// cosigner, addenda and amendment link.</summary>
+    [HttpGet("{id:guid}/record")]
+    public async Task<IActionResult> Record(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetNoteRecordAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The note as a clinical encounter: template version, values and header facts.</summary>
+    [HttpGet("{id:guid}/encounter")]
+    public async Task<IActionResult> Encounter(Guid id)
+    {
+        try
+        {
+            var encounter = await _notes.GetEncounterAsync(id, _currentUser, HttpContext.RequestAborted);
+            await _notes.RecordNoteViewAsync(id, _currentUser, HttpContext.RequestAborted);
+            return Ok(encounter);
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Autosave of a draft encounter. 409 EDIT_CONFLICT when someone
+    /// else saved since the editor's BaseSaveVersion; 422 with the field
+    /// problems when a value breaks its template's rules.</summary>
+    [HttpPut("{id:guid}/encounter")]
+    public async Task<IActionResult> SaveEncounter(Guid id, [FromBody] SaveEncounterRequest request)
+    {
+        try
+        {
+            return Ok(await _notes.SaveEncounterAsync(id, request, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (EncounterConflictException ex)
+        {
+            return Conflict(new { detail = ex.Message, code = "EDIT_CONFLICT", saveVersion = ex.CurrentSaveVersion, savedAt = ex.SavedAt, savedByName = ex.SavedByName });
+        }
+        catch (TemplateValidationException ex) { return UnprocessableEntity(new { detail = ex.Message, errors = ex.Errors }); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The episode summarized from signed charting, for progress
+    /// notes, re-evaluations, recertifications and discharge summaries.</summary>
+    [HttpGet("{id:guid}/episode-summary")]
+    public async Task<IActionResult> EpisodeSummary(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetEpisodeSummaryAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Fills the note's empty fields from the episode summary. 409
+    /// EDIT_CONFLICT like an encounter save.</summary>
+    [HttpPost("{id:guid}/prefill")]
+    public async Task<IActionResult> Prefill(Guid id, [FromBody] PrefillNoteRequest request)
+    {
+        try
+        {
+            return Ok(await _notes.PrefillAsync(id, request, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (EncounterConflictException ex)
+        {
+            return Conflict(new { detail = ex.Message, code = "EDIT_CONFLICT", saveVersion = ex.CurrentSaveVersion, savedAt = ex.SavedAt, savedByName = ex.SavedByName });
+        }
+        catch (TemplateValidationException ex) { return UnprocessableEntity(new { detail = ex.Message, errors = ex.Errors }); }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The therapist confirms they reviewed the pre-filled content.</summary>
+    [HttpPost("{id:guid}/prefill/review")]
+    public async Task<IActionResult> ReviewPrefill(Guid id)
+    {
+        try
+        {
+            return Ok(ClinicalNoteMapper.ToDto(await _notes.ReviewPrefillAsync(id, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Opens the encounter for an appointment: its note, or a new
+    /// draft of the visit's note type. 422 for a cancelled/no-show visit.</summary>
+    [HttpPost("for-appointment/{appointmentId:guid}")]
+    public async Task<IActionResult> OpenForAppointment(Guid appointmentId, [FromQuery] bool missedVisit = false)
+    {
+        try
+        {
+            return Ok(await _notes.OpenAppointmentEncounterAsync(appointmentId, _currentUser, HttpContext.RequestAborted, missedVisit));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Measurements from the patient's signed notes, oldest first.</summary>
+    [HttpGet("patient/{patientId:guid}/measurement-history")]
+    public async Task<IActionResult> MeasurementHistory(Guid patientId)
+    {
+        try
+        {
+            return Ok(await _notes.GetMeasurementHistoryAsync(patientId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Pain ratings from the patient's signed notes, oldest first.</summary>
+    [HttpGet("patient/{patientId:guid}/pain-history")]
+    public async Task<IActionResult> PainHistory(Guid patientId)
+    {
+        try
+        {
+            return Ok(await _notes.GetPainHistoryAsync(patientId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The note's latest save -- polled by the workspace to warn about another editor.</summary>
+    [HttpGet("{id:guid}/encounter/status")]
+    public async Task<IActionResult> EncounterStatus(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetEncounterStatusAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Switch a draft to another template (before any field is filled in).</summary>
+    [HttpPut("{id:guid}/template")]
+    public async Task<IActionResult> ChangeTemplate(Guid id, [FromBody] ChangeNoteTemplateRequest request)
+    {
+        try
+        {
+            return Ok(ToDto(await _notes.ChangeTemplateAsync(id, request.TemplateId, _currentUser, HttpContext.RequestAborted)));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    /// <summary>Electronic signatures and status history of a note.</summary>
+    [HttpGet("{id:guid}/history")]
+    public async Task<IActionResult> History(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.GetNoteHistoryAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The patient's plans of care, newest first.</summary>
+    [HttpGet("patient/{patientId:guid}/plans-of-care")]
+    public async Task<IActionResult> PlansOfCare(Guid patientId)
+    {
+        try
+        {
+            return Ok(await _notes.ListPlansOfCareAsync(patientId, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    /// <summary>The current user's unsigned notes and notes awaiting their cosignature.</summary>
+    [HttpGet("queues")]
+    public async Task<IActionResult> Queues()
+    {
+        try
+        {
+            return Ok(await _notes.GetNoteQueuesAsync(_currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
 
     [HttpGet("{id:guid}/interventions")]
@@ -207,16 +503,57 @@ public class NotesController : ControllerBase
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
-    private static ClinicalNoteDto ToDto(ClinicalNote n) => new(
-        n.Id, n.PatientId, n.TherapistId, n.AppointmentId, n.NoteType, n.Status, n.ServiceDate,
-        n.Subjective, n.Objective, n.Interventions, n.Assessment, n.Plan,
-        n.PlanOfCareStart, n.PlanOfCareEnd, n.FrequencyPerWeek, n.DurationWeeks, n.ReassessmentDue,
-        n.PlanOfCareCertifiedDate, n.PlanOfCareCertifyingProviderId,
-        n.SignatureName, n.SignatureCredentials, n.SignedAt, n.SignatureIpAddress, n.SignatureHash,
-        n.CosignRequired, n.CosignedById, n.CosignedAt);
+    [HttpPut("{id:guid}/interventions/{interventionId:guid}")]
+    public async Task<IActionResult> UpdateIntervention(Guid id, Guid interventionId, [FromBody] CreateInterventionRequest request)
+    {
+        try
+        {
+            var item = await _notes.UpdateInterventionAsync(id, interventionId, request, _currentUser, HttpContext.RequestAborted);
+            return Ok(ToInterventionDto(item));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    [HttpDelete("{id:guid}/interventions/{interventionId:guid}")]
+    public async Task<IActionResult> DeleteIntervention(Guid id, Guid interventionId)
+    {
+        try
+        {
+            await _notes.DeleteInterventionAsync(id, interventionId, _currentUser, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
+    [HttpGet("{id:guid}/interventions/summary")]
+    public async Task<IActionResult> InterventionSummary(Guid id)
+    {
+        try
+        {
+            return Ok(await _notes.SummarizeInterventionsAsync(id, _currentUser, HttpContext.RequestAborted));
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+    }
+
+    private static ClinicalNoteDto ToDto(ClinicalNote n) => ClinicalNoteMapper.ToDto(n);
 
     private static InterventionDto ToInterventionDto(NoteIntervention i) => new(
-        i.Id, i.NoteId, i.Description, i.BodyRegion, i.Category, i.Minutes, i.Units, i.IsTimed, i.Order);
+        i.Id, i.NoteId, i.Description, i.BodyRegion, i.Category, i.Minutes, i.Units, i.IsTimed, i.Order, i.PatientResponse);
 }
 
-public record SignNoteRequest(bool AttestationConfirmed);
+/// <param name="Password">The signer re-enters their own password (step-up).</param>
+/// <param name="SaveVersion">The version the signer reviewed; refused (409) if the note was saved since.</param>
+public record SignNoteRequest(bool AttestationConfirmed, string? Password = null, int? SaveVersion = null);
+
+/// <param name="Password">The cosigner re-enters their own password (step-up).</param>
+public record CosignNoteRequest(string? Password = null);
+
+/// <param name="Kind">"print" or "export" (Save as PDF).</param>
+public record OutputRequest(string Kind);
+
+public record ReportOutputRequest(string Report, string Kind);

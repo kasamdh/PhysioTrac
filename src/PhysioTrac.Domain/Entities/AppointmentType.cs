@@ -38,4 +38,9 @@ public class AppointmentType : BaseEntity
     /// billed this way; a biller must generate its charges from the note
     /// instead (or enter one manually).</summary>
     public string? DefaultCptCode { get; set; }
+
+    /// <summary>The note this kind of visit is documented with (e.g. an
+    /// "Initial Evaluation" type -> Evaluation). Null = decided from the
+    /// appointment's Kind.</summary>
+    public NoteType? DefaultNoteType { get; set; }
 }

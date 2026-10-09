@@ -80,10 +80,33 @@ public class SessionService : ISessionService
             return null;
         }
 
+        // Touch at most every TouchInterval. Every authenticated request runs
+        // this, and a SPA fires several in parallel -- writing the same
+        // RowVersion'd row from each one made all but the first fail with a
+        // DbUpdateConcurrencyException (500). Idle-timeout accuracy of
+        // ~30s is plenty against a timeout measured in minutes.
+        if (now - session.LastActivityAt < TouchInterval)
+        {
+            return session;
+        }
+
         session.LastActivityAt = now;
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // A parallel request touched (or revoked) this session first.
+            // Reload so this request's DbContext isn't left holding a stale
+            // RowVersion for its own later SaveChanges, then re-check.
+            await _db.Entry(session).ReloadAsync(ct);
+            return session.IsActive ? session : null;
+        }
         return session;
     }
+
+    private static readonly TimeSpan TouchInterval = TimeSpan.FromSeconds(30);
 
     public async Task RevokeAsync(string sessionKey, SessionRevokedReason reason, CancellationToken ct = default)
     {

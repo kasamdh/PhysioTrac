@@ -79,6 +79,119 @@ public class PatientsController : ControllerBase
         }
     }
 
+    /// <summary>Administration patient list: the same caller-scoped patient
+    /// set as <see cref="List"/>, filterable by clinic location, status and
+    /// appointment dates, with each row's last and next visit.
+    /// <para>Appointment dates are calendar days in the organization's
+    /// timezone (inclusive); cancelled appointments never count. With a date
+    /// range, a location narrows to appointments at that location; without
+    /// one, it matches patients whose primary location it is or who have any
+    /// appointment there.</para></summary>
+    [HttpGet("directory")]
+    public async Task<IActionResult> Directory(
+        [FromQuery] string? search = null, [FromQuery] PatientStatus? status = null, [FromQuery] Guid? locationId = null,
+        [FromQuery] DateOnly? appointmentFrom = null, [FromQuery] DateOnly? appointmentTo = null,
+        [FromQuery] bool deleted = false,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
+    {
+        try
+        {
+            var ct = HttpContext.RequestAborted;
+            var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, ct);
+            IQueryable<Patient> query;
+            if (deleted)
+            {
+                // Soft-deleted charts, so they can be found and restored.
+                // PatientsFor hides them by design, so this is org-scoped by
+                // hand -- and limited to the roles that can delete/restore.
+                _tenantAccess.RequireRole(_currentUser, RoleSets.Scheduling);
+                query = _db.Patients.Where(p => p.OrganizationId == organization.Id && p.DeletedAt != null);
+            }
+            else
+            {
+                query = _tenantAccess.PatientsFor(_currentUser);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(p =>
+                    p.FirstName.Contains(term) || p.LastName.Contains(term) || p.MedicalRecordNumber.Contains(term));
+            }
+            if (status is not null)
+            {
+                query = query.Where(p => p.Status == status);
+            }
+
+            var appointments = _db.Appointments.Where(a => a.Status != AppointmentStatus.Cancelled);
+            if (appointmentFrom is not null || appointmentTo is not null)
+            {
+                var tz = TimeZoneInfo.TryFindSystemTimeZoneById(organization.Timezone, out var found) ? found : TimeZoneInfo.Utc;
+                var inRange = appointments;
+                if (appointmentFrom is DateOnly from)
+                {
+                    var fromUtc = StartOfDayUtc(from, tz);
+                    inRange = inRange.Where(a => a.StartsAt >= fromUtc);
+                }
+                if (appointmentTo is DateOnly to)
+                {
+                    var toUtc = StartOfDayUtc(to.AddDays(1), tz);
+                    inRange = inRange.Where(a => a.StartsAt < toUtc);
+                }
+                if (locationId is not null)
+                {
+                    inRange = inRange.Where(a => a.LocationDetailId == locationId);
+                }
+                query = query.Where(p => inRange.Any(a => a.PatientId == p.Id));
+            }
+            else if (locationId is not null)
+            {
+                query = query.Where(p => p.PrimaryLocationId == locationId
+                    || appointments.Any(a => a.PatientId == p.Id && a.LocationDetailId == locationId));
+            }
+
+            query = query.OrderBy(p => p.LastName).ThenBy(p => p.FirstName);
+
+            var total = await query.CountAsync(ct);
+            var clampedPageSize = Math.Clamp(pageSize, 1, 100);
+            var clampedPage = Math.Max(page, 1);
+            var patients = await query
+                .Skip((clampedPage - 1) * clampedPageSize).Take(clampedPageSize)
+                .ToListAsync(ct);
+
+            var ids = patients.Select(p => p.Id).ToList();
+            var visits = await appointments.Where(a => ids.Contains(a.PatientId))
+                .Select(a => new { a.PatientId, a.StartsAt })
+                .ToListAsync(ct);
+            var locationNames = await _db.Locations.Where(l => l.OrganizationId == organization.Id)
+                .ToDictionaryAsync(l => l.Id, l => l.Name, ct);
+            var now = DateTimeOffset.UtcNow;
+
+            var rows = patients.Select(p =>
+            {
+                var mine = visits.Where(v => v.PatientId == p.Id).Select(v => v.StartsAt).ToList();
+                return new PatientDirectoryRowDto(
+                    p.Id, p.MedicalRecordNumber, p.FullName, p.DateOfBirth, p.Age, p.Phone, p.Email, p.Status,
+                    p.PrimaryLocationId,
+                    p.PrimaryLocationId is Guid lid && locationNames.TryGetValue(lid, out var name) ? name : null,
+                    mine.Where(t => t < now).Select(t => (DateTimeOffset?)t).Max(),
+                    mine.Where(t => t >= now).Select(t => (DateTimeOffset?)t).Min());
+            }).ToList();
+
+            return Ok(new PagedPatientDirectoryDto(rows, total, clampedPage, clampedPageSize));
+        }
+        catch (ForbiddenException ex)
+        {
+            return StatusCode(403, new { detail = ex.Message });
+        }
+    }
+
+    private static DateTimeOffset StartOfDayUtc(DateOnly day, TimeZoneInfo tz)
+    {
+        var local = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        return new DateTimeOffset(local, tz.GetUtcOffset(local)).ToUniversalTime();
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id)
     {
@@ -116,11 +229,20 @@ public class PatientsController : ControllerBase
             _tenantAccess.RequireRole(_currentUser, RoleSets.Scheduling);
             var organization = await _tenantAccess.OrganizationRequiredAsync(_currentUser, HttpContext.RequestAborted);
 
+            if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+            {
+                return UnprocessableEntity(new { detail = "First and last name are required." });
+            }
+            if (request.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow) || request.DateOfBirth.Year < 1900)
+            {
+                return UnprocessableEntity(new { detail = "Enter a valid date of birth (not in the future)." });
+            }
+
             var patient = new Patient
             {
                 OrganizationId = organization.Id,
-                FirstName = request.FirstName,
-                LastName = request.LastName,
+                FirstName = request.FirstName.Trim(),
+                LastName = request.LastName.Trim(),
                 DateOfBirth = request.DateOfBirth,
                 Phone = request.Phone,
                 Email = request.Email,
@@ -142,19 +264,34 @@ public class PatientsController : ControllerBase
         }
     }
 
+    /// <summary>Restricted to Scheduling the same as Create/Delete --
+    /// RequirePatientAccessAsync alone would let any role that can merely
+    /// *see* the chart (Biller, Compliance, or a Patient-role portal account
+    /// on their own record) rewrite its demographics and status.</summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePatientRequest request)
     {
         try
         {
+            _tenantAccess.RequireRole(_currentUser, RoleSets.Scheduling);
             var patient = await _tenantAccess.RequirePatientAccessAsync(
                 _currentUser, id,
                 route: HttpContext.Request.Path,
                 ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
                 ct: HttpContext.RequestAborted);
 
-            patient.FirstName = request.FirstName;
-            patient.LastName = request.LastName;
+            if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+            {
+                return UnprocessableEntity(new { detail = "First and last name are required." });
+            }
+            if (request.DateOfBirth is DateOnly dob && (dob > DateOnly.FromDateTime(DateTime.UtcNow) || dob.Year < 1900))
+            {
+                return UnprocessableEntity(new { detail = "Enter a valid date of birth (not in the future)." });
+            }
+
+            patient.FirstName = request.FirstName.Trim();
+            patient.LastName = request.LastName.Trim();
+            if (request.DateOfBirth is DateOnly newDob) patient.DateOfBirth = newDob;
             patient.Phone = request.Phone;
             patient.Email = request.Email;
             patient.Address = request.Address;
@@ -293,6 +430,13 @@ public class PatientsController : ControllerBase
 }
 
 public record TimelineEntryDto(Guid Id, string Type, DateTimeOffset OccurredAt, string Status);
+
+public record PatientDirectoryRowDto(
+    Guid Id, string MedicalRecordNumber, string FullName, DateOnly DateOfBirth, int Age, string? Phone, string? Email,
+    PatientStatus Status, Guid? PrimaryLocationId, string? PrimaryLocationName,
+    DateTimeOffset? LastVisitAt, DateTimeOffset? NextAppointmentAt);
+
+public record PagedPatientDirectoryDto(IReadOnlyList<PatientDirectoryRowDto> Items, int Total, int Page, int PageSize);
 
 public record PatientTimelineDto(
     IReadOnlyList<TimelineEntryDto> Appointments,

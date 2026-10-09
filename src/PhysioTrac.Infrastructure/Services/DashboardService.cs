@@ -32,7 +32,8 @@ public class DashboardService : IDashboardService
     /// IAppointmentService.ListForRangeAsync already applies -- rather than
     /// being blocked outright, since a treating clinician legitimately
     /// needs their own productivity/schedule numbers.</summary>
-    private static bool IsCaseloadNarrowed(ICurrentUser actor) => actor.Role is UserRole.Therapist or UserRole.Assistant;
+    private static bool IsCaseloadNarrowed(ICurrentUser actor) =>
+        AccessControl.Enabled && actor.Role is UserRole.Therapist or UserRole.Assistant;
 
     public async Task<NewPatientsDto> GetNewPatientsAsync(ICurrentUser actor, DateOnly from, DateOnly to, CancellationToken ct = default)
     {

@@ -1,4 +1,5 @@
 using PhysioTrac.Domain.Common;
+using PhysioTrac.Domain.Enums;
 
 namespace PhysioTrac.Domain.Entities;
 
@@ -16,6 +17,10 @@ public class Provider : BaseEntity
     public string LastName { get; set; } = string.Empty;
     public string? Specialty { get; set; }
     public string? Credentials { get; set; }
+
+    /// <summary>Drives scope-of-practice scheduling rules (a PTA can't be
+    /// booked for an evaluation, re-evaluation, or discharge visit).</summary>
+    public ProviderDiscipline Discipline { get; set; } = ProviderDiscipline.Other;
     public string? NpiNumber { get; set; }
     public bool IsActive { get; set; } = true;
     public bool OnlineBookingEnabled { get; set; } = true;

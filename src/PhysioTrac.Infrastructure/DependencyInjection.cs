@@ -17,6 +17,7 @@ using PhysioTrac.Application.Sessions;
 using PhysioTrac.Application.SuperAdmin;
 using PhysioTrac.Application.Tenancy;
 using PhysioTrac.Application.Users;
+using PhysioTrac.Infrastructure.Ai;
 using PhysioTrac.Infrastructure.Auditing;
 using PhysioTrac.Infrastructure.Identity;
 using PhysioTrac.Infrastructure.Persistence;
@@ -29,9 +30,12 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<EntityChangeAuditInterceptor>();
+        services.AddScoped<UserStampInterceptor>();
         services.AddDbContext<PhysioTracDbContext>((serviceProvider, options) =>
             options.UseSqlServer(configuration.GetConnectionString("Default"))
-                .AddInterceptors(serviceProvider.GetRequiredService<EntityChangeAuditInterceptor>()));
+                .AddInterceptors(
+                    serviceProvider.GetRequiredService<UserStampInterceptor>(),
+                    serviceProvider.GetRequiredService<EntityChangeAuditInterceptor>()));
         services.AddMemoryCache();
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUserAccessor>();
@@ -49,11 +53,28 @@ public static class DependencyInjection
         services.AddScoped<IPrivilegedAccessService, PrivilegedAccessService>();
         services.AddScoped<IAvailabilityService, AvailabilityService>();
         services.AddScoped<IAppointmentService, AppointmentService>();
+        services.AddScoped<IScheduleService, ScheduleService>();
+        services.AddScoped<IProviderAvailabilityService, ProviderAvailabilityService>();
         services.AddScoped<IReminderService, NoOpReminderService>();
         services.AddScoped<IClinicalNoteService, ClinicalNoteService>();
+        services.AddScoped<IDocumentationTemplateService, DocumentationTemplateService>();
+        services.AddScoped<ISpecialTestLibraryService, SpecialTestLibraryService>();
+        services.AddScoped<IInterventionLibraryService, InterventionLibraryService>();
+        services.AddScoped<ISignatureVerifier, PasswordSignatureVerifier>();
         services.AddScoped<IClinicalTemplateService, ClinicalTemplateService>();
         services.AddScoped<IFunctionalGoalService, FunctionalGoalService>();
         services.AddScoped<IOutcomeScoreService, OutcomeScoreService>();
+        // AI drafting: provider chosen in config ("Mock" by default, "None" = off).
+        var aiProvider = configuration.GetSection(DocumentationAiOptions.SectionName).Get<DocumentationAiOptions>()?.Provider ?? "Mock";
+        switch (aiProvider.Trim().ToLowerInvariant())
+        {
+            case "mock": services.AddSingleton<IDocumentationAiProvider, MockDocumentationAiProvider>(); break;
+            case "none" or "": break;
+            default: throw new InvalidOperationException($"Unknown DocumentationAi:Provider '{aiProvider}' (use Mock or None).");
+        }
+        services.AddScoped<IDocumentationAiService>(sp => new DocumentationAiService(
+            sp.GetRequiredService<IClinicalNoteService>(), sp.GetRequiredService<ITenantAccessService>(),
+            sp.GetRequiredService<IAuditService>(), sp.GetService<IDocumentationAiProvider>()));
         services.AddScoped<IPublicBookingService, PublicBookingService>();
         services.AddScoped<IPortalBookingService, PortalBookingService>();
         services.AddScoped<IChargeService, ChargeService>();
@@ -63,6 +84,8 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IPlatformDashboardService, PlatformDashboardService>();
         services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddSingleton<IExerciseImageProcessor, PhysioTrac.Infrastructure.Media.SkiaExerciseImageProcessor>();
+        services.AddScoped<IExerciseLibraryService, ExerciseLibraryService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConsentService, ConsentService>();
         services.AddScoped<IConsentTemplateService, ConsentTemplateService>();

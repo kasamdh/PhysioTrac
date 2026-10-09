@@ -23,6 +23,19 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Role-based access control can be switched OFF while the product is being
+// built (AccessControl:Enabled=false in appsettings.Development.json) --
+// every staff login then has full access to every module. Never allowed
+// outside Development: refuse to start rather than run a real deployment
+// with role checks disabled.
+AccessControl.Enabled = builder.Configuration.GetValue("AccessControl:Enabled", true);
+if (!AccessControl.Enabled && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "AccessControl:Enabled is false, which is only allowed in Development. " +
+        "Remove the setting (or set it to true) before running in " + builder.Environment.EnvironmentName + ".");
+}
+
 const string FrontendCorsPolicy = "Frontend";
 
 builder.Host.UseSerilog((context, services, configuration) => configuration
@@ -208,6 +221,23 @@ if (app.Environment.IsDevelopment())
     await db.Database.MigrateAsync();
     await DemoDataSeeder.SeedAsync(scope.ServiceProvider);
 }
+
+// System documentation templates are reference data (no patient data), kept
+// current in every environment -- once the schema is up to date.
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<PhysioTracDbContext>();
+    if (!(await db.Database.GetPendingMigrationsAsync()).Any())
+    {
+        await SystemTemplateSeeder.SeedAsync(db);
+        await SpecialTestSeeder.SeedAsync(db);
+        await InterventionLibrarySeeder.SeedAsync(db);
+        await ExerciseLibrarySeeder.SeedAsync(db);
+    }
+}
+
+// Access control OFF: give the platform SuperAdmin a clinic to work in.
+await AccessControlStartup.ResolveSuperAdminOrganizationAsync(app.Services);
 
 if (app.Environment.IsDevelopment())
 {

@@ -68,7 +68,9 @@ public record UpdatePatientRequest(
     Guid? PrimaryLocationId,
     Guid? PrimaryCareProviderId,
     Guid? ReferringProviderId,
-    PatientStatus Status);
+    PatientStatus Status,
+    // Optional so older callers keep working; null leaves the date unchanged.
+    DateOnly? DateOfBirth = null);
 
 /// <summary>Query parameters for GET /api/v1/patients -- all optional.
 /// SortBy is a small fixed vocabulary ("lastName" default, "createdAt",

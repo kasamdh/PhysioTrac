@@ -419,6 +419,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<int?>("DefaultNoteType")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
@@ -503,7 +506,88 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId", "CreatedAt");
 
+                    b.HasIndex("ObjectId", "Action", "CreatedAt");
+
                     b.ToTable("AuditEvents");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.BodyChartFinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Annotation")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FindingType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RadiatesTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int?>("Severity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("View")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal>("X")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<decimal>("Y")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("NoteId", "Order");
+
+                    b.ToTable("BodyChartFindings");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.BookingConfiguration", b =>
@@ -513,6 +597,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("AllowAnyAvailableTherapist")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("AllowDoubleBookOverride")
                         .HasColumnType("bit");
 
                     b.Property<bool>("AllowNewPatients")
@@ -550,6 +637,12 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("SlotIntervalMinutes")
                         .HasColumnType("int");
+
+                    b.Property<int>("StaffSlotMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("TherapistsMayReschedule")
+                        .HasColumnType("bit");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
@@ -932,6 +1025,13 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AmendmentReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("AmendsNoteId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("AppointmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -949,6 +1049,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("DiagnosisSnapshot")
                         .HasColumnType("nvarchar(max)");
@@ -988,6 +1091,12 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateOnly?>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("PeriodStart")
+                        .HasColumnType("date");
+
                     b.Property<string>("Plan")
                         .HasColumnType("nvarchar(max)");
 
@@ -1000,14 +1109,33 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("PlanOfCareEnd")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("PlanOfCareId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateOnly?>("PlanOfCareStart")
                         .HasColumnType("date");
 
                     b.Property<string>("PrecautionsSnapshot")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("PrefillReviewedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("PrefillReviewedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("PrefilledAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("PrefilledById")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateOnly?>("ReassessmentDue")
                         .HasColumnType("date");
+
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -1035,8 +1163,8 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("Subjective")
                         .HasColumnType("nvarchar(max)");
@@ -1045,13 +1173,40 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("SupervisingProviderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TemplateVersionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TherapistId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TreatingProviderId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("VoidedById")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("AmendsNoteId");
 
                     b.HasIndex("AppointmentId")
                         .IsUnique()
@@ -1059,13 +1214,125 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PlanOfCareCertifyingProviderId");
 
+                    b.HasIndex("PlanOfCareId");
+
+                    b.HasIndex("SupervisingProviderId");
+
+                    b.HasIndex("TemplateVersionId");
+
                     b.HasIndex("PatientId", "ServiceDate");
 
                     b.HasIndex("Status", "ReassessmentDue");
 
+                    b.HasIndex("Status", "ServiceDate");
+
                     b.HasIndex("TherapistId", "ServiceDate");
 
+                    b.HasIndex("TreatingProviderId", "ServiceDate");
+
                     b.ToTable("ClinicalNotes");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteFieldValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("FieldId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool?>("ValueBool")
+                        .HasColumnType("bit");
+
+                    b.Property<DateOnly?>("ValueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ValueJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("ValueNumber")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("ValueText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<TimeOnly?>("ValueTime")
+                        .HasColumnType("time");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FieldId");
+
+                    b.HasIndex("NoteId", "FieldKey")
+                        .IsUnique();
+
+                    b.ToTable("ClinicalNoteFieldValues");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteStatusChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ChangedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId", "CreatedAt");
+
+                    b.ToTable("ClinicalNoteStatusChanges");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplate", b =>
@@ -1080,7 +1347,14 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CreatedById")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystem")
                         .HasColumnType("bit");
 
                     b.Property<Guid?>("LocationId")
@@ -1113,13 +1387,25 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
 
+                    b.Property<string>("Specialty")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("State")
                         .HasMaxLength(2)
                         .HasColumnType("nchar(2)")
                         .IsFixedLength();
 
+                    b.Property<string>("TemplateKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Version")
                         .HasColumnType("int");
@@ -1128,9 +1414,219 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("LocationId");
 
+                    b.HasIndex("TemplateKey");
+
                     b.HasIndex("OrganizationId", "NoteType", "Scope", "State", "LocationId", "IsActive");
 
                     b.ToTable("ClinicalNoteTemplates");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateAppointmentType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AppointmentTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentTypeId");
+
+                    b.HasIndex("TemplateId", "AppointmentTypeId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicalNoteTemplateAppointmentTypes");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateField", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ConditionJson")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ConfigJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("HelpText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NoteColumn")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Placeholder")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ValidationJson")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SectionId", "DisplayOrder");
+
+                    b.HasIndex("VersionId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("ClinicalNoteTemplateFields");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateSection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Component")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("HelpText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VersionId", "DisplayOrder");
+
+                    b.HasIndex("VersionId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("ClinicalNoteTemplateSections");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ChangeSummary")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("ClinicalNoteTemplateVersions");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteVersion", b =>
@@ -1474,6 +1970,311 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.ToTable("DocumentShareLinks");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ElectronicSignature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Credentials")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DisplayTimeZone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Meaning")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("NoteVersionNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("SignedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SignerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("SignerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SignerUserId");
+
+                    b.HasIndex("NoteId", "SignedAt");
+
+                    b.ToTable("ElectronicSignatures");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Exercise", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BodyRegion")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("BreathingInstructions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("ClinicalPurpose")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("CommonMistakes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Contraindications")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Difficulty")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EndingPosition")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Equipment")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Laterality")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<bool>("NeedsClinicalReview")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PatientDescription")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Progressions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Regressions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReviewedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SafetyPrecautions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("StartingPosition")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("TargetMuscles")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VideoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[OrganizationId] IS NULL");
+
+                    b.HasIndex("OrganizationId", "Code")
+                        .IsUnique()
+                        .HasFilter("[OrganizationId] IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "IsActive", "BodyRegion");
+
+                    b.ToTable("Exercises");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ExerciseMedia", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AltText")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExerciseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OriginalFileName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ReplacedByMediaId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SourceAttribution")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ThumbnailStorageKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExerciseId", "RetiredAt", "Sequence");
+
+                    b.ToTable("ExerciseMedia");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.FunctionalGoal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1492,6 +2293,10 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("BaselineValue")
                         .HasPrecision(8, 2)
                         .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -1513,6 +2318,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PlanOfCareId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("RowVersion")
@@ -1548,11 +2356,80 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PlanOfCareId");
 
                     b.HasIndex("PatientId", "Status", "TargetDate");
 
                     b.ToTable("FunctionalGoals");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.FunctionalGoalHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("CurrentValue")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("GoalVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid?>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("ProgressPercent")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("RecordedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId");
+
+                    b.HasIndex("GoalId", "CreatedAt");
+
+                    b.ToTable("FunctionalGoalHistory", (string)null);
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.HomeExerciseItem", b =>
@@ -1782,6 +2659,219 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.ToTable("IntakeFormTemplates");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.InterventionGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId", "IsActive");
+
+                    b.ToTable("InterventionGroups");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.InterventionGroupItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("CptCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Duration")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Equipment")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsTimed")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LibraryItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Position")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("Repetitions")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Resistance")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int?>("Sets")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LibraryItemId");
+
+                    b.HasIndex("GroupId", "Order");
+
+                    b.ToTable("InterventionGroupItems");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.InterventionLibraryItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BodyRegion")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("CptCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DefaultDuration")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("DefaultEquipment")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DefaultPosition")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("DefaultRepetitions")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DefaultResistance")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("DefaultSets")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsTimed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("Category", "IsActive");
+
+                    b.ToTable("InterventionLibraryItems");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Location", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1982,31 +3072,142 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.ToTable("NoteAddenda");
                 });
 
-            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteIntervention", b =>
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteAttachment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("BodyRegion")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Category")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                    b.Property<string>("Caption")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("Description")
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PatientDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientDocumentId");
+
+                    b.HasIndex("NoteId", "PatientDocumentId")
+                        .IsUnique();
+
+                    b.ToTable("NoteAttachments");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteCosignRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RequestedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResolutionComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ResolvedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("SupervisorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId");
+
+                    b.HasIndex("Status", "SupervisorUserId");
+
+                    b.ToTable("NoteCosignRequests");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteGoalProgress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("BaselineValue")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("CurrentValue")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("FunctionalLimitation")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsTimed")
+                    b.Property<string>("FunctionalTask")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("GoalVersion")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IncludeInNarrative")
                         .HasColumnType("bit");
 
-                    b.Property<int>("Minutes")
-                        .HasColumnType("int");
+                    b.Property<string>("MeasurementMethod")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("NoteId")
                         .HasColumnType("uniqueidentifier");
@@ -2014,14 +3215,165 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("int");
 
-                    b.Property<string>("PatientResponse")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<decimal?>("PreviousValue")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateOnly>("TargetDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("TargetValue")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("Term")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoalId");
+
+                    b.HasIndex("NoteId", "GoalId")
+                        .IsUnique();
+
+                    b.ToTable("NoteGoalProgress", (string)null);
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteIntervention", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AssistanceLevel")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("BodyRegion")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid?>("CarriedForwardFromNoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("CarryForwardReviewed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("CptCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Cueing")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Distance")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Duration")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<TimeOnly?>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Equipment")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsTimed")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LibraryItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Modification")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PainAfter")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PainBefore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PatientResponse")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Position")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("Repetitions")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Resistance")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int?>("Sets")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly?>("StartTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<int?>("Units")
                         .HasColumnType("int");
@@ -2031,9 +3383,118 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CarriedForwardFromNoteId");
+
+                    b.HasIndex("LibraryItemId");
+
                     b.HasIndex("NoteId");
 
                     b.ToTable("NoteInterventions");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ObjectiveMeasurement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AssistanceLevel")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("AssistiveDevice")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("BodyRegion")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Compensation")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Condition")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EndFeel")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Item")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Mode")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Movement")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("NumericValue")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("Painful")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Side")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Surface")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("TextValue")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId", "Order");
+
+                    b.HasIndex("PatientId", "Category");
+
+                    b.ToTable("ObjectiveMeasurements");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Organization", b =>
@@ -2053,6 +3514,9 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("ArchivedById")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AutoCreatePendingCharges")
+                        .HasColumnType("bit");
 
                     b.Property<string>("CancellationReason")
                         .HasColumnType("nvarchar(max)");
@@ -2200,6 +3664,10 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Interpretation")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("ItemResponsesJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -2249,6 +3717,105 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("OutcomeScores");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PainAssessment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("AfterTreatment")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<string>("AggravatingFactors")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal?>("BeforeTreatment")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<decimal?>("Best")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("Current")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<string>("DailyPattern")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Duration")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("EasingFactors")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Frequency")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("FunctionalImpact")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Irritability")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Qualities")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Scale")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("SleepImpact")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("Worst")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId")
+                        .IsUnique();
+
+                    b.HasIndex("PatientId");
+
+                    b.ToTable("PainAssessments");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Patient", b =>
@@ -2938,6 +4505,112 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.ToTable("PaymentRecords");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PlanOfCare", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("CertifiedDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("CertifyingProviderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("DischargeNoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DischargeReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("DurationWeeks")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("FrequencyPerWeek")
+                        .HasColumnType("int");
+
+                    b.Property<string>("HomeProgram")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("PatientEducation")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PlannedInterventions")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid?>("PreviousPlanOfCareId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Prognosis")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Referrals")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RehabPotential")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SourceNoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TreatmentDiagnosis")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CertifyingProviderId");
+
+                    b.HasIndex("PreviousPlanOfCareId");
+
+                    b.HasIndex("SourceNoteId");
+
+                    b.HasIndex("PatientId", "Status");
+
+                    b.HasIndex("Status", "EndDate");
+
+                    b.ToTable("PlansOfCare");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.PrivilegedAccessGrant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2996,6 +4669,11 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Credentials")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Discipline")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -3137,6 +4815,43 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProviderId", "LocationId", "DayOfWeek");
 
                     b.ToTable("ProviderAvailabilities");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ProviderFavorite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "ItemType", "ItemId")
+                        .IsUnique();
+
+                    b.ToTable("ProviderFavorites");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ProviderLicense", b =>
@@ -3416,6 +5131,166 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasFilter("[LocationId] IS NOT NULL");
 
                     b.ToTable("ServicePrices");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.SpecialTestDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BodyRegion")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("ContraindicationWarning")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("InterpretationGuide")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("ResultKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Specialty")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("Specialty", "IsActive");
+
+                    b.ToTable("SpecialTestDefinitions");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.SpecialTestResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BodyRegion")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Interpretation")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("NumericValue")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Side")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Specialty")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("TestName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId");
+
+                    b.HasIndex("NoteId", "Order");
+
+                    b.HasIndex("PatientId", "TestName");
+
+                    b.ToTable("SpecialTestResults");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Superbill", b =>
@@ -3879,6 +5754,17 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.BodyChartFinding", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.BookingConfiguration", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
@@ -4052,6 +5938,11 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNote", b =>
                 {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "AmendsNote")
+                        .WithMany()
+                        .HasForeignKey("AmendsNoteId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PhysioTrac.Domain.Entities.Appointment", "Appointment")
                         .WithOne()
                         .HasForeignKey("PhysioTrac.Domain.Entities.ClinicalNote", "AppointmentId")
@@ -4068,11 +5959,71 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PlanOfCareCertifyingProviderId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("PhysioTrac.Domain.Entities.PlanOfCare", "PlanOfCare")
+                        .WithMany()
+                        .HasForeignKey("PlanOfCareId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Provider", "SupervisingProvider")
+                        .WithMany()
+                        .HasForeignKey("SupervisingProviderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNoteTemplateVersion", "TemplateVersion")
+                        .WithMany()
+                        .HasForeignKey("TemplateVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Provider", "TreatingProvider")
+                        .WithMany()
+                        .HasForeignKey("TreatingProviderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AmendsNote");
+
                     b.Navigation("Appointment");
 
                     b.Navigation("Patient");
 
+                    b.Navigation("PlanOfCare");
+
                     b.Navigation("PlanOfCareCertifyingProvider");
+
+                    b.Navigation("SupervisingProvider");
+
+                    b.Navigation("TemplateVersion");
+
+                    b.Navigation("TreatingProvider");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteFieldValue", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNoteTemplateField", "Field")
+                        .WithMany()
+                        .HasForeignKey("FieldId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany("FieldValues")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Field");
+
+                    b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteStatusChange", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany("StatusChanges")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Note");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplate", b =>
@@ -4090,6 +6041,66 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("LocationDetail");
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateAppointmentType", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.AppointmentType", "AppointmentType")
+                        .WithMany()
+                        .HasForeignKey("AppointmentTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNoteTemplate", "Template")
+                        .WithMany("AppointmentTypes")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppointmentType");
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateField", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNoteTemplateSection", "Section")
+                        .WithMany("Fields")
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNoteTemplateVersion", "Version")
+                        .WithMany("Fields")
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Section");
+
+                    b.Navigation("Version");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateSection", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNoteTemplateVersion", "Version")
+                        .WithMany("Sections")
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Version");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateVersion", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNoteTemplate", "Template")
+                        .WithMany("Versions")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Template");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteVersion", b =>
@@ -4161,6 +6172,36 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("PatientDocument");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ElectronicSignature", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany("Signatures")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Exercise", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ExerciseMedia", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.Exercise", "Exercise")
+                        .WithMany("Media")
+                        .HasForeignKey("ExerciseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Exercise");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.FunctionalGoal", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
@@ -4169,7 +6210,24 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("PhysioTrac.Domain.Entities.PlanOfCare", "PlanOfCare")
+                        .WithMany()
+                        .HasForeignKey("PlanOfCareId");
+
                     b.Navigation("Patient");
+
+                    b.Navigation("PlanOfCare");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.FunctionalGoalHistory", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.FunctionalGoal", "Goal")
+                        .WithMany()
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Goal");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.HomeExerciseItem", b =>
@@ -4238,6 +6296,24 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.InterventionGroupItem", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.InterventionGroup", "Group")
+                        .WithMany("Items")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.InterventionLibraryItem", "LibraryItem")
+                        .WithMany()
+                        .HasForeignKey("LibraryItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Group");
+
+                    b.Navigation("LibraryItem");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Location", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
@@ -4290,12 +6366,79 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Note");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteAttachment", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.PatientDocument", "PatientDocument")
+                        .WithMany()
+                        .HasForeignKey("PatientDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+
+                    b.Navigation("PatientDocument");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteCosignRequest", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteGoalProgress", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.FunctionalGoal", "Goal")
+                        .WithMany()
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Goal");
+
+                    b.Navigation("Note");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.NoteIntervention", b =>
                 {
+                    b.HasOne("PhysioTrac.Domain.Entities.InterventionLibraryItem", "LibraryItem")
+                        .WithMany()
+                        .HasForeignKey("LibraryItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
                         .WithMany("InterventionItems")
                         .HasForeignKey("NoteId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("LibraryItem");
+
+                    b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ObjectiveMeasurement", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Note");
@@ -4317,6 +6460,17 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Note");
 
                     b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PainAssessment", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Note");
                 });
 
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Patient", b =>
@@ -4508,6 +6662,39 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Superbill");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.PlanOfCare", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.ReferringProvider", "CertifyingProvider")
+                        .WithMany()
+                        .HasForeignKey("CertifyingProviderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhysioTrac.Domain.Entities.PlanOfCare", "PreviousPlanOfCare")
+                        .WithMany()
+                        .HasForeignKey("PreviousPlanOfCareId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "SourceNote")
+                        .WithMany()
+                        .HasForeignKey("SourceNoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CertifyingProvider");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("PreviousPlanOfCare");
+
+                    b.Navigation("SourceNote");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.PrivilegedAccessGrant", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.Organization", "Organization")
@@ -4637,6 +6824,24 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.SpecialTestResult", b =>
+                {
+                    b.HasOne("PhysioTrac.Domain.Entities.SpecialTestDefinition", "Definition")
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PhysioTrac.Domain.Entities.ClinicalNote", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Definition");
+
+                    b.Navigation("Note");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.Superbill", b =>
                 {
                     b.HasOne("PhysioTrac.Domain.Entities.Patient", "Patient")
@@ -4716,12 +6921,47 @@ namespace PhysioTrac.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Addenda");
 
+                    b.Navigation("FieldValues");
+
                     b.Navigation("InterventionItems");
+
+                    b.Navigation("Signatures");
+
+                    b.Navigation("StatusChanges");
 
                     b.Navigation("Versions");
                 });
 
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplate", b =>
+                {
+                    b.Navigation("AppointmentTypes");
+
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateSection", b =>
+                {
+                    b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.ClinicalNoteTemplateVersion", b =>
+                {
+                    b.Navigation("Fields");
+
+                    b.Navigation("Sections");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.Exercise", b =>
+                {
+                    b.Navigation("Media");
+                });
+
             modelBuilder.Entity("PhysioTrac.Domain.Entities.HomeExerciseProgram", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("PhysioTrac.Domain.Entities.InterventionGroup", b =>
                 {
                     b.Navigation("Items");
                 });

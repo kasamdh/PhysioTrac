@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using PhysioTrac.Application.Auth;
 using PhysioTrac.Application.Clinical;
 using PhysioTrac.Application.Common;
-using PhysioTrac.Domain.Entities;
 
 namespace PhysioTrac.Api.Controllers;
 
@@ -21,13 +20,17 @@ public class OutcomesController : ControllerBase
         _outcomes = outcomes;
     }
 
+    /// <summary>The measures that can be recorded: items, response options,
+    /// scoring method, interpretation bands and meaningful-change values.</summary>
+    [HttpGet("measures")]
+    public IActionResult Measures() => Ok(OutcomeMeasureCatalog.All);
+
     [HttpGet("patient/{patientId:guid}")]
     public async Task<IActionResult> ListForPatient(Guid patientId)
     {
         try
         {
-            var scores = await _outcomes.ListForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted);
-            return Ok(scores.Select(ToDto));
+            return Ok(await _outcomes.ListDtosForPatientAsync(patientId, _currentUser, HttpContext.RequestAborted));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
     }
@@ -38,11 +41,23 @@ public class OutcomesController : ControllerBase
         try
         {
             var score = await _outcomes.RecordAsync(request, _currentUser, HttpContext.RequestAborted);
-            return CreatedAtAction(nameof(ListForPatient), new { patientId = score.PatientId }, ToDto(score));
+            return CreatedAtAction(nameof(ListForPatient), new { patientId = score.PatientId }, OutcomeScoreMapper.ToDto(score, false));
         }
         catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
         catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
     }
 
-    private static OutcomeScoreDto ToDto(OutcomeScore o) => new(o.Id, o.PatientId, o.NoteId, o.RecordedById, o.Measure, o.MeasuredOn, o.Score, o.MaximumScore);
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        try
+        {
+            await _outcomes.DeleteAsync(id, _currentUser, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
 }

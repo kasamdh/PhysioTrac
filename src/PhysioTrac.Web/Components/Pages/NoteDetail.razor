@@ -155,6 +155,10 @@ else
                 <input type="checkbox" @bind="_attestationConfirmed" />
                 I confirm this note has been reviewed and is ready to sign.
             </label>
+            <label class="mb-3 block text-sm">
+                Your password (required to sign)
+                <input type="password" class="field-input mt-1" autocomplete="current-password" @bind="_signPassword" />
+            </label>
             @if (_signError is not null)
             {
                 <p class="alert-error mb-3">@_signError</p>
@@ -168,6 +172,10 @@ else
         <div class="card mt-4">
             <h3 class="section-title">Cosignature required</h3>
             <p class="mb-3 text-sm text-text-muted">This note was signed by the treating assistant and awaits a supervising cosignature.</p>
+            <label class="mb-3 block text-sm">
+                Your password (required to cosign)
+                <input type="password" class="field-input mt-1" autocomplete="current-password" @bind="_signPassword" />
+            </label>
             @if (_signError is not null)
             {
                 <p class="alert-error mb-3">@_signError</p>
@@ -225,6 +233,7 @@ else
     private string? _saveError;
 
     private bool _attestationConfirmed;
+    private string? _signPassword;
     private string? _signError;
 
     private string _newInterventionDescription = string.Empty;
@@ -309,7 +318,7 @@ else
             // controller does (it's a persistent circuit, not one request);
             // null here is an honest gap, not a workaround -- the React/API
             // sign path (NotesController) does capture the real IP.
-            await NoteService.SignNoteAsync(NoteId, _attestationConfirmed, ipAddress: null, CurrentUser);
+            await NoteService.SignNoteAsync(NoteId, _attestationConfirmed, ipAddress: null, CurrentUser, _signPassword);
         }
         catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
         {
@@ -324,7 +333,7 @@ else
         _signError = null;
         try
         {
-            await NoteService.CosignNoteAsync(NoteId, CurrentUser);
+            await NoteService.CosignNoteAsync(NoteId, CurrentUser, _signPassword);
         }
         catch (Exception ex) when (ex is PhysioTrac.Application.Common.ForbiddenException or InvalidOperationException)
         {

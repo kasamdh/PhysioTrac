@@ -17,13 +17,19 @@ public enum NoteType
     PlanOfCare,
     DryNeedlingTreatment,
     PelvicHealthEvaluation,
+    Recertification,
+    Consultation,
+    Communication,
+    MissedVisit,
+    Addendum,
 }
 
 /// <summary>Locked is a further, manual step past Signed -- Signed already
 /// blocks direct edits (see EnforceSignedNoteImmutability) and still allows
 /// an addendum; Locked additionally blocks new addenda too (e.g. once a
-/// billing cycle closes on the note). Amended is defined but not yet wired
-/// to any transition -- pre-existing, unrelated to this phase's changes.</summary>
+/// billing cycle closes on the note). Amended: a signed note superseded by
+/// its signed formal amendment (ClinicalNote.AmendsNoteId) -- content and
+/// signature unchanged, still part of the legal record.</summary>
 public enum NoteStatus
 {
     Draft,
@@ -31,6 +37,15 @@ public enum NoteStatus
     Signed,
     Amended,
     Locked,
+    /// <summary>A supervising PT sent an assistant's submitted note back
+    /// with a reason; the assistant edits it again and resubmits.</summary>
+    ReturnedForCorrection,
+    /// <summary>Withdrawn with a reason (e.g. documented on the wrong
+    /// patient). Kept, never deleted; excluded from the active record.</summary>
+    Voided,
+    /// <summary>A supervising PT has started reviewing a submitted
+    /// (ReviewRequired) note; they cosign it or return it for correction.</summary>
+    InReview,
 }
 
 public enum InterventionCategory
@@ -43,14 +58,24 @@ public enum InterventionCategory
     SelfCare,
     PatientEducation,
     Other,
+    CanalithRepositioning,
+    Modalities,
+    DryNeedling,
+    HomeExerciseProgram,
 }
 
+/// <summary>A goal's state. Draft goals await a PT's approval; approved
+/// goals are Not Started, In Progress (Active), Met, Partially Met or
+/// Discontinued. Values are stored, so new states are appended.</summary>
 public enum GoalStatus
 {
     Draft,
+    /// <summary>In progress.</summary>
     Active,
     Met,
     Discontinued,
+    NotStarted,
+    PartiallyMet,
 }
 
 public enum GoalTerm
@@ -80,4 +105,7 @@ public enum OutcomeMeasure
     Tug,
     Berg,
     Psfs,
+    FiveTimesSitToStand,
+    Abc,
+    Fga,
 }

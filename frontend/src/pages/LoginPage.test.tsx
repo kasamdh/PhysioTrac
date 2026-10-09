@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { LoginPage } from "./LoginPage";
 import { useAuth } from "../features/auth/AuthProvider";
+import { clearLastLogout, recordLogout } from "../features/auth/lastLogout";
 
 vi.mock("../features/auth/AuthProvider", () => ({
   useAuth: vi.fn(),
@@ -42,10 +43,10 @@ describe("LoginPage", () => {
     });
 
     renderLoginPage();
-    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^login$/i }));
 
-    expect(await screen.findByText(/username is required/i)).toBeInTheDocument();
-    expect(await screen.findByText(/password is required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/login user id is required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/login password is required/i)).toBeInTheDocument();
     expect(signIn).not.toHaveBeenCalled();
   });
 
@@ -61,9 +62,9 @@ describe("LoginPage", () => {
     });
 
     renderLoginPage();
-    await userEvent.type(screen.getByLabelText(/username/i), "admin");
-    await userEvent.type(screen.getByLabelText(/password/i), "DemoPass123!");
-    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await userEvent.type(screen.getByLabelText(/login user id/i), "admin");
+    await userEvent.type(screen.getByLabelText(/login password/i), "DemoPass123!");
+    await userEvent.click(screen.getByRole("button", { name: /^login$/i }));
 
     await waitFor(() => expect(signIn).toHaveBeenCalledWith({ username: "admin", password: "DemoPass123!" }));
   });
@@ -80,5 +81,38 @@ describe("LoginPage", () => {
 
     renderLoginPage();
     expect(screen.getByText("Invalid username or password.")).toBeInTheDocument();
+  });
+
+  it("toggles password visibility with the eye button", async () => {
+    renderLoginPage();
+    const input = screen.getByLabelText(/login password/i);
+    expect(input).toHaveAttribute("type", "password");
+    await userEvent.click(screen.getByRole("button", { name: /show password/i }));
+    expect(input).toHaveAttribute("type", "text");
+    await userEvent.click(screen.getByRole("button", { name: /hide password/i }));
+    expect(input).toHaveAttribute("type", "password");
+  });
+
+  it("confirms a successful logout once, with the time", () => {
+    recordLogout("user");
+    const { unmount } = renderLoginPage();
+    expect(screen.getByRole("status")).toHaveTextContent(/^Successful Logout at \d{1,2}\/\d{1,2}\/\d{4} \d{1,2}:\d{2}\s?[AP]M\.$/);
+    unmount();
+
+    // A later visit to /login doesn't repeat it.
+    renderLoginPage();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("says when the sign-out was for inactivity", () => {
+    recordLogout("idle");
+    renderLoginPage();
+    expect(screen.getByRole("status")).toHaveTextContent(/Signed out after a period of inactivity at/);
+  });
+
+  it("shows no logout notice on a normal visit", () => {
+    clearLastLogout();
+    renderLoginPage();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

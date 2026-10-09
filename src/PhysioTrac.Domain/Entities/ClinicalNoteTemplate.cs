@@ -63,4 +63,18 @@ public class ClinicalNoteTemplate : BaseEntity
     public bool IsActive { get; set; } = true;
 
     public Guid CreatedById { get; set; }
+
+    /// <summary>Stable identifier for system templates (e.g. "daily-soap"),
+    /// used to seed and find them; null for clinic-created templates.</summary>
+    public string? TemplateKey { get; set; }
+
+    /// <summary>Shipped with the application (read-only to clinics; copy to customize).</summary>
+    public bool IsSystem { get; set; }
+
+    public ClinicalSpecialty Specialty { get; set; } = ClinicalSpecialty.General;
+    public string? Description { get; set; }
+    public Guid? UpdatedById { get; set; }
+
+    public ICollection<ClinicalNoteTemplateVersion> Versions { get; set; } = new List<ClinicalNoteTemplateVersion>();
+    public ICollection<ClinicalNoteTemplateAppointmentType> AppointmentTypes { get; set; } = new List<ClinicalNoteTemplateAppointmentType>();
 }

@@ -3,7 +3,8 @@ using PhysioTrac.Domain.Enums;
 
 namespace PhysioTrac.Domain.Entities;
 
-/// <summary>Outcome-measure score and raw component data for deterministic trends.</summary>
+/// <summary>An outcome-measure score with its raw item responses (JSON list of
+/// OutcomeItemResponseDto, or "{}" when only a total was entered).</summary>
 public class OutcomeScore : BaseEntity
 {
     public Guid PatientId { get; set; }
@@ -20,4 +21,7 @@ public class OutcomeScore : BaseEntity
     public decimal? MaximumScore { get; set; }
     public string ItemResponsesJson { get; set; } = "{}";
     public string? Notes { get; set; }
+
+    /// <summary>The interpretation shown when the score was recorded.</summary>
+    public string? Interpretation { get; set; }
 }

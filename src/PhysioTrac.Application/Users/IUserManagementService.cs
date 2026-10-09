@@ -25,6 +25,13 @@ public interface IUserManagementService
     Task<StaffUserDto> DeactivateAsync(ICurrentUser actor, Guid userId, string? reason, CancellationToken ct = default);
 
     Task<StaffUserDto> ActivateAsync(ICurrentUser actor, Guid userId, CancellationToken ct = default);
+
+    /// <summary>Administration › Users › Edit User: user ID, name, email,
+    /// access level, status (Active / Suspended / Deleted) and, optionally, a
+    /// new password. An admin can't change their own status or access level.
+    /// Suspending, deleting or resetting the password signs the user out
+    /// everywhere.</summary>
+    Task<StaffUserDto> UpdateAsync(ICurrentUser actor, Guid userId, UpdateUserRequest request, CancellationToken ct = default);
 }
 
 public record StaffUserDto(
@@ -32,3 +39,7 @@ public record StaffUserDto(
     UserRole Role, UserStatus Status, bool MustChangePassword);
 
 public record InviteUserRequest(string FirstName, string LastName, string Email, UserRole Role);
+
+/// <param name="NewPassword">Blank/null keeps the current password.</param>
+public record UpdateUserRequest(
+    string UserName, string FirstName, string LastName, string? Email, UserRole Role, UserStatus Status, string? NewPassword);

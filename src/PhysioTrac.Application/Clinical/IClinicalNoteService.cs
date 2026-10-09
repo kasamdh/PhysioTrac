@@ -48,7 +48,19 @@ public interface IClinicalNoteService
     /// the signer's credentials-at-signing-time, ipAddress, and a content
     /// hash on the note itself, and writes the final immutable
     /// ClinicalNoteVersion snapshot.</summary>
-    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, CancellationToken ct = default);
+    /// <param name="password">The signer's own password (step-up); a missing or
+    /// wrong one throws <see cref="SignatureVerificationException"/>.</param>
+    Task<ClinicalNote> SignNoteAsync(Guid noteId, bool attestationConfirmed, string? ipAddress, ICurrentUser actor, string? password = null,
+        int? expectedSaveVersion = null, CancellationToken ct = default);
+
+    /// <summary>A supervising PT starts reviewing a submitted note (ReviewRequired -> InReview).</summary>
+    Task<ClinicalNote> StartReviewAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>A supervising PT returns a submitted note to its author with a reason.</summary>
+    Task<ClinicalNote> ReturnForCorrectionAsync(Guid noteId, string reason, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Voids a note with a reason (password for a signed note).</summary>
+    Task<ClinicalNote> VoidNoteAsync(Guid noteId, VoidNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
 
     /// <summary>A further, manual step past Signed that additionally blocks
     /// new addenda -- see NoteStatus.Locked's own doc comment.</summary>
@@ -61,7 +73,8 @@ public interface IClinicalNoteService
 
     /// <summary>Completes a PTA-authored note awaiting cosign. Caller must
     /// have already checked <see cref="CanCosignNote"/>.</summary>
-    Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+    /// <param name="password">The cosigner's own password (step-up).</param>
+    Task<ClinicalNote> CosignNoteAsync(Guid noteId, ICurrentUser actor, string? password = null, CancellationToken ct = default);
 
     /// <summary>Attach a correction to a signed note. The original note is never touched.</summary>
     Task<NoteAddendum> CreateAddendumAsync(Guid noteId, CreateAddendumRequest request, ICurrentUser actor, CancellationToken ct = default);
@@ -85,4 +98,93 @@ public interface IClinicalNoteService
     /// <summary>Whether a progress note is due for this patient right now.
     /// See ProgressNoteStatusDto's own doc comment.</summary>
     Task<ProgressNoteStatusDto> GetProgressNoteStatusAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Clinical Charting: edit an intervention row on a draft note.</summary>
+    Task<NoteIntervention> UpdateInterventionAsync(Guid noteId, Guid interventionId, CreateInterventionRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Clinical Charting: remove an intervention row from a draft note.</summary>
+    Task DeleteInterventionAsync(Guid noteId, Guid interventionId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Total timed minutes and the organization's 8-minute-rule units.</summary>
+    Task<InterventionSummaryDto> SummarizeInterventionsAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>A formal amendment may be started on a Signed (not Locked)
+    /// note by whoever could sign it.</summary>
+    bool CanAmendNote(ICurrentUser user, ClinicalNote note);
+
+    /// <summary>Starts (or returns the already-open) formal amendment of a
+    /// signed note: a new draft copied from it -- narrative, structured
+    /// findings and interventions -- carrying the reason. Signing that draft
+    /// supersedes the original (Status Amended); the original never changes.</summary>
+    Task<ClinicalNote> CreateAmendmentAsync(Guid noteId, CreateAmendmentRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Actions, people, addenda and amendment links for one note.</summary>
+    Task<NoteRecordDto> GetNoteRecordAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Version history with the saver's name on each version.</summary>
+    Task<IReadOnlyList<ClinicalNoteVersionDto>> GetVersionHistoryViewAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The current user's documentation work queues.</summary>
+    Task<NoteQueuesDto> GetNoteQueuesAsync(ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The note's electronic signatures and every status change.</summary>
+    Task<NoteHistoryDto> GetNoteHistoryAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The note opened as an encounter: template version, values, header facts.</summary>
+    Task<EncounterDto> GetEncounterAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Autosave of a draft encounter (template values + narrative),
+    /// refused with <see cref="EncounterConflictException"/> when someone
+    /// else saved since <see cref="SaveEncounterRequest.BaseSaveVersion"/>.</summary>
+    Task<EncounterSaveResultDto> SaveEncounterAsync(Guid noteId, SaveEncounterRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The encounter for an appointment: its note, or a new draft of
+    /// the visit's note type (one note per appointment). Refused for a
+    /// cancelled or no-show visit -- no treatment is documented for it.</summary>
+    /// <param name="missedVisit">For a cancelled or no-show visit: open a missed-visit note instead of a treatment note.</param>
+    Task<AppointmentEncounterDto> OpenAppointmentEncounterAsync(Guid appointmentId, ICurrentUser actor, CancellationToken ct = default,
+        bool missedVisit = false);
+
+    /// <summary>Every measurement on the patient's signed notes, oldest first (values exactly as recorded).</summary>
+    Task<IReadOnlyList<PatientMeasurementDto>> GetMeasurementHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Pain ratings from the patient's signed notes, oldest first.</summary>
+    Task<IReadOnlyList<PainHistoryPointDto>> GetPainHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The note's latest save (cheap; polled to warn about another editor).</summary>
+    /// <summary>The patient's episode summarized from signed charting (visits,
+    /// attendance, pain, measurements, outcomes, goals, comparisons).</summary>
+    Task<EpisodeSummaryDto> GetEpisodeSummaryAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Fills a progress / re-evaluation / recertification / discharge
+    /// note's empty fields from the episode summary. The note then can't be
+    /// signed until <see cref="ReviewPrefillAsync"/> confirms the review.</summary>
+    Task<PrefillResultDto> PrefillAsync(Guid noteId, PrefillNoteRequest request, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<ClinicalNote> ReviewPrefillAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The documentation dashboard for the caller's patients.</summary>
+    Task<DocumentationDashboardDto> GetDashboardAsync(DashboardFilter filter, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Records that the caller opened a note (at most once per five minutes per person).</summary>
+    Task RecordNoteViewAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Records a print or PDF export of a note ("print" / "export"); refused when the caller can't view it.</summary>
+    Task RecordNoteOutputAsync(Guid noteId, string kind, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Records a print or export of a patient report.</summary>
+    Task RecordPatientReportOutputAsync(Guid patientId, string report, string kind, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<IReadOnlyList<BodyChartHistoryDto>> GetBodyChartHistoryAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
+
+    Task<EncounterStatusDto> GetEncounterStatusAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Switches a draft to another template before any field is filled.</summary>
+    Task<ClinicalNote> ChangeTemplateAsync(Guid noteId, Guid templateId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>Documentation checks, including the template's required fields.</summary>
+    Task<IReadOnlyList<ComplianceFinding>> GetComplianceAsync(Guid noteId, ICurrentUser actor, CancellationToken ct = default);
+
+    /// <summary>The patient's plans of care, newest first.</summary>
+    Task<IReadOnlyList<PlanOfCareDto>> ListPlansOfCareAsync(Guid patientId, ICurrentUser actor, CancellationToken ct = default);
 }

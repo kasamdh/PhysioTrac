@@ -62,6 +62,19 @@ public class UsersController : ControllerBase
         catch (InvalidOperationException ex) { return Conflict(new { detail = ex.Message }); }
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserRequest request)
+    {
+        try
+        {
+            var user = await _users.UpdateAsync(_currentUser, id, request, HttpContext.RequestAborted);
+            return Ok(user);
+        }
+        catch (ForbiddenException ex) { return StatusCode(403, new { detail = ex.Message }); }
+        catch (NotFoundException ex) { return NotFound(new { detail = ex.Message }); }
+        catch (InvalidOperationException ex) { return UnprocessableEntity(new { detail = ex.Message }); }
+    }
+
     [HttpPatch("{id:guid}/deactivate")]
     public async Task<IActionResult> Deactivate(Guid id, [FromBody] DeactivateUserRequest? request)
     {

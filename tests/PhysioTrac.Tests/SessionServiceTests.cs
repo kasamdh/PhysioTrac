@@ -64,12 +64,30 @@ public class SessionServiceTests
     {
         var (db, service) = NewService();
         var session = await service.CreateSessionAsync(Guid.NewGuid(), Guid.NewGuid(), UserRole.Therapist, null, null);
+        session.LastActivityAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        await db.SaveChangesAsync();
         var originalActivity = session.LastActivityAt;
 
-        await Task.Delay(10);
         var result = await service.ValidateAndTouchAsync(session.SessionKey);
 
         Assert.NotNull(result);
         Assert.True(result!.LastActivityAt > originalActivity);
+    }
+
+    [Fact]
+    public async Task ValidateAndTouch_RecentlyTouched_DoesNotWriteAgain()
+    {
+        // Parallel requests from one browser all validate the same session;
+        // only one of them should write, or they collide on its RowVersion.
+        var (_, service) = NewService();
+        var session = await service.CreateSessionAsync(Guid.NewGuid(), Guid.NewGuid(), UserRole.Therapist, null, null);
+        var originalActivity = session.LastActivityAt;
+        var originalVersion = session.RowVersion;
+
+        var result = await service.ValidateAndTouchAsync(session.SessionKey);
+
+        Assert.NotNull(result);
+        Assert.Equal(originalActivity, result!.LastActivityAt);
+        Assert.Equal(originalVersion, result.RowVersion);
     }
 }

@@ -102,9 +102,11 @@ public class EntityChangeAuditInterceptorTests
         db.AuditEvents.Add(new AuditEvent { OrganizationId = org.Id, Action = "access.denied", ObjectType = "Patient" });
         await db.SaveChangesAsync();
 
-        var events = await db.AuditEvents.ToListAsync();
+        var events = await db.AuditEvents.Where(e => e.ObjectType != nameof(Organization)).ToListAsync();
         // Exactly the one manually-written row -- not a second row auditing
-        // the creation of the audit row itself.
+        // the creation of the audit row itself. (Creating the organization
+        // is itself logged, so it's left out of this count.)
         Assert.Single(events);
+        Assert.DoesNotContain(await db.AuditEvents.ToListAsync(), e => e.ObjectType == nameof(AuditEvent));
     }
 }
